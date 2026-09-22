@@ -4,9 +4,9 @@
 
 | Pole | Wartość |
 |---|---|
-| **Etap** | E0. Fundament i źródło SQL, zakończony, 12 z 12. E1 czeka na spisanie zadań |
-| **Ostatnio ukończone** | [YQM-10, YQM-11](01-fundament-i-sql.md): test integracyjny Active Record, cache, dwa połączenia i savepointy przy wyłączonym logowaniu i profilowaniu Yii; CI z MySQL i PostgreSQL jako services (pominięty test = czerwony przebieg), `README.md` z przykładem konfiguracji i instrukcją aplikacji testowej. Workflow sprawdzony `actionlint` i odtworzeniem kroków w compose; pierwszy run na GitHub niepotwierdzony do pierwszego pusha |
-| **Następne** | Spisać zadania [E1. Adapter plikowy](02-adapter-plikowy.md) z celu i obowiązkowych scenariuszy odbioru w tym pliku, numeracja od YQM-13. Komendy przez Docker: `docker compose run --rm php composer test` (bazy startują same) |
+| **Etap** | E1. Adapter plikowy, spisany, 0 z 6 |
+| **Ostatnio ukończone** | Spisanie zadań [E1](02-adapter-plikowy.md) (YQM-13..YQM-18) i domknięcie [spec 03 §3](../spec/03-adaptery-wyjsciowe.md#3-domyślny-adapter-plikowy): zajęta blokada bez logu, `write(): bool` jako sygnał utraty, tworzenie katalogu, granice rotacji, walidacja `file`. Wcześniej E0 zamknięty przez [YQM-10, YQM-11](01-fundament-i-sql.md), CI z MySQL i PostgreSQL przeszło na GitHub (run 35735436471) |
+| **Następne** | [YQM-13](02-adapter-plikowy.md): klasa `FileAdapter` z zapisem pod nieblokującą blokadą. Komendy przez Docker: `docker compose run --rm php composer test` (bazy startują same) |
 
 Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trzeba zajrzeć na początku sesji.
 
@@ -15,12 +15,12 @@ Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trze
 | Etap | Plik | Cel | Co działa na końcu | Postęp |
 |---|---|---|---|---|
 | **E0** | [01-fundament-i-sql](01-fundament-i-sql.md) | Pakiet, kolektor, `Command`, cykl życia HTTP | Aplikacja z MySQL i PostgreSQL daje paczkę do jawnego adaptera, wyjątek nie gubi paczki | 12/12 |
-| **E1** | [02-adapter-plikowy](02-adapter-plikowy.md) | Adapter plikowy z rotacją | Paczki w `runtime/logs`, bezpieczne przy 8 procesach | – |
+| **E1** | [02-adapter-plikowy](02-adapter-plikowy.md) | Adapter plikowy z rotacją | Paczki w `runtime/logs`, bezpieczne przy 8 procesach | 0/6 |
 | **E2** | [03-mongodb](03-mongodb.md) | Źródło MongoDB | Jedna paczka z wpisami SQL i MongoDB | – |
 | **E3** | [04-konsola](04-konsola.md) | Zadania konsolowe | Wiele paczek z `seq` w jednym procesie | – |
 | **E4** | [05-wydajnosc-i-odbior](05-wydajnosc-i-odbior.md) | Test wydajności, dokumentacja | Narzut w progu, limity potwierdzone, README pakietu | – |
 
-12 zadań spisanych. Jedno zadanie to jedna sesja i jeden commit.
+18 zadań spisanych. Jedno zadanie to jedna sesja i jeden commit.
 
 ## Dlaczego w tej kolejności
 
@@ -39,6 +39,7 @@ Efekt uboczny: do końca E1 pakiet nie ma MongoDB, więc demo w aplikacji z Mong
 | Podmiana klasy `Command` omija jakąś ścieżkę Active Record albo raportuje trafienie w cache | Test integracyjny z AR i `Connection::cache()` | YQM-10, E0 |
 | `exit(1)` z `ErrorHandler` gubi paczkę mimo callbacku shutdown | Test z nieobsłużonym wyjątkiem w osobnym procesie | YQM-8, E0 |
 | `Command::prepare()` łączy `open()` i `pdo->prepare()`, więc pomiar samego `prepare` może wymagać nadpisania całej metody i psuć wiązanie parametrów lub konwersję wyjątków | Test wiązania, konwersji wyjątków i ponownego wykonania przygotowanego polecenia. Rozstrzygnięte w YQM-5: kopia metody z zegarem wokół `pdo->prepare()` | YQM-5, E0 |
+| Blokada `.lock` nie chroni rotacji przy wielu procesach i dwie rotacje nadpisują `.1` | Test 8 procesów z rozliczeniem paczek utraconych przez zajętą blokadę | YQM-18, E1 |
 | `yii\mongodb\Connection` nie daje dostępu do `Manager` bez podmiany klasy | Sonda jako pierwsze zadanie etapu | E2 |
 | Normalizator literałów kosztuje więcej niż 5% czasu | Pomiar całości z normalizacją | E4 |
 

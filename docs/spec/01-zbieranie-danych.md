@@ -2,7 +2,7 @@
 
 Jak wpisy powstają i kiedy kolektor je przyjmuje. Format wpisu i paczki jest w [02](02-format-paczki.md), odbiorca paczki w [03](03-adaptery-wyjsciowe.md).
 
-Kod powstaje w etapie E0. Zdanie, którego kod jeszcze nie realizuje, opisuje zachowanie docelowe. Odwołania do Yii dotyczą wersji 2.0.55.
+Zdanie, którego kod jeszcze nie realizuje, opisuje zachowanie docelowe. Odwołania do Yii dotyczą wersji 2.0.55.
 
 ## 1. Komponent i konfiguracja
 
@@ -23,11 +23,11 @@ Pakiet dostarcza komponent aplikacji Yii rejestrowany w `bootstrap`. Przy starci
 | `maxQueryLength` | Limit długości `query` w bajtach razem z wielokropkiem, najmniej `3` (długość `…`) | `2048` |
 | `flushIntervalSeconds` | Odstęp wysyłki w zadaniu konsolowym | `30` |
 | `adapter` | Klasa, obiekt lub `callable`. Brak oznacza adapter plikowy | `null` |
-| `file` | Ustawienia adaptera plikowego, [03 §3](03-adaptery-wyjsciowe.md#3-domyślny-adapter-plikowy) | |
+| `file` | Ustawienia adaptera plikowego, [03 §3](03-adaptery-wyjsciowe.md#3-domyślny-adapter-plikowy) | `[]` |
 
 Połączenie spoza listy nie jest mierzone. Połączenie tworzone dynamicznie w kodzie i własna klasa `Command` są poza zakresem.
 
-Pakiet nie łączy się z bazą w bootstrapie: driver odczytuje z prefiksu `dsn`. Z jednym `Yii::error` pomijane są, a reszta listy działa: nieznane id połączenia lub modułu, połączenie bez `dsn` (np. tylko `masters`/`slaves`), driver inny niż `mysql` i `pgsql`, połączenie z własnym `commandClass` albo własnym `commandMap` dla swojego drivera oraz ten sam obiekt połączenia pod drugim id z listy (liczy się pierwsze id). Błędna konfiguracja pakietu (np. brak `app`, `maxQueryLength` poniżej `3`) i wersja Yii, w której `yii\db\Command` nie ma prywatnych pól `_isolationLevel` i `_retryHandler` używanych przez pomiar ([ADR-0001](../adr/0001-podmiana-klasy-command-zamiast-profilera.md)), wyłączają pakiet w tym procesie: bez podmiany `Command` i bez wysyłki, z jednym `Yii::error`. Aplikacja odpowiada normalnie.
+Pakiet nie łączy się z bazą w bootstrapie: driver odczytuje z prefiksu `dsn`. Z jednym `Yii::error` pomijane są, a reszta listy działa: nieznane id połączenia lub modułu, połączenie bez `dsn` (np. tylko `masters`/`slaves`), driver inny niż `mysql` i `pgsql`, połączenie z własnym `commandClass` albo własnym `commandMap` dla swojego drivera oraz ten sam obiekt połączenia pod drugim id z listy (liczy się pierwsze id). Błędna konfiguracja pakietu (np. brak `app`, `maxQueryLength` poniżej `3`, przy `adapter: null` także nieznany klucz `file`, pusty `file.path` lub nieznany alias w nim albo `file.maxSize` lub `file.maxFiles` poniżej `1`) i wersja Yii, w której `yii\db\Command` nie ma prywatnych pól `_isolationLevel` i `_retryHandler` używanych przez pomiar ([ADR-0001](../adr/0001-podmiana-klasy-command-zamiast-profilera.md)), wyłączają pakiet w tym procesie: bez podmiany `Command` i bez wysyłki, z jednym `Yii::error`. Aplikacja odpowiada normalnie.
 
 ## 2. Źródło SQL
 

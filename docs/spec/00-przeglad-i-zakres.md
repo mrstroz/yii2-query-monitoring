@@ -7,7 +7,7 @@
 | **Projekt** | yii2-query-monitoring |
 | **Repozytorium** | `github.com/mrstroz/yii2-query-monitoring` |
 | **Data utworzenia** | 2026-09-22 |
-| **Status** | Szkic, oparty na briefie. Kod powstaje w etapie E0, od YQM-1. |
+| **Status** | W realizacji. Stan etapów jest w [plan/roadmap.md](../plan/roadmap.md) |
 
 ---
 
