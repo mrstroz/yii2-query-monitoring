@@ -32,6 +32,8 @@ final class SqlNormalizerTest extends TestCase
         yield 'digits in identifiers stay' => ['SELECT col_2 FROM table1 WHERE t1.c2 = 3', 'SELECT col_2 FROM table1 WHERE t1.c2 = ?'];
         yield 'digits followed by letters are unknown' => ['SELECT * FROM 1table', null];
         yield 'number glued to word is unknown' => ['SELECT 123abc', null];
+        yield 'number glued to non-ASCII letter is unknown' => ['SELECT 123ł', null];
+        yield 'number and non-ASCII word apart' => ['SELECT 123 ł', 'SELECT ? ł'];
         yield 'in list is not merged' => ['SELECT * FROM t WHERE id IN (1, 2, 3)', 'SELECT * FROM t WHERE id IN (?, ?, ?)'];
         yield 'block comment becomes one space' => ['SELECT a/* c */FROM t', 'SELECT a FROM t'];
         yield 'block comment between spaces' => ['SELECT /* hint */ a FROM t', 'SELECT a FROM t'];
@@ -147,6 +149,32 @@ final class SqlNormalizerTest extends TestCase
     public function testDefaultMaxQueryLength(): void
     {
         self::assertSame(2048, SqlNormalizer::DEFAULT_MAX_QUERY_LENGTH);
+    }
+
+    /**
+     * @return iterable<int, array{int}>
+     */
+    public static function tooSmallLimits(): iterable
+    {
+        yield [0];
+        yield [2];
+        yield [-1];
+    }
+
+    #[DataProvider('tooSmallLimits')]
+    public function testLimitSmallerThanEllipsisIsRejected(int $max): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        new SqlNormalizer($max);
+    }
+
+    public function testSmallestLimitGivesOnlyEllipsis(): void
+    {
+        $normalizer = new SqlNormalizer(3);
+
+        self::assertSame('…', $normalizer->normalize('SELECT abcdef', 'mysql'));
+        self::assertSame('a b', $normalizer->normalize('a  b', 'pgsql'));
     }
 
     public function testShortQueryIsNotTruncated(): void

@@ -41,7 +41,7 @@ Commit messages in English with the task id: `feat: YQM-5 measured Command class
 These come from the ADRs and are easy to violate by accident:
 
 - The library must never change the result of a database operation or the application response (`spec/00 §2`). Every collector and adapter call is wrapped; exceptions are logged once per process via `Yii::error` and not rethrown.
-- SQL is measured by replacing `commandClass` on configured connections, not by enabling Yii profiling (ADR-0001). Timing covers `PDO::prepare()` and `PDOStatement::execute()` only. `begin`/`commit`/`rollback` go through PDO directly and are out of scope; savepoints go through `Command` and are in.
+- SQL is measured by setting `commandMap` for the driver of each configured connection to the package's `Command` class (ADR-0001; `commandClass` is deprecated), not by enabling Yii profiling. Timing covers `PDO::prepare()` and `PDOStatement::execute()` only. `begin`/`commit`/`rollback` go through PDO directly and are out of scope; savepoints go through `Command` and are in.
 - The batch is a flat list, no aggregates (ADR-0002). Limits: 500 entries, 256 KB per batch, 2 KB per `query`. HTTP drops the excess and counts it in `dropped`; console flushes and starts a new batch.
 - Finalisation happens in `EVENT_AFTER_REQUEST` with a `register_shutdown_function` fallback (ADR-0003). The "finalised" flag is set before the batch is built and is never reset, so an adapter failure does not trigger a second attempt.
 - Normalisation replaces literals with `?` and returns `query: null` when unsure (ADR-0004). Rules differ per dialect: `"..."` is a string in MySQL and an identifier in PostgreSQL. Only MySQL's default `sql_mode` is supported.

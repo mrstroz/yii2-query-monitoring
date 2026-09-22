@@ -10,6 +10,47 @@ services:
       - .:/app
       - composer-cache:/tmp/composer/cache
     working_dir: /app
+    environment:
+      QM_MYSQL_DSN: "mysql:host=mysql;dbname=qm"
+      QM_MYSQL_USER: qm
+      QM_MYSQL_PASSWORD: qm
+      QM_PGSQL_DSN: "pgsql:host=pgsql;dbname=qm"
+      QM_PGSQL_USER: qm
+      QM_PGSQL_PASSWORD: qm
+    depends_on:
+      mysql:
+        condition: service_healthy
+      pgsql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: qm
+      MYSQL_USER: qm
+      MYSQL_PASSWORD: qm
+      MYSQL_ROOT_PASSWORD: qm
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uqm", "-pqm"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+
+  pgsql:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: qm
+      POSTGRES_USER: qm
+      POSTGRES_PASSWORD: qm
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "qm", "-d", "qm"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
 
 volumes:
   composer-cache:

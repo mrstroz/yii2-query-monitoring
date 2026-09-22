@@ -4,9 +4,9 @@
 
 | Pole | Wartość |
 |---|---|
-| **Etap** | E0. Fundament i źródło SQL, w toku, 4 z 12 |
-| **Ostatnio ukończone** | [YQM-2, YQM-3, YQM-6](01-fundament-i-sql.md): `QueryBatch` i JSON, kolektor z limitami (JSON nigdy ponad `maxBatchBytes`), `SqlNormalizer` z dialektami MySQL i PostgreSQL |
-| **Następne** | [YQM-12](01-fundament-i-sql.md) aplikacja testowa w osobnym procesie, potem YQM-4 komponent (grupa G3). Komendy przez Docker: `docker compose run --rm php composer test` |
+| **Etap** | E0. Fundament i źródło SQL, w toku, 7 z 12 |
+| **Ostatnio ukończone** | [YQM-12, YQM-4, YQM-5](01-fundament-i-sql.md): aplikacja testowa w osobnym procesie na MySQL i PostgreSQL, komponent `QueryMonitor` z wysyłką w `EVENT_AFTER_REQUEST`, mierzony `Command` przez `commandMap` |
+| **Następne** | [YQM-7, YQM-8, YQM-9](01-fundament-i-sql.md): akcja wejściowa, finalizacja z shutdown, ochrona aplikacji. Komendy przez Docker: `docker compose run --rm php composer test` (bazy startują same) |
 
 Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trzeba zajrzeć na początku sesji.
 
@@ -14,7 +14,7 @@ Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trze
 
 | Etap | Plik | Cel | Co działa na końcu | Postęp |
 |---|---|---|---|---|
-| **E0** | [01-fundament-i-sql](01-fundament-i-sql.md) | Pakiet, kolektor, `Command`, cykl życia HTTP | Aplikacja z MySQL i PostgreSQL daje paczkę do jawnego adaptera, wyjątek nie gubi paczki | 4/12 |
+| **E0** | [01-fundament-i-sql](01-fundament-i-sql.md) | Pakiet, kolektor, `Command`, cykl życia HTTP | Aplikacja z MySQL i PostgreSQL daje paczkę do jawnego adaptera, wyjątek nie gubi paczki | 7/12 |
 | **E1** | [02-adapter-plikowy](02-adapter-plikowy.md) | Adapter plikowy z rotacją | Paczki w `runtime/logs`, bezpieczne przy 8 procesach | – |
 | **E2** | [03-mongodb](03-mongodb.md) | Źródło MongoDB | Jedna paczka z wpisami SQL i MongoDB | – |
 | **E3** | [04-konsola](04-konsola.md) | Zadania konsolowe | Wiele paczek z `seq` w jednym procesie | – |
@@ -36,9 +36,9 @@ Efekt uboczny: do końca E1 pakiet nie ma MongoDB, więc demo w aplikacji z Mong
 
 | Ryzyko | Co robimy | Kiedy |
 |---|---|---|
-| Podmiana `commandClass` omija jakąś ścieżkę Active Record albo raportuje trafienie w cache | Test integracyjny z AR i `Connection::cache()` | YQM-10, E0 |
+| Podmiana klasy `Command` omija jakąś ścieżkę Active Record albo raportuje trafienie w cache | Test integracyjny z AR i `Connection::cache()` | YQM-10, E0 |
 | `exit(1)` z `ErrorHandler` gubi paczkę mimo callbacku shutdown | Test z nieobsłużonym wyjątkiem w osobnym procesie | YQM-8, E0 |
-| `Command::prepare()` łączy `open()` i `pdo->prepare()`, więc pomiar samego `prepare` może wymagać nadpisania całej metody i psuć wiązanie parametrów lub konwersję wyjątków | Test wiązania, konwersji wyjątków i ponownego wykonania przygotowanego polecenia | YQM-5, E0 |
+| `Command::prepare()` łączy `open()` i `pdo->prepare()`, więc pomiar samego `prepare` może wymagać nadpisania całej metody i psuć wiązanie parametrów lub konwersję wyjątków | Test wiązania, konwersji wyjątków i ponownego wykonania przygotowanego polecenia. Rozstrzygnięte w YQM-5: kopia metody z zegarem wokół `pdo->prepare()` | YQM-5, E0 |
 | `yii\mongodb\Connection` nie daje dostępu do `Manager` bez podmiany klasy | Sonda jako pierwsze zadanie etapu | E2 |
 | Normalizator literałów kosztuje więcej niż 5% czasu | Pomiar całości z normalizacją | E4 |
 

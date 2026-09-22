@@ -9,13 +9,13 @@ Kontrakt między kolektorem a każdym adapterem. Zmiana pola oznacza nowe `v`.
 | `v` | int | Wersja formatu. Pierwsza wersja to `1` |
 | `app` | string | Wartość `app` z konfiguracji |
 | `type` | `http` \| `console` | Kontekst |
-| `id` | string | Losowy identyfikator generowany przez bibliotekę, wspólny dla wszystkich paczek zadania |
+| `id` | string | Losowy identyfikator generowany przez bibliotekę, wspólny dla wszystkich paczek zadania: 16 znaków `[0-9a-f]` z `random_bytes(8)` |
 | `seq` | int | Numer paczki w zadaniu konsolowym, od 1. Dla HTTP zawsze `1` |
 | `module` | string \| null | `uniqueId` modułu akcji wejściowej. `null` dla głównej aplikacji |
 | `controller` | string \| null | Lokalne id kontrolera akcji wejściowej |
 | `action` | string \| null | Lokalne id akcji wejściowej |
 | `ts` | string | Moment wysyłki, ISO 8601 w UTC |
-| `host` | string | Wynik `gethostname()` |
+| `host` | string | Wynik `gethostname()`, pusty tekst, gdy funkcja zwróci `false` |
 | `dropped` | int | Wpisy pominięte po przekroczeniu limitu |
 | `queries` | array | Lista wpisów w kolejności zakończenia |
 

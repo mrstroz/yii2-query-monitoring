@@ -8,7 +8,7 @@ Kod powstaje w etapie E0. Zdanie, którego kod jeszcze nie realizuje, opisuje za
 
 Pakiet dostarcza komponent aplikacji Yii rejestrowany w `bootstrap`. Przy starcie komponent:
 
-1. Podmienia `commandClass` w każdym połączeniu SQL z listy `connections`.
+1. Ustawia `commandMap` dla drivera każdego połączenia SQL z listy `connections` na klasę `Command` pakietu. Połączenie z modułu (`admin/db`) jest pobierane przez `getModule()`, więc moduł ładuje się już w bootstrapie.
 2. Rejestruje subskrybenta zdarzeń sterownika w każdym połączeniu MongoDB z listy.
 3. Podpina się pod `EVENT_BEFORE_ACTION` i `EVENT_AFTER_REQUEST` aplikacji.
 4. Rejestruje callback przez `register_shutdown_function`.
@@ -27,9 +27,11 @@ Pakiet dostarcza komponent aplikacji Yii rejestrowany w `bootstrap`. Przy starci
 
 Połączenie spoza listy nie jest mierzone. Połączenie tworzone dynamicznie w kodzie i własna klasa `Command` są poza zakresem.
 
+Pakiet nie łączy się z bazą w bootstrapie: driver odczytuje z prefiksu `dsn`. Z jednym `Yii::error` pomijane są, a reszta listy działa: nieznane id połączenia lub modułu, połączenie bez `dsn` (np. tylko `masters`/`slaves`), driver inny niż `mysql` i `pgsql`, połączenie z własnym `commandClass` albo własnym `commandMap` dla swojego drivera oraz ten sam obiekt połączenia pod drugim id z listy (liczy się pierwsze id). Błędna konfiguracja pakietu (np. brak `app`, `maxQueryLength` poniżej `3`) i wersja Yii, w której `yii\db\Command` nie ma prywatnych pól `_isolationLevel` i `_retryHandler` używanych przez pomiar ([ADR-0001](../adr/0001-podmiana-klasy-command-zamiast-profilera.md)), wyłączają pakiet w tym procesie: bez podmiany `Command` i bez wysyłki, z jednym `Yii::error`. Aplikacja odpowiada normalnie.
+
 ## 2. Źródło SQL
 
-Pakiet dostarcza klasę rozszerzającą `yii\db\Command`. Podmiana przez `commandClass` obejmuje wszystko, co aplikacja wykonuje przez `Connection::createCommand()`, w tym Active Record, `Query`, migracje i zapytania o schemat.
+Pakiet dostarcza klasę rozszerzającą `yii\db\Command`. Podmiana przez `commandMap` obejmuje wszystko, co aplikacja wykonuje przez `Connection::createCommand()`, w tym Active Record, `Query`, migracje i zapytania o schemat.
 
 | Co | Zachowanie |
 |---|---|
@@ -40,7 +42,7 @@ Pakiet dostarcza klasę rozszerzającą `yii\db\Command`. Podmiana przez `comman
 | Transakcje | `begin`, `commit`, `rollback` idą przez PDO i nie dają wpisów |
 | Ponowienia | Każda próba `PDOStatement::execute()` w pętli ponowień `Command::internalExecute()` to osobny wpis |
 
-`time_ms` to czas wywołań sterownika widziany z PHP, nie czas serwera bazy. PDO MySQL domyślnie buforuje wynik, więc transfer danych mieści się w `execute()` i duży `SELECT` ma duży pomiar. Błąd przy późniejszym odczycie kursora nie jest raportowany.
+`time_ms` to czas wywołań sterownika widziany z PHP, nie czas serwera bazy, w milisekundach zaokrąglonych do trzech miejsc po przecinku. PDO MySQL domyślnie buforuje wynik, więc transfer danych mieści się w `execute()` i duży `SELECT` ma duży pomiar. Błąd przy późniejszym odczycie kursora nie jest raportowany.
 
 ## 3. Źródło MongoDB
 

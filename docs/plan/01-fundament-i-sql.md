@@ -21,17 +21,17 @@
       Spec: [02 §5](../spec/02-format-paczki.md#5-limity) · Zależy od: YQM-2
       Gotowe, gdy: 600 wpisów daje paczkę z 500 wpisami i `dropped: 100`, limit bajtów jest liczony dla końcowego JSON z nagłówkiem i `dropped`, a wpis `result: error` po limicie też zwiększa licznik.
 
-- [ ] (^) **YQM-12** Aplikacja testowa Yii z Active Record, adapter przechwytujący i uruchamianie testów w osobnym procesie
+- [x] (^) **YQM-12** Aplikacja testowa Yii z Active Record, adapter przechwytujący i uruchamianie testów w osobnym procesie
       Spec: [00 §7](../spec/00-przeglad-i-zakres.md#7-środowiska) · Zależy od: YQM-2
       Gotowe, gdy: test PHPUnit uruchamia aplikację w osobnym procesie PHP, odczytuje paczkę zapisaną przez adapter przechwytujący i sprawdza jej treść, a model AR ma schemat tworzony przy starcie testu.
       Istnieje, bo YQM-8 sprawdza prawdziwe `exit()` i shutdown, czego nie da się zrobić w procesie PHPUnit.
 
-- [ ] (=) **YQM-4** Komponent Yii z konfiguracją, bootstrapem, nagłówkiem paczki i podpięciem listy połączeń
+- [x] (=) **YQM-4** Komponent Yii z konfiguracją, bootstrapem, nagłówkiem paczki i podpięciem listy połączeń
       Spec: [01 §1](../spec/01-zbieranie-danych.md#1-komponent-i-konfiguracja) · [02 §1](../spec/02-format-paczki.md#1-nagłówek) · Zależy od: YQM-3, YQM-12
-      Gotowe, gdy: nagłówek ma losowe `id`, `app`, `host`, `ts` w UTC i `seq: 1`, połączenie spoza listy nie daje wpisów, `admin/db` z modułu jest znajdowane, a `enabled: false` nie podmienia `commandClass` i nie wywołuje adaptera.
+      Gotowe, gdy: nagłówek ma losowe `id`, `app`, `host`, `ts` w UTC i `seq: 1`, połączenie spoza listy nie daje wpisów, `admin/db` z modułu jest znajdowane, a `enabled: false` nie podmienia klasy `Command` i nie wywołuje adaptera.
       W E0 konfiguracja obsługuje tylko SQL i jawnie podany adapter. Klucze `file` i połączenia MongoDB dochodzą w E1 i E2.
 
-- [ ] (^) **YQM-5** Klasa `Command` mierząca `PDO::prepare()` i `PDOStatement::execute()`
+- [x] (^) **YQM-5** Klasa `Command` mierząca `PDO::prepare()` i `PDOStatement::execute()`
       Spec: [01 §2](../spec/01-zbieranie-danych.md#2-źródło-sql) · ADR: [0001](../adr/0001-podmiana-klasy-command-zamiast-profilera.md) · Zależy od: YQM-4
       Gotowe, gdy: wyjątek z `prepare()` i z `execute()` daje wpis `result: error` z SQLSTATE i przechodzi przez konwersję wyjątków Yii bez zmian, ponowienie w `internalExecute()` daje dwa wpisy, drugie wykonanie tego samego przygotowanego polecenia nie dolicza czasu przygotowania, wiązanie parametrów działa jak w `yii\db\Command`, a `Connection::open()` i pobranie wyników nie wchodzą w `time_ms`.
       Sonda ryzyka: `Command::prepare()` w Yii 2.0.55 robi `open()` i `pdo->prepare()` w jednej metodzie. Zadanie ustala, jak zmierzyć samo `pdo->prepare()`.
