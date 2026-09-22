@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## State of the repository
 
-Milestone E0 in progress; `YQM-1` created the package skeleton (`mrstroz/yii2-query-monitoring`, namespace `mrstroz\querymonitoring`, code in `src/`, tests in `tests/`). The package is a Composer library for Yii 2 that collects a flat list of database queries (MySQL, PostgreSQL, MongoDB) per HTTP request or console run and hands one `QueryBatch` to an output adapter. Everything about what it must do is in `docs/`.
+Milestone E0 is finished (`YQM-1`..`YQM-12`): SQL monitoring for MySQL and PostgreSQL over HTTP requests with an explicit adapter; the CI workflow runs the tests on both databases. The next step is writing out the tasks of E1 (file adapter). `YQM-1` created the package skeleton (`mrstroz/yii2-query-monitoring`, namespace `mrstroz\querymonitoring`, code in `src/`, tests in `tests/`). The package is a Composer library for Yii 2 that collects a flat list of database queries (MySQL, PostgreSQL, MongoDB) per HTTP request or console run and hands one `QueryBatch` to an output adapter. Everything about what it must do is in `docs/`.
 
 ## Start here
 

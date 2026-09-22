@@ -4,9 +4,9 @@
 
 | Pole | Wartość |
 |---|---|
-| **Etap** | E0. Fundament i źródło SQL, w toku, 10 z 12 |
-| **Ostatnio ukończone** | [YQM-7, YQM-8, YQM-9](01-fundament-i-sql.md): akcja wejściowa z `EVENT_BEFORE_ACTION`, finalizacja w `EVENT_AFTER_REQUEST` z awaryjnym shutdown i flagą „sfinalizowano”, ochrona aplikacji z flagą ponownego wejścia (`QueryCollector::pause()`) |
-| **Następne** | [YQM-10, YQM-11](01-fundament-i-sql.md): test integracyjny AR, cache, kilka połączeń i savepointy; CI na MySQL i PostgreSQL, przykład konfiguracji i instrukcja w README. Komendy przez Docker: `docker compose run --rm php composer test` (bazy startują same) |
+| **Etap** | E0. Fundament i źródło SQL, zakończony, 12 z 12. E1 czeka na spisanie zadań |
+| **Ostatnio ukończone** | [YQM-10, YQM-11](01-fundament-i-sql.md): test integracyjny Active Record, cache, dwa połączenia i savepointy przy wyłączonym logowaniu i profilowaniu Yii; CI z MySQL i PostgreSQL jako services (pominięty test = czerwony przebieg), `README.md` z przykładem konfiguracji i instrukcją aplikacji testowej. Workflow sprawdzony `actionlint` i odtworzeniem kroków w compose; pierwszy run na GitHub niepotwierdzony do pierwszego pusha |
+| **Następne** | Spisać zadania [E1. Adapter plikowy](02-adapter-plikowy.md) z celu i obowiązkowych scenariuszy odbioru w tym pliku, numeracja od YQM-13. Komendy przez Docker: `docker compose run --rm php composer test` (bazy startują same) |
 
 Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trzeba zajrzeć na początku sesji.
 
@@ -14,7 +14,7 @@ Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trze
 
 | Etap | Plik | Cel | Co działa na końcu | Postęp |
 |---|---|---|---|---|
-| **E0** | [01-fundament-i-sql](01-fundament-i-sql.md) | Pakiet, kolektor, `Command`, cykl życia HTTP | Aplikacja z MySQL i PostgreSQL daje paczkę do jawnego adaptera, wyjątek nie gubi paczki | 7/12 |
+| **E0** | [01-fundament-i-sql](01-fundament-i-sql.md) | Pakiet, kolektor, `Command`, cykl życia HTTP | Aplikacja z MySQL i PostgreSQL daje paczkę do jawnego adaptera, wyjątek nie gubi paczki | 12/12 |
 | **E1** | [02-adapter-plikowy](02-adapter-plikowy.md) | Adapter plikowy z rotacją | Paczki w `runtime/logs`, bezpieczne przy 8 procesach | – |
 | **E2** | [03-mongodb](03-mongodb.md) | Źródło MongoDB | Jedna paczka z wpisami SQL i MongoDB | – |
 | **E3** | [04-konsola](04-konsola.md) | Zadania konsolowe | Wiele paczek z `seq` w jednym procesie | – |

@@ -19,6 +19,9 @@ $connection = [
     'username' => (string) getenv($prefix . 'USER'),
     'password' => (string) getenv($prefix . 'PASSWORD'),
     'pdoClass' => TestPdo::class,
+    // Measurement must not depend on Yii's own query logging and profiling (YQM-10).
+    'enableLogging' => false,
+    'enableProfiling' => false,
 ];
 
 $monitor = [
@@ -61,6 +64,7 @@ return [
         ],
     ],
     'components' => [
+        'cache' => yii\caching\ArrayCache::class,
         'db' => $connection,
         'dbOther' => $connection,
         'queryMonitor' => $monitor,

@@ -9,32 +9,14 @@ use mrstroz\querymonitoring\collector\QueryCollector;
 use mrstroz\querymonitoring\sql\Recorder;
 use mrstroz\querymonitoring\sql\SqlNormalizer;
 use mrstroz\querymonitoring\support\Guard;
-use PHPUnit\Framework\TestCase;
-use yii\log\Logger;
+use mrstroz\querymonitoring\tests\Unit\LoggedTestCase;
 
 /**
  * YQM-9, spec 01 §6: a recorder whose collector does not accept does nothing, not even normalise;
  * a failure inside it is swallowed with one package error.
  */
-final class RecorderTest extends TestCase
+final class RecorderTest extends LoggedTestCase
 {
-    private Logger $logger;
-
-    protected function setUp(): void
-    {
-        if (!class_exists('Yii', false)) {
-            require_once __DIR__ . '/../../../vendor/yiisoft/yii2/Yii.php';
-        }
-        $this->logger = new Logger();
-        $this->logger->flushInterval = PHP_INT_MAX;
-        \yii\BaseYii::setLogger($this->logger);
-    }
-
-    protected function tearDown(): void
-    {
-        \yii\BaseYii::setLogger(null);
-    }
-
     public function testRecordsWhileAccepting(): void
     {
         $collector = $this->collector();
@@ -96,13 +78,5 @@ final class RecorderTest extends TestCase
     private function collector(): QueryCollector
     {
         return new QueryCollector('app', BatchType::Http, 'req_1', 'host');
-    }
-
-    /**
-     * @return list<array<int, mixed>>
-     */
-    private function errors(): array
-    {
-        return array_values(array_filter($this->logger->messages, static fn(array $m): bool => $m[1] === Logger::LEVEL_ERROR));
     }
 }

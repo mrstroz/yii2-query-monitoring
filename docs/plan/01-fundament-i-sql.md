@@ -53,12 +53,12 @@
       Spec: [01 §6](../spec/01-zbieranie-danych.md#6-ochrona-aplikacji) · ADR: [0006](../adr/0006-blad-adaptera-gubi-paczke.md) · Zależy od: YQM-8
       Gotowe, gdy: adapter rzucający wyjątek nie zmienia odpowiedzi i nie jest wywołany drugi raz w shutdown, wymuszony błąd w kolektorze, normalizatorze i serializacji po udanym zapytaniu nie zmienia jego wyniku, przy błędzie bazy aplikacja dostaje oryginalny wyjątek Yii, `Yii::error` pojawia się raz na proces bez zapętlenia, a zapytanie wewnątrz adaptera nie daje wpisu.
 
-- [ ] (=) **YQM-10** Test integracyjny: Active Record, cache, kilka połączeń i savepointy przez podmienione `Command`
+- [x] (=) **YQM-10** Test integracyjny: Active Record, cache, kilka połączeń i savepointy przez podmienione `Command`
       Spec: [00 §6](../spec/00-przeglad-i-zakres.md#6-kryteria-sukcesu) · Zależy od: YQM-5, YQM-6, YQM-7, YQM-9
       Gotowe, gdy: `Model::find()->all()` daje wpis z `query` bez wartości, drugie wywołanie w `Connection::cache()` nie daje wpisu, dwa monitorowane połączenia dają wpisy z różnym `conn` w kolejności zakończenia, zagnieżdżona transakcja daje wpisy savepointów, a `enableProfiling` i `enableLogging` są w teście wyłączone.
       Sonda ryzyka: podmiana klasy może omijać jakąś ścieżkę Yii. Ten test to sprawdza przed budową reszty.
 
-- [ ] (=) **YQM-11** Cały zestaw testów E0 na MySQL i PostgreSQL w CI przez Docker, przykład konfiguracji i instrukcja aplikacji testowej
+- [x] (=) **YQM-11** Cały zestaw testów E0 na MySQL i PostgreSQL w CI przez Docker, przykład konfiguracji i instrukcja aplikacji testowej
       Spec: [00 §7](../spec/00-przeglad-i-zakres.md#7-środowiska) · Zależy od: YQM-10
       Gotowe, gdy: workflow CI uruchamia `composer test` z testami zależnymi od bazy na obu bazach i przechodzi, a `README.md` pakietu ma przykład konfiguracji dla SQL z jawnym adapterem i instrukcję uruchomienia aplikacji testowej.
       Etap nie zamyka się bez tego zadania. SQLite nie potwierdza pomiaru ani normalizacji na deklarowanych bazach.

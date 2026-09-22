@@ -9,6 +9,42 @@ jobs:
   checks:
     name: PHP ${{ matrix.php }}${{ matrix.dependencies == 'lowest' && ' (lowest)' || '' }}
     runs-on: ubuntu-latest
+    # The same database images as docker-compose.yml; the integration tests fail instead of skipping without them.
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: qm
+          MYSQL_USER: qm
+          MYSQL_PASSWORD: qm
+          MYSQL_ROOT_PASSWORD: qm
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uqm -pqm"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 60
+      pgsql:
+        image: postgres:16
+        env:
+          POSTGRES_DB: qm
+          POSTGRES_USER: qm
+          POSTGRES_PASSWORD: qm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U qm -d qm"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 60
+    env:
+      QM_MYSQL_DSN: "mysql:host=127.0.0.1;port=3306;dbname=qm"
+      QM_MYSQL_USER: qm
+      QM_MYSQL_PASSWORD: qm
+      QM_PGSQL_DSN: "pgsql:host=127.0.0.1;port=5432;dbname=qm"
+      QM_PGSQL_USER: qm
+      QM_PGSQL_PASSWORD: qm
     strategy:
       fail-fast: false
       matrix:

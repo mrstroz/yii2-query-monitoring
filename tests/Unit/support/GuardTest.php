@@ -5,31 +5,13 @@ declare(strict_types=1);
 namespace mrstroz\querymonitoring\tests\Unit\support;
 
 use mrstroz\querymonitoring\support\Guard;
-use PHPUnit\Framework\TestCase;
-use yii\log\Logger;
+use mrstroz\querymonitoring\tests\Unit\LoggedTestCase;
 
 /**
  * spec 00 §2, 01 §6: package code never changes the application's result; one Yii::error per process, without query text.
  */
-final class GuardTest extends TestCase
+final class GuardTest extends LoggedTestCase
 {
-    private Logger $logger;
-
-    protected function setUp(): void
-    {
-        if (!class_exists('Yii', false)) {
-            require_once __DIR__ . '/../../../vendor/yiisoft/yii2/Yii.php';
-        }
-        $this->logger = new Logger();
-        $this->logger->flushInterval = PHP_INT_MAX;
-        \yii\BaseYii::setLogger($this->logger);
-    }
-
-    protected function tearDown(): void
-    {
-        \yii\BaseYii::setLogger(null);
-    }
-
     public function testReturnsValueOfCallback(): void
     {
         self::assertSame(42, (new Guard())->run(static fn(): int => 42, 'test'));
@@ -79,13 +61,6 @@ final class GuardTest extends TestCase
         self::assertStringNotContainsString('SELECT', $logged);
     }
 
-    /**
-     * @return list<array<int, mixed>>
-     */
-    private function errors(): array
-    {
-        return array_values(array_filter($this->logger->messages, static fn(array $m): bool => $m[1] === Logger::LEVEL_ERROR));
-    }
 
     private function throwing(): int
     {
