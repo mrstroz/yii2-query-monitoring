@@ -19,7 +19,7 @@ Pakiet nie zna adresu workera, kolejki ani formatu API odbiorcy.
 
 | Sytuacja | Zachowanie |
 |---|---|
-| Wyjątek z `send()` | Paczka przepada. Jeden `Yii::error` na proces, bez treści zapytań |
+| Wyjątek z `send()` | Paczka przepada. Jeden `Yii::error` na proces, bez treści zapytań. Wyjątek własnego adaptera plikowego ([§3](#3-domyślny-adapter-plikowy)) jest logowany z komunikatem, który nazywa operację i ścieżkę, bez treści zapytań i bez JSON paczki; wyjątek innego adaptera tylko z nazwą klasy |
 | Ponowienia | Brak |
 | Zapis awaryjny | Brak |
 | Czas działania | Odpowiada za niego adapter |

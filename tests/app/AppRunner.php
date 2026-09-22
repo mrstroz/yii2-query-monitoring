@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace mrstroz\querymonitoring\tests\app;
 
+use yii\helpers\FileHelper;
+
 /**
  * Runs the test application (tests/app/web/index.php) in a separate PHP process, like one PHP-FPM request.
  *
@@ -15,6 +17,7 @@ namespace mrstroz\querymonitoring\tests\app;
  *   (DSNs from `QM_MYSQL_DSN`/`QM_PGSQL_DSN` and credentials set in docker-compose.yml),
  * - `QM_CAPTURE_FILE`, `QM_LOG_FILE` — per-run files created and removed by the runner
  *   (with `QM_CAPTURE_FILE.calls`, the capturing adapter's call log),
+ * - `QM_RUNTIME` — a per-run `@runtime` directory, read into {@see RunResult::$runtimeFiles} and removed,
  * - everything in `$env`, e.g. `QM_SCENARIO` or the {@see TestPdo} switches.
  *
  * Route {@see self::SCENARIO_ROUTE} loads `tests/Integration/scenarios/<QM_SCENARIO>.php`, which returns
@@ -33,11 +36,14 @@ final class AppRunner
     {
         $captureFile = (string) tempnam(sys_get_temp_dir(), 'qm-capture-');
         $logFile = (string) tempnam(sys_get_temp_dir(), 'qm-log-');
+        $runtime = sys_get_temp_dir() . '/qm-runtime-' . bin2hex(random_bytes(6));
+        mkdir($runtime);
         $childEnv = array_merge(getenv(), [
             'QM_COMPONENT' => (string) json_encode((object) $componentConfig),
             'QM_ROUTE' => $route,
             'QM_CAPTURE_FILE' => $captureFile,
             'QM_LOG_FILE' => $logFile,
+            'QM_RUNTIME' => $runtime,
         ], $env);
 
         try {
@@ -49,11 +55,12 @@ final class AppRunner
                 'message' => (string) ($log['message'] ?? ''),
             ], self::readLines($logFile));
 
-            return new RunResult($exitCode, $stdout, $stderr, self::readLines($captureFile), $logs, self::readLines($captureFile . '.calls'));
+            return new RunResult($exitCode, $stdout, $stderr, self::readLines($captureFile), $logs, self::readLines($captureFile . '.calls'), self::readFiles($runtime));
         } finally {
             @unlink($captureFile);
             @unlink($captureFile . '.calls');
             @unlink($logFile);
+            FileHelper::removeDirectory($runtime);
         }
     }
 
@@ -109,6 +116,22 @@ final class AppRunner
         proc_close($process);
 
         return [$status['exitcode'], $stdout, $stderr];
+    }
+
+    /**
+     * Every file under `$directory`, by its path relative to it, sorted.
+     *
+     * @return array<string, string>
+     */
+    private static function readFiles(string $directory): array
+    {
+        $files = [];
+        foreach (FileHelper::findFiles($directory) as $file) {
+            $files[substr($file, strlen($directory) + 1)] = (string) file_get_contents($file);
+        }
+        ksort($files);
+
+        return $files;
     }
 
     /**

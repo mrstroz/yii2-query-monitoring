@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace mrstroz\querymonitoring\support;
 
+use mrstroz\querymonitoring\adapter\FileAdapterException;
+
 /**
  * Runs package code so that it can never change the application's result (spec 00 §2, 01 §6).
  *
@@ -37,8 +39,9 @@ final class Guard
     }
 
     /**
-     * Only the package's own configuration errors carry their message; any other exception is
-     * logged by class, because its message may quote SQL.
+     * Only the package's own exceptions carry their message: configuration errors and the file
+     * adapter's, whose message names the operation and the path. Any other exception is logged by
+     * class, because its message may quote SQL.
      */
     private function log(\Throwable $e, string $context): void
     {
@@ -46,7 +49,8 @@ final class Guard
             return;
         }
         $this->logged = true;
-        $detail = $e instanceof \yii\base\InvalidConfigException ? ': ' . $e->getMessage() : '';
+        $trusted = $e instanceof \yii\base\InvalidConfigException || $e instanceof FileAdapterException;
+        $detail = $trusted ? ': ' . $e->getMessage() : '';
 
         try {
             \Yii::error(sprintf('Query monitoring failed in %s with %s%s', $context, $e::class, $detail), self::LOG_CATEGORY);

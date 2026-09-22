@@ -158,14 +158,4 @@ final class QueryMonitorComponentTest extends IntegrationTestCase
         $this->assertOnePackageError($result);
         self::assertCount(1, $this->entriesWith($batch, 'qm_on_db'));
     }
-
-    #[DataProvider('databases')]
-    public function testNullAdapterSendsNothingWithOneError(string $db): void
-    {
-        $result = $this->scenario($db, 'per-connection', ['adapter' => null]);
-
-        $this->assertProcessOk($result);
-        self::assertSame([], $result->batches);
-        $this->assertOnePackageError($result);
-    }
 }

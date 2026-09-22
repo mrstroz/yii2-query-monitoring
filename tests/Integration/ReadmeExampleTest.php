@@ -9,9 +9,8 @@ use mrstroz\querymonitoring\tests\app\Schema;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
- * YQM-11: the SQL configuration example in README.md runs as written, and its option table matches the
- * component. Only the example's `adapter`, a class of the reader's application, is left to the test
- * application's capturing adapter.
+ * YQM-11, YQM-15: the SQL configuration example in README.md runs as written and writes its batch to the
+ * default file, and its option table matches the component.
  */
 final class ReadmeExampleTest extends IntegrationTestCase
 {
@@ -26,17 +25,21 @@ final class ReadmeExampleTest extends IntegrationTestCase
         $component = $example['components']['queryMonitor'] ?? null;
         self::assertIsArray($component);
         self::assertSame(QueryMonitor::class, $component['class']);
-        self::assertIsString($component['adapter'], 'the example names an adapter explicitly');
-        self::assertStringStartsNotWith('mrstroz\querymonitoring\\', ltrim($component['adapter'], '\\'), 'the adapter is the reader\'s own class');
-        unset($component['adapter']);
+        self::assertArrayNotHasKey('adapter', $component, 'the example uses the default file adapter');
 
         $this->requireDatabase($db);
         Schema::create(Schema::connection($db));
-        $result = $this->request($db, 'order/index', $component);
+        // The test application's own default is the capturing adapter; the example's missing key means null.
+        $result = $this->request($db, 'order/index', ['adapter' => null] + $component);
 
         $this->assertProcessOk($result);
         $this->assertNoErrors($result);
-        $batch = $this->singleBatch($result);
+        self::assertSame([], $result->batches);
+        $file = $result->runtimeFiles['logs/query-monitoring.jsonl'] ?? '';
+        self::assertStringEndsWith("\n", $file);
+        self::assertStringNotContainsString("\n", rtrim($file, "\n"), 'one batch, one line');
+        $batch = json_decode($file, true, 512, JSON_THROW_ON_ERROR);
+        self::assertIsArray($batch);
         self::assertSame($component['app'], $batch['app']);
         self::assertNotEmpty($batch['queries']);
         self::assertSame($component['connections'], array_values(array_unique(array_column($batch['queries'], 'conn'))));

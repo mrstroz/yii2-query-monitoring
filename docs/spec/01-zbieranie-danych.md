@@ -88,7 +88,7 @@ Bezczynny proces nie wysyła, bo nie ma timera. Akcja wejściowa jest brana z `E
 
 ## 6. Ochrona aplikacji
 
-Każde wywołanie kolektora i adaptera jest w `try/catch`. Wyjątek daje jeden `Yii::error` na proces, bez treści zapytań, i nie jest propagowany. Flaga ponownego wejścia sprawia, że zapytania wykonane przez adapter podczas `send()` nie trafiają do kolektora.
+Każde wywołanie kolektora i adaptera jest w `try/catch`. Wyjątek daje jeden `Yii::error` na proces, bez treści zapytań, i nie jest propagowany. Komunikat wyjątku trafia do logu tylko dla wyjątków pakietu: błędnej konfiguracji ([§1](#1-komponent-i-konfiguracja)) i adaptera plikowego ([03 §2](03-adaptery-wyjsciowe.md#2-błąd-adaptera)); inne wyjątki są logowane tylko z nazwą klasy. Flaga ponownego wejścia sprawia, że zapytania wykonane przez adapter podczas `send()` nie trafiają do kolektora.
 
 ## 7. Poza zakresem
 

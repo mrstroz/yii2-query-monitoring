@@ -55,6 +55,8 @@ foreach (json_decode((string) getenv('QM_EXTRA_CONNECTIONS') ?: '{}', true) ?: [
 return [
     'id' => 'qm-test-app',
     'basePath' => __DIR__,
+    // A directory per run from AppRunner, so the default file adapter never writes into the repository.
+    'runtimePath' => (string) getenv('QM_RUNTIME') ?: __DIR__ . '/runtime',
     'controllerNamespace' => 'mrstroz\querymonitoring\tests\app\controllers',
     'bootstrap' => ['log', 'queryMonitor'],
     'modules' => [

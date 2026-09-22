@@ -1,15 +1,16 @@
 # Yii 2 Query Monitoring
 
 Collects a flat list of the database queries run during one HTTP request of a Yii 2 application and hands
-it, as one batch, to an output adapter you provide. Each entry has the connection, the operation, the
-normalised query text with literals replaced by `?`, the time of `PDO::prepare()` and
-`PDOStatement::execute()` and the result. Parameter values never enter a batch.
+it, as one batch, to an output adapter: by default a JSON Lines file, or an adapter you provide. Each
+entry has the connection, the operation, the normalised query text with literals replaced by `?`, the
+time of `PDO::prepare()` and `PDOStatement::execute()` and the result. Parameter values never enter a
+batch.
 
 ## Status
 
-Milestone E0: MySQL and PostgreSQL over HTTP requests, with an adapter you write. A default file
-adapter, MongoDB and console commands are planned and not available yet. The specification (in Polish)
-is in [`docs/spec/`](docs/spec/).
+Milestone E1: MySQL and PostgreSQL over HTTP requests, written to a rotated JSON Lines file or handed to
+an adapter you write. MongoDB and console commands are planned and not available yet. The specification
+(in Polish) is in [`docs/spec/`](docs/spec/).
 
 ## Requirements
 
@@ -26,7 +27,7 @@ composer require mrstroz/yii2-query-monitoring
 ## Configuration
 
 Register the component, list its id under `bootstrap` and name the connections to monitor. A connection
-inside a module is `module/id`. The `adapter` is your own class; the package does not ship one yet.
+inside a module is `module/id`. Without `adapter`, batches go to `@runtime/logs/query-monitoring.jsonl`.
 
 <!-- example:sql-config -->
 ```php
@@ -39,7 +40,6 @@ return [
             'class' => \mrstroz\querymonitoring\QueryMonitor::class,
             'app' => 'shop-api',
             'connections' => ['db'],
-            'adapter' => \app\monitoring\QueueAdapter::class,
         ],
     ],
 ];
@@ -49,7 +49,8 @@ return [
 |---|---|---|
 | `app` | required | Application name written to every batch |
 | `connections` | `[]` | Ids of `yii\db\Connection` components to monitor |
-| `adapter` | required | Class name, object implementing `BatchAdapterInterface`, or `callable(QueryBatch)` |
+| `adapter` | `null` | Class name, object implementing `BatchAdapterInterface`, or `callable(QueryBatch)`; `null` writes to a file |
+| `file` | `[]` | Settings of the file adapter, see below; ignored when `adapter` is set |
 | `enabled` | `true` | `false` installs nothing and sends nothing |
 | `maxEntries` | `500` | Entries per batch; the excess is counted in `dropped` |
 | `maxBatchBytes` | `262144` | Size of the batch JSON; the excess is counted in `dropped` |
@@ -58,7 +59,37 @@ return [
 A monitored connection must not set its own `commandClass` or `commandMap` for its driver: the package
 measures queries by setting `commandMap` to its own `Command` class.
 
+A wrong setting, including a wrong key of `file` when the file adapter is used, disables the package for
+the process with one `Yii::error`; the application runs as without it.
+
+## The file adapter
+
+Each batch is one line of JSON appended to the file. Every key of `file` can be set on its own; the
+others keep their defaults:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `file.path` | `@runtime/logs/query-monitoring.jsonl` | File path; Yii aliases allowed. The directory is created on the first write |
+| `file.maxSize` | `10485760` | Bytes; a file that grows over it is rotated |
+| `file.maxFiles` | `5` | Rotated copies kept: `.1` is the newest, `.5` the oldest |
+
+```php
+'queryMonitor' => [
+    'class' => \mrstroz\querymonitoring\QueryMonitor::class,
+    'app' => 'shop-api',
+    'connections' => ['db'],
+    'file' => ['path' => '@app/runtime/monitoring/queries.jsonl'],
+],
+```
+
+Writing and rotation take a non-blocking lock on `<path>.lock`. When another process holds it, the
+batch is dropped rather than making the request wait. The file must be on a local disk (no NFS) and
+writable by both the web server and console users. A write that fails, for example on a full disk or a
+directory without write permission, is logged once per process with `Yii::error` and the batch is lost.
+
 ## Writing an adapter
+
+Set `adapter` to send batches somewhere else instead of the file:
 
 ```php
 use mrstroz\querymonitoring\adapter\BatchAdapterInterface;

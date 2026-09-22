@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## State of the repository
 
-Milestone E0 is finished (`YQM-1`..`YQM-12`): SQL monitoring for MySQL and PostgreSQL over HTTP requests with an explicit adapter; the CI workflow runs the tests on both databases. The tasks of E1 (file adapter) are written out as `YQM-13`..`YQM-18`; the next one is `YQM-13`. `YQM-1` created the package skeleton (`mrstroz/yii2-query-monitoring`, namespace `mrstroz\querymonitoring`, code in `src/`, tests in `tests/`). The package is a Composer library for Yii 2 that collects a flat list of database queries (MySQL, PostgreSQL, MongoDB) per HTTP request or console run and hands one `QueryBatch` to an output adapter. Everything about what it must do is in `docs/`.
+Milestones E0 (`YQM-1`..`YQM-12`) and E1 (`YQM-13`..`YQM-18`) are finished: SQL monitoring for MySQL and PostgreSQL over HTTP requests, written by default to a rotated JSON Lines file (`FileAdapter`) or handed to an adapter the application sets; the CI workflow runs the tests on both databases. The next step is writing out the tasks of E2 (MongoDB), starting at `YQM-19`. `YQM-1` created the package skeleton (`mrstroz/yii2-query-monitoring`, namespace `mrstroz\querymonitoring`, code in `src/`, tests in `tests/`). The package is a Composer library for Yii 2 that collects a flat list of database queries (MySQL, PostgreSQL, MongoDB) per HTTP request or console run and hands one `QueryBatch` to an output adapter. Everything about what it must do is in `docs/`.
 
 ## Start here
 
@@ -16,7 +16,7 @@ Documentation is in Polish. This file stays in English.
 
 - `docs/spec/` says **what** the system does. `00` scope, glossary and open questions; `01` how entries are collected (Command subclass for SQL, driver events for MongoDB, HTTP and console lifecycle); `02` the batch format, normalisation rules and limits; `03` adapter contract, file adapter, performance test.
 - `docs/adr/` says **why**. Seven accepted decisions. A changed parameter edits the ADR in place; a new decision gets a new ADR.
-- `docs/plan/` says **when**. Tasks are `YQM-NN`, numbered continuously, one task per commit. Milestones E0 and E1 have tasks written out; E2–E4 have a goal and mandatory acceptance scenarios.
+- `docs/plan/` says **when**. Tasks are `YQM-NN`, numbered continuously, one task per commit. Milestones E0 and E1 have tasks written out and done; E2–E4 have a goal and mandatory acceptance scenarios.
 - `docs/query-monitoring-library-brief.md` is the original brief. Where it disagrees with `spec/`, `spec/` wins.
 
 Rules that hold across the tree: spec section numbers are addresses and are never renumbered; plan tasks link to spec and never describe behaviour; if a task changes behaviour, fix the spec first, then the code; tick the checkbox and replace "Stan na dziś" in the same commit as the code.

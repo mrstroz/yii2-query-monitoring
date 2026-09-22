@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace mrstroz\querymonitoring\tests\Unit\support;
 
+use mrstroz\querymonitoring\adapter\FileAdapterException;
 use mrstroz\querymonitoring\support\Guard;
 use mrstroz\querymonitoring\tests\Unit\LoggedTestCase;
 
@@ -61,6 +62,28 @@ final class GuardTest extends LoggedTestCase
         self::assertStringNotContainsString('SELECT', $logged);
     }
 
+    public function testFileAdapterExceptionIsLoggedWithItsWholeMessage(): void
+    {
+        $message = 'File adapter could not open the lock file /var/log/app/q.jsonl.lock: fopen(/var/log/app/q.jsonl.lock): Failed to open stream: Permission denied';
+        (new Guard())->run(static function () use ($message): never {
+            throw new FileAdapterException($message);
+        }, 'send');
+
+        $errors = $this->errors();
+        self::assertCount(1, $errors);
+        self::assertSame('Query monitoring failed in send with ' . FileAdapterException::class . ': ' . $message, $errors[0][0]);
+    }
+
+    public function testOtherRuntimeExceptionIsLoggedByClassOnly(): void
+    {
+        (new Guard())->run(static function (): never {
+            throw new \UnexpectedValueException('File adapter could not open /var/log/app/q.jsonl');
+        }, 'send');
+
+        $errors = $this->errors();
+        self::assertCount(1, $errors);
+        self::assertSame('Query monitoring failed in send with UnexpectedValueException', $errors[0][0]);
+    }
 
     private function throwing(): int
     {

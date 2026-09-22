@@ -6,6 +6,7 @@ namespace mrstroz\querymonitoring;
 
 use mrstroz\querymonitoring\adapter\BatchAdapterInterface;
 use mrstroz\querymonitoring\adapter\CallableAdapter;
+use mrstroz\querymonitoring\adapter\FileAdapter;
 use mrstroz\querymonitoring\batch\BatchType;
 use mrstroz\querymonitoring\batch\QueryBatch;
 use mrstroz\querymonitoring\collector\QueryCollector;
@@ -34,7 +35,6 @@ use yii\db\Connection;
  *         'class' => \mrstroz\querymonitoring\QueryMonitor::class,
  *         'app' => 'shop-api',
  *         'connections' => ['db', 'admin/db'],
- *         'adapter' => MyAdapter::class,
  *     ],
  * ],
  * ```
@@ -60,12 +60,21 @@ class QueryMonitor extends Component implements BootstrapInterface
     public int $maxQueryLength = 2048;
 
     /**
-     * Class name, {@see BatchAdapterInterface} object or `callable(QueryBatch): mixed` (spec 03 §1).
-     * In E0 there is no file adapter yet: `null` sends nothing and logs one `Yii::error`.
+     * Class name, {@see BatchAdapterInterface} object or `callable(QueryBatch): mixed` (spec 03 §1);
+     * `null` writes to a file with {@see FileAdapter}, set by {@see self::$file}.
      *
      * @var class-string<BatchAdapterInterface>|BatchAdapterInterface|callable(QueryBatch): mixed|null
      */
     public mixed $adapter = null;
+
+    /**
+     * Settings of the file adapter, used only when `adapter` is `null` (spec 03 §3): `path` (Yii alias
+     * allowed), `maxSize` in bytes and `maxFiles` archived copies. An omitted key keeps its default
+     * from {@see FileAdapter}; an unknown key or a wrong value disables the package.
+     *
+     * @var array<string, mixed>
+     */
+    public array $file = [];
 
     private ?Guard $guard = null;
     private ?QueryCollector $collector = null;
@@ -240,6 +249,9 @@ class QueryMonitor extends Component implements BootstrapInterface
     private function resolveAdapter(): BatchAdapterInterface
     {
         $adapter = $this->adapter;
+        if ($adapter === null) {
+            return $this->createFileAdapter();
+        }
         if (is_string($adapter) && class_exists($adapter)) {
             $adapter = \Yii::createObject($adapter);
         }
@@ -250,6 +262,34 @@ class QueryMonitor extends Component implements BootstrapInterface
             return new CallableAdapter($adapter);
         }
 
-        throw new InvalidConfigException('QueryMonitor::$adapter must be a class name, an adapter object or a callable; the file adapter arrives in E1.');
+        throw new InvalidConfigException('QueryMonitor::$adapter must be null, a class name, an adapter object or a callable.');
+    }
+
+    /**
+     * The default adapter from {@see self::$file}, checked key by key. Only the alias is resolved here:
+     * the directory and the files are created on the first write (spec 03 §3).
+     */
+    private function createFileAdapter(): FileAdapter
+    {
+        $defaults = ['path' => FileAdapter::DEFAULT_PATH, 'maxSize' => FileAdapter::DEFAULT_MAX_SIZE, 'maxFiles' => FileAdapter::DEFAULT_MAX_FILES];
+        $unknown = array_diff_key($this->file, $defaults);
+        if ($unknown !== []) {
+            throw new InvalidConfigException('QueryMonitor::$file has unknown keys: ' . implode(', ', array_keys($unknown)) . '.');
+        }
+        $file = array_replace($defaults, $this->file);
+        if (!is_string($file['path']) || $file['path'] === '') {
+            throw new InvalidConfigException('QueryMonitor::$file[\'path\'] must be a non-empty string.');
+        }
+        foreach (['maxSize', 'maxFiles'] as $key) {
+            if (!is_int($file[$key]) || $file[$key] < 1) {
+                throw new InvalidConfigException("QueryMonitor::\$file['{$key}'] must be an integer of at least 1.");
+            }
+        }
+        $path = \Yii::getAlias($file['path'], false);
+        if ($path === false) {
+            throw new InvalidConfigException("QueryMonitor::\$file['path'] uses an unknown alias: {$file['path']}.");
+        }
+
+        return new FileAdapter($path, $file['maxSize'], $file['maxFiles']);
     }
 }
