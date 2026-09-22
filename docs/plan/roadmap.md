@@ -4,9 +4,9 @@
 
 | Pole | Wartość |
 |---|---|
-| **Etap** | E0. Fundament i źródło SQL, w toku, 1 z 12 |
-| **Ostatnio ukończone** | [YQM-1](01-fundament-i-sql.md) szkielet pakietu: `mrstroz\querymonitoring`, PHPUnit 10.5, PHPStan 2 level 8, PHP CS Fixer, Docker, CI 8.1–8.4 |
-| **Następne** | [YQM-2](01-fundament-i-sql.md) paczka i interfejs adaptera, równolegle YQM-6 normalizator. Komendy przez Docker: `docker compose run --rm php composer test` |
+| **Etap** | E0. Fundament i źródło SQL, w toku, 2 z 12 |
+| **Ostatnio ukończone** | [YQM-2](01-fundament-i-sql.md): `QueryBatch` i JSON, `BatchAdapterInterface` |
+| **Następne** | [YQM-3](01-fundament-i-sql.md) kolektor z limitami, [YQM-6](01-fundament-i-sql.md) normalizator SQL. Komendy przez Docker: `docker compose run --rm php composer test` |
 
 Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trzeba zajrzeć na początku sesji.
 
@@ -14,7 +14,7 @@ Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trze
 
 | Etap | Plik | Cel | Co działa na końcu | Postęp |
 |---|---|---|---|---|
-| **E0** | [01-fundament-i-sql](01-fundament-i-sql.md) | Pakiet, kolektor, `Command`, cykl życia HTTP | Aplikacja z MySQL i PostgreSQL daje paczkę do jawnego adaptera, wyjątek nie gubi paczki | 1/12 |
+| **E0** | [01-fundament-i-sql](01-fundament-i-sql.md) | Pakiet, kolektor, `Command`, cykl życia HTTP | Aplikacja z MySQL i PostgreSQL daje paczkę do jawnego adaptera, wyjątek nie gubi paczki | 2/12 |
 | **E1** | [02-adapter-plikowy](02-adapter-plikowy.md) | Adapter plikowy z rotacją | Paczki w `runtime/logs`, bezpieczne przy 8 procesach | – |
 | **E2** | [03-mongodb](03-mongodb.md) | Źródło MongoDB | Jedna paczka z wpisami SQL i MongoDB | – |
 | **E3** | [04-konsola](04-konsola.md) | Zadania konsolowe | Wiele paczek z `seq` w jednym procesie | – |

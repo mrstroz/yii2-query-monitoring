@@ -13,7 +13,7 @@
       Gotowe, gdy: `composer test`, `composer stan` i `composer cs` działają na pustym pakiecie, a CI w GitHub Actions uruchamia je na PHP 8.1 i 8.4.
       Rozstrzyga otwartą kwestię 1 w spec 00 §9: nazwę pakietu i namespace.
 
-- [ ] (=) **YQM-2** Klasa `QueryBatch` z nagłówkiem i wpisami, serializacja do JSON, interfejs adaptera
+- [x] (=) **YQM-2** Klasa `QueryBatch` z nagłówkiem i wpisami, serializacja do JSON, interfejs adaptera
       Spec: [02 §1](../spec/02-format-paczki.md#1-nagłówek) · [03 §1](../spec/03-adaptery-wyjsciowe.md#1-kontrakt) · Zależy od: YQM-1
       Gotowe, gdy: JSON z przykładu w spec 02 §3 powstaje z obiektu i przechodzi porównanie w teście, a `BatchAdapterInterface::send()` jest zdefiniowany.
 
