@@ -13,7 +13,8 @@ namespace mrstroz\querymonitoring\tests\app;
  * - `QM_ROUTE` — the route to run,
  * - `QM_DB` — `mysql` or `pgsql`, the database behind `db`, `dbOther` and `admin/db`
  *   (DSNs from `QM_MYSQL_DSN`/`QM_PGSQL_DSN` and credentials set in docker-compose.yml),
- * - `QM_CAPTURE_FILE`, `QM_LOG_FILE` — per-run files created and removed by the runner,
+ * - `QM_CAPTURE_FILE`, `QM_LOG_FILE` — per-run files created and removed by the runner
+ *   (with `QM_CAPTURE_FILE.calls`, the capturing adapter's call log),
  * - everything in `$env`, e.g. `QM_SCENARIO` or the {@see TestPdo} switches.
  *
  * Route {@see self::SCENARIO_ROUTE} loads `tests/Integration/scenarios/<QM_SCENARIO>.php`, which returns
@@ -48,9 +49,10 @@ final class AppRunner
                 'message' => (string) ($log['message'] ?? ''),
             ], self::readLines($logFile));
 
-            return new RunResult($exitCode, $stdout, $stderr, self::readLines($captureFile), $logs);
+            return new RunResult($exitCode, $stdout, $stderr, self::readLines($captureFile), $logs, self::readLines($captureFile . '.calls'));
         } finally {
             @unlink($captureFile);
+            @unlink($captureFile . '.calls');
             @unlink($logFile);
         }
     }
@@ -115,6 +117,9 @@ final class AppRunner
     private static function readLines(string $file): array
     {
         $lines = [];
+        if (!is_file($file)) {
+            return $lines;
+        }
         foreach (file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
             $decoded = json_decode($line, true);
             if (is_array($decoded)) {

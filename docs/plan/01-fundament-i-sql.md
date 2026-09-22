@@ -41,15 +41,15 @@
       Gotowe, gdy: testy tabelaryczne pokrywają literały, komentarze, `LIMIT`, niedomknięty literał dający `null`, `SELECT "email" FROM "users"` z identyfikatorami dla `pgsql` i dwoma `?` dla `mysql`, a obcięcie daje najwyżej 2048 bajtów razem z `…`, poprawne UTF-8 i następuje po normalizacji.
       Rozstrzyga otwartą kwestię 4 w spec 00 §9.
 
-- [ ] (=) **YQM-7** Akcja wejściowa z `EVENT_BEFORE_ACTION` w nagłówku
+- [x] (=) **YQM-7** Akcja wejściowa z `EVENT_BEFORE_ACTION` w nagłówku
       Spec: [01 §4](../spec/01-zbieranie-danych.md#4-żądanie-http) · Zależy od: YQM-4
       Gotowe, gdy: kontroler w głównej aplikacji daje `module: null`, kontroler w module zagnieżdżonym daje `module: "admin/orders"` z lokalnymi `controller` i `action`, zagnieżdżone `runAction` i `site/error` nie nadpisują pierwszej akcji, a 404 przed routingiem ze skonfigurowanym `errorAction` daje trzy `null`.
 
-- [ ] (=) **YQM-8** Finalizacja w `EVENT_AFTER_REQUEST` i w callbacku shutdown
+- [x] (=) **YQM-8** Finalizacja w `EVENT_AFTER_REQUEST` i w callbacku shutdown
       Spec: [01 §4](../spec/01-zbieranie-danych.md#4-żądanie-http) · ADR: [0003](../adr/0003-finalizacja-w-after-request-i-shutdown.md) · Zależy od: YQM-4, YQM-12
       Gotowe, gdy: nieobsłużony wyjątek zakończony przez `ErrorHandler` z `exit(1)`, zwykłe `exit()` w akcji i zwykłe żądanie dają dokładnie jedną paczkę w osobnym procesie, żądanie bez zapytań nie daje żadnej, a zapytanie po finalizacji nie daje wpisu ani drugiej paczki.
 
-- [ ] (=) **YQM-9** Ochrona aplikacji: obsługa błędu adaptera, błędu monitoringu i flaga ponownego wejścia
+- [x] (=) **YQM-9** Ochrona aplikacji: obsługa błędu adaptera, błędu monitoringu i flaga ponownego wejścia
       Spec: [01 §6](../spec/01-zbieranie-danych.md#6-ochrona-aplikacji) · ADR: [0006](../adr/0006-blad-adaptera-gubi-paczke.md) · Zależy od: YQM-8
       Gotowe, gdy: adapter rzucający wyjątek nie zmienia odpowiedzi i nie jest wywołany drugi raz w shutdown, wymuszony błąd w kolektorze, normalizatorze i serializacji po udanym zapytaniu nie zmienia jego wyniku, przy błędzie bazy aplikacja dostaje oryginalny wyjątek Yii, `Yii::error` pojawia się raz na proces bez zapętlenia, a zapytanie wewnątrz adaptera nie daje wpisu.
 

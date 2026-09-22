@@ -18,7 +18,7 @@ Wyjątek z `send()` jest przechwytywany, paczka przepada, biblioteka zapisuje je
 
 **Pozytywne:** jedna ścieżka błędu. Pakiet nie potrzebuje kolejki ponowień ani drugiego adaptera w konfiguracji.
 
-**Negatywne:** awaria odbiorcy oznacza dziurę w danych bez możliwości odtworzenia. Wolny adapter wydłuża zajętość procesu FPM.
+**Negatywne:** awaria odbiorcy oznacza dziurę w danych bez możliwości odtworzenia. Wolny adapter wydłuża zajętość procesu FPM. `EVENT_AFTER_REQUEST` zachodzi przed `Response::send()`, więc wolny adapter opóźnia też odpowiedź dla klienta.
 
 **Wymagania:** dokumentacja adaptera musi mówić o fazie shutdown i o limicie czasu.
 

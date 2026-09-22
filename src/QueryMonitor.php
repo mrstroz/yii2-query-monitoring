@@ -14,9 +14,11 @@ use mrstroz\querymonitoring\sql\Dialect;
 use mrstroz\querymonitoring\sql\Recorder;
 use mrstroz\querymonitoring\sql\SqlNormalizer;
 use mrstroz\querymonitoring\support\Guard;
+use yii\base\ActionEvent;
 use yii\base\Application;
 use yii\base\BootstrapInterface;
 use yii\base\Component;
+use yii\base\Event;
 use yii\base\InvalidConfigException;
 use yii\db\Connection;
 
@@ -39,6 +41,7 @@ use yii\db\Connection;
  *
  * All work happens inside one {@see support\Guard}: a wrong setting disables the package for the
  * process with one `Yii::error`, and the application answers as without the package.
+ * {@see self::createNormalizer()} and {@see self::createCollector()} are the only extension points.
  */
 class QueryMonitor extends Component implements BootstrapInterface
 {
@@ -67,10 +70,11 @@ class QueryMonitor extends Component implements BootstrapInterface
     private ?Guard $guard = null;
     private ?QueryCollector $collector = null;
     private ?BatchAdapterInterface $batchAdapter = null;
+    private bool $finalized = false;
 
     /**
-     * Validates the settings, installs the measured `Command` on the listed connections and
-     * subscribes {@see self::finalize()} to `Application::EVENT_AFTER_REQUEST`.
+     * Validates the settings, installs the measured `Command` on the listed connections, captures the
+     * entry action and subscribes {@see self::finalize()} to `Application::EVENT_AFTER_REQUEST` and to shutdown.
      * With `enabled: false` it does nothing; a wrong setting disables the package with one `Yii::error`.
      */
     public function bootstrap($app): void
@@ -83,23 +87,58 @@ class QueryMonitor extends Component implements BootstrapInterface
     }
 
     /**
-     * Closes the collector and sends a non-empty batch to the adapter. The single finalisation path:
-     * YQM-8 adds the "finalised" flag and the shutdown fallback here. A no-op when the package is
-     * disabled or was not installed.
+     * Closes the collector and sends a non-empty batch to the adapter, once per process (spec 01 §4, ADR-0003).
+     * Called from `Application::EVENT_AFTER_REQUEST` and from the shutdown callback, whichever comes first.
+     *
+     * `$finalized` is the only finalisation state: it is set before anything else, also when the package
+     * was not installed, and never reset, so an adapter or collector failure is not retried in shutdown.
+     * The collector is paused while the adapter sends, so queries the adapter runs are not entries (spec 01 §6).
      */
     public function finalize(): void
     {
+        if ($this->finalized) {
+            return;
+        }
+        $this->finalized = true;
         $collector = $this->collector;
         $adapter = $this->batchAdapter;
         if ($collector === null || $adapter === null || $this->guard === null) {
             return;
         }
         $this->guard->run(static function () use ($collector, $adapter): void {
-            $batch = $collector->close(new \DateTimeImmutable());
-            if ($batch->queries !== [] || $batch->dropped > 0) {
-                $adapter->send($batch);
+            $collector->pause();
+            try {
+                $batch = $collector->close(new \DateTimeImmutable());
+                if ($batch->queries !== [] || $batch->dropped > 0) {
+                    $adapter->send($batch);
+                }
+            } finally {
+                $collector->resume();
             }
         }, 'send');
+    }
+
+    /**
+     * Creates the normaliser shared by all monitored connections.
+     */
+    protected function createNormalizer(): SqlNormalizer
+    {
+        return new SqlNormalizer($this->maxQueryLength);
+    }
+
+    /**
+     * Creates the collector for this process, with a new random batch id.
+     */
+    protected function createCollector(Application $app): QueryCollector
+    {
+        return new QueryCollector(
+            app: $this->app,
+            type: $app instanceof \yii\console\Application ? BatchType::Console : BatchType::Http,
+            id: bin2hex(random_bytes(8)),
+            host: (string) gethostname(),
+            maxEntries: $this->maxEntries,
+            maxBatchBytes: $this->maxBatchBytes,
+        );
     }
 
     private function install(Application $app, Guard $guard): void
@@ -113,22 +152,43 @@ class QueryMonitor extends Component implements BootstrapInterface
         if (!Command::supportsInstalledYii()) {
             throw new InvalidConfigException('The installed yii\\db\\Command lacks the private fields the measured Command reads; see ADR-0001.');
         }
-        $normalizer = new SqlNormalizer($this->maxQueryLength);
+        $normalizer = $this->createNormalizer();
         $adapter = $this->resolveAdapter();
-        $collector = new QueryCollector(
-            app: $this->app,
-            type: $app instanceof \yii\console\Application ? BatchType::Console : BatchType::Http,
-            id: bin2hex(random_bytes(8)),
-            host: (string) gethostname(),
-            maxEntries: $this->maxEntries,
-            maxBatchBytes: $this->maxBatchBytes,
-        );
+        $collector = $this->createCollector($app);
         foreach ($this->connections as $id) {
             $guard->run(fn() => $this->installOn($app, $id, $normalizer, $collector, $guard), "connection {$id}");
         }
         $this->collector = $collector;
         $this->batchAdapter = $adapter;
+        $this->captureEntryAction($app, $collector, $guard);
         $app->on(Application::EVENT_AFTER_REQUEST, fn() => $this->finalize());
+        // exit() in an action and exit(1) from the ErrorHandler skip EVENT_AFTER_REQUEST (ADR-0003).
+        register_shutdown_function(fn() => $this->finalize());
+    }
+
+    /**
+     * Stores the first action of the request in the header (spec 01 §4). The handler detaches itself
+     * after the first action; an action run by the error handler (`errorAction`) is skipped and leaves
+     * it attached, so a 404 before routing keeps three `null`s.
+     */
+    private function captureEntryAction(Application $app, QueryCollector $collector, Guard $guard): void
+    {
+        // The parameter is a plain Event: a type error on a foreign trigger() must happen inside the guard.
+        $handler = static function (Event $event) use (&$handler, $app, $collector, $guard): void {
+            $guard->run(static function () use ($event, $handler, $app, $collector): void {
+                if (!$event instanceof ActionEvent) {
+                    return;
+                }
+                if ($app->has('errorHandler') && $app->getErrorHandler()->exception !== null) {
+                    return;
+                }
+                $controller = $event->action->controller;
+                $module = $controller->module;
+                $collector->setAction($module instanceof Application ? null : $module->getUniqueId(), $controller->id, $event->action->id);
+                $app->off(Application::EVENT_BEFORE_ACTION, $handler);
+            }, 'action');
+        };
+        $app->on(Application::EVENT_BEFORE_ACTION, $handler);
     }
 
     private function installOn(Application $app, string $id, SqlNormalizer $normalizer, QueryCollector $collector, Guard $guard): void

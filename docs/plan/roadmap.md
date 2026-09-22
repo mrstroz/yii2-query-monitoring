@@ -4,9 +4,9 @@
 
 | Pole | Wartość |
 |---|---|
-| **Etap** | E0. Fundament i źródło SQL, w toku, 7 z 12 |
-| **Ostatnio ukończone** | [YQM-12, YQM-4, YQM-5](01-fundament-i-sql.md): aplikacja testowa w osobnym procesie na MySQL i PostgreSQL, komponent `QueryMonitor` z wysyłką w `EVENT_AFTER_REQUEST`, mierzony `Command` przez `commandMap` |
-| **Następne** | [YQM-7, YQM-8, YQM-9](01-fundament-i-sql.md): akcja wejściowa, finalizacja z shutdown, ochrona aplikacji. Komendy przez Docker: `docker compose run --rm php composer test` (bazy startują same) |
+| **Etap** | E0. Fundament i źródło SQL, w toku, 10 z 12 |
+| **Ostatnio ukończone** | [YQM-7, YQM-8, YQM-9](01-fundament-i-sql.md): akcja wejściowa z `EVENT_BEFORE_ACTION`, finalizacja w `EVENT_AFTER_REQUEST` z awaryjnym shutdown i flagą „sfinalizowano”, ochrona aplikacji z flagą ponownego wejścia (`QueryCollector::pause()`) |
+| **Następne** | [YQM-10, YQM-11](01-fundament-i-sql.md): test integracyjny AR, cache, kilka połączeń i savepointy; CI na MySQL i PostgreSQL, przykład konfiguracji i instrukcja w README. Komendy przez Docker: `docker compose run --rm php composer test` (bazy startują same) |
 
 Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trzeba zajrzeć na początku sesji.
 

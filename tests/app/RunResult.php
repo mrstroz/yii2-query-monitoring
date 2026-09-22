@@ -12,6 +12,7 @@ final class RunResult
     /**
      * @param list<array<string, mixed>> $batches batches received by the capturing adapter, decoded, in order
      * @param list<array{level: string, category: string, message: string}> $logs Yii log messages of level error and warning
+     * @param list<array<string, mixed>> $adapterCalls one line per call of the capturing adapter's `send()`, in order
      */
     public function __construct(
         public readonly int $exitCode,
@@ -19,5 +20,6 @@ final class RunResult
         public readonly string $stderr,
         public readonly array $batches,
         public readonly array $logs,
+        public readonly array $adapterCalls = [],
     ) {}
 }

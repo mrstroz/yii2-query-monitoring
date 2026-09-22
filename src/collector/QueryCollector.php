@@ -43,6 +43,7 @@ final class QueryCollector
     private int $dropped = 0;
     private bool $full = false;
     private ?QueryBatch $batch = null;
+    private bool $paused = false;
     private ?string $module = null;
     private ?string $controller = null;
     private ?string $action = null;
@@ -75,11 +76,11 @@ final class QueryCollector
 
     /**
      * Stores the entry, or counts it in `dropped` when a limit is reached.
-     * After {@see self::close()} the entry is ignored and `dropped` does not change.
+     * While {@see self::isAccepting()} is false the entry is ignored and `dropped` does not change.
      */
     public function add(QueryEntry $entry): void
     {
-        if ($this->batch !== null) {
+        if (!$this->isAccepting()) {
             return;
         }
         if ($this->full || count($this->entries) >= $this->maxEntries) {
@@ -132,6 +133,26 @@ final class QueryCollector
     public function isClosed(): bool
     {
         return $this->batch !== null;
+    }
+
+    /**
+     * Stops intake until {@see self::resume()}: the re-entry flag of spec 01 §6, set around the
+     * adapter's `send()` so that queries the adapter runs do not become entries.
+     */
+    public function pause(): void
+    {
+        $this->paused = true;
+    }
+
+    public function resume(): void
+    {
+        $this->paused = false;
+    }
+
+    /** False after {@see self::close()} and while paused; {@see self::add()} then ignores entries. */
+    public function isAccepting(): bool
+    {
+        return $this->batch === null && !$this->paused;
     }
 
     /** Number of stored entries. */

@@ -9,11 +9,17 @@ use yii\log\Target;
 
 /**
  * Writes each log message as one JSON line `{level, category, message}` to `QM_LOG_FILE`.
+ *
+ * With `QM_LOG_QUERY=1` it first runs a query through the monitored `db`, like a database log target,
+ * so a test can show that a logged package error does not loop through the log.
  */
 final class JsonLogTarget extends Target
 {
     public function export(): void
     {
+        if (getenv('QM_LOG_QUERY') === '1') {
+            \Yii::$app?->getDb()->createCommand('SELECT 1 AS qm_in_log')->queryScalar();
+        }
         $lines = '';
         foreach ($this->messages as $message) {
             [$text, $level, $category] = $message;

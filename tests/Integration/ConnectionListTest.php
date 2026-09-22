@@ -20,7 +20,10 @@ final class ConnectionListTest extends IntegrationTestCase
 
     private const APP_COMMAND = \yii\db\sqlite\Command::class;
 
-    private const SLOW_CONNECT_S = 2;
+    /** Sleep of one connection attempt, well above the limit, so process start-up cannot hide or fake one. */
+    private const SLOW_CONNECT_S = 5;
+
+    private const MAX_RUN_S = 2;
 
     /**
      * @return array<string, mixed>
@@ -46,7 +49,7 @@ final class ConnectionListTest extends IntegrationTestCase
         $elapsed = microtime(true) - $started;
 
         self::assertFalse($this->scenarioOutput($result)['open']['dbMasters']);
-        self::assertLessThan(self::SLOW_CONNECT_S, $elapsed, 'no connection attempt in bootstrap');
+        self::assertLessThan(self::MAX_RUN_S, $elapsed, 'no connection attempt in bootstrap');
         $this->assertOnePackageError($result);
         self::assertSame([], $result->batches);
     }

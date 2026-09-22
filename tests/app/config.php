@@ -65,6 +65,11 @@ return [
         'dbOther' => $connection,
         'queryMonitor' => $monitor,
         ...$extra,
+        'errorHandler' => [
+            // A real exit(1) after an unhandled exception, as in production; YII_ENV_TEST would silence it.
+            'silentExitOnException' => false,
+            'errorAction' => getenv('QM_ERROR_ACTION') === '1' ? 'site/error' : null,
+        ],
         'request' => [
             'cookieValidationKey' => 'test',
             'enableCsrfValidation' => false,

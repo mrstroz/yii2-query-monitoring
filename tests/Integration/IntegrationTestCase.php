@@ -40,13 +40,20 @@ abstract class IntegrationTestCase extends TestCase
      */
     protected function scenario(string $db, string $name, array $component = [], array $env = []): RunResult
     {
+        return $this->request($db, AppRunner::SCENARIO_ROUTE, $component, ['QM_SCENARIO' => $name] + $env);
+    }
+
+    /**
+     * Runs one request of the test application for `$route` (named so, because TestCase::run() is final).
+     *
+     * @param array<string, mixed> $component merged over {@see self::defaultComponent()}
+     * @param array<string, string> $env
+     */
+    protected function request(string $db, string $route, array $component = [], array $env = []): RunResult
+    {
         $this->requireDatabase($db);
 
-        return AppRunner::run(
-            array_replace(self::defaultComponent(), $component),
-            AppRunner::SCENARIO_ROUTE,
-            ['QM_DB' => $db, 'QM_SCENARIO' => $name] + $env,
-        );
+        return AppRunner::run(array_replace(self::defaultComponent(), $component), $route, ['QM_DB' => $db] + $env);
     }
 
     /**

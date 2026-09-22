@@ -20,7 +20,7 @@ Finalizacja następuje w `EVENT_AFTER_REQUEST`. Przy starcie komponent rejestruj
 
 **Negatywne:** błąd krytyczny PHP nadal gubi paczkę. Adapter może działać w fazie shutdown, gdy część komponentów Yii jest zamknięta. Zapytania po `EVENT_AFTER_REQUEST` są niewidoczne.
 
-**Wymagania:** flaga „sfinalizowano” w kolektorze, ustawiana przed budową paczki, także przy pustym buforze, i nie cofana przy błędzie adaptera. Sprawdzana w obu ścieżkach.
+**Wymagania:** flaga „sfinalizowano” na jedynej ścieżce finalizacji komponentu, a nie w kolektorze, bo błąd przy budowie paczki zostawiłby kolektor otwarty. Ustawiana przed budową paczki, także przy pustym buforze, i nie cofana przy błędzie adaptera ani kolektora. Sprawdzana w obu ścieżkach.
 
 ## Rozważane warianty
 
