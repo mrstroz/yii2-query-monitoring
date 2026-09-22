@@ -17,7 +17,7 @@
       Spec: [02 §1](../spec/02-format-paczki.md#1-nagłówek) · [03 §1](../spec/03-adaptery-wyjsciowe.md#1-kontrakt) · Zależy od: YQM-1
       Gotowe, gdy: JSON z przykładu w spec 02 §3 powstaje z obiektu i przechodzi porównanie w teście, a `BatchAdapterInterface::send()` jest zdefiniowany.
 
-- [ ] (^) **YQM-3** Kolektor w pamięci z limitem wpisów i rozmiaru
+- [x] (^) **YQM-3** Kolektor w pamięci z limitem wpisów i rozmiaru
       Spec: [02 §5](../spec/02-format-paczki.md#5-limity) · Zależy od: YQM-2
       Gotowe, gdy: 600 wpisów daje paczkę z 500 wpisami i `dropped: 100`, limit bajtów jest liczony dla końcowego JSON z nagłówkiem i `dropped`, a wpis `result: error` po limicie też zwiększa licznik.
 

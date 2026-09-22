@@ -98,6 +98,8 @@ Wartości parametrów, dokumenty, adresy URL z parametrami i dane uwierzytelniaj
 | Pojedynczy wpis z nagłówkiem ponad `maxBatchBytes` | Wpis przepada, `dropped` rośnie | Wpis przepada, `dropped` bieżącej paczki rośnie |
 | `maxQueryLength` | [§4](#4-normalizacja) | [§4](#4-normalizacja) |
 
+Niezmiennik: JSON paczki nigdy nie przekracza `maxBatchBytes`. Kolektor liczy bajty nagłówka z bieżącymi wartościami, z miejscem na `seq` i `dropped` do 10 cyfr, oraz bajty każdego wpisu po serializacji. Gdy akcja wejściowa ustawiona po wpisach wydłuży nagłówek ponad limit, przy zamknięciu kolektor usuwa wpisy od końca i dolicza je do `dropped`. Wpis dodany po zamknięciu kolektora jest pomijany i nie zwiększa `dropped`. W HTTP pierwszy wpis, który nie mieści się w `maxEntries` lub `maxBatchBytes`, kończy przyjmowanie: każdy następny, także krótszy, tylko zwiększa `dropped`, więc lista jest pełna do pierwszego osiągniętego limitu ([00 §6](00-przeglad-i-zakres.md#6-kryteria-sukcesu)).
+
 Wpis z `query` obciętym do `maxQueryLength` mieści się w `maxBatchBytes` przy wartościach początkowych, więc ostatni wiersz tabeli dotyczy tylko konfiguracji z bardzo małym limitem paczki.
 
 ## 6. Poza zakresem
