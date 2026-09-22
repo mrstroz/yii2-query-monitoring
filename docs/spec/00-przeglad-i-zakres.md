@@ -7,7 +7,7 @@
 | **Projekt** | yii2-query-monitoring |
 | **Repozytorium** | `github.com/mrstroz/yii2-query-monitoring` |
 | **Data utworzenia** | 2026-09-22 |
-| **Status** | Szkic, oparty na briefie. Kod jeszcze nie istnieje. |
+| **Status** | Szkic, oparty na briefie. Kod powstaje w etapie E0, od YQM-1. |
 
 ---
 
@@ -82,7 +82,7 @@ Z tego wynika reszta: wyjątek w kolektorze lub adapterze jest przechwytywany i 
 | CI | GitHub Actions | Matryca PHP 8.1 do 8.4 |
 | Produkcja | Aplikacje Yii 2 na PHP-FPM | Każda aplikacja podaje własne `app` w konfiguracji |
 
-Wymagania: PHP 8.1 lub nowszy, Yii 2.0.45 lub nowszy. `yiisoft/yii2-mongodb` i `ext-mongodb` są zależnościami opcjonalnymi w `suggest`. Aplikacja tylko z SQL instaluje pakiet bez MongoDB.
+Wymagania: PHP 8.1 lub nowszy, Yii 2.0.55 lub nowszy. Starsze wydania 2.0.x mają security advisories, przez które domyślna polityka Composera 2.10 ich nie instaluje. `yiisoft/yii2-mongodb` i `ext-mongodb` są zależnościami opcjonalnymi w `suggest`. Aplikacja tylko z SQL instaluje pakiet bez MongoDB.
 
 ## 8. Słownik
 
@@ -102,7 +102,7 @@ Wymagania: PHP 8.1 lub nowszy, Yii 2.0.45 lub nowszy. `yiisoft/yii2-mongodb` i `
 
 | # | Kwestia | Warianty | Co to rozstrzygnie |
 |---|---|---|---|
-| 1 | Nazwa pakietu i namespace | `mrstroz/yii2-query-monitoring` z `mrstroz\querymonitoring`, albo inna | Decyzja przy YQM-1 |
+| 1 | Nazwa pakietu i namespace | **Rozstrzygnięte 2026-09-22 w YQM-1:** `mrstroz/yii2-query-monitoring` z `mrstroz\querymonitoring` | Zamknięte |
 | 2 | Czy `yii\mongodb\Connection` udostępnia `Manager` sterownika tak, żeby dało się podpiąć `CommandSubscriber` bez podmiany klasy połączenia | `addSubscriber` na `Manager`, albo podmiana klasy `Connection` | Sonda w pierwszym zadaniu etapu E2 |
 | 3 | Limity: 500 wpisów, 256 KB, 2 KB na `query`, 10 MB × 5 plików | Zostają, albo korekta | Wynik testu wydajności w E4 |
 | 4 | Organizacja normalizatora SQL: jedna klasa z parametrem dialektu, czy osobna klasa na dialekt | Jedna klasa, albo klasa na `db` | Decyzja przy YQM-6. Reguły dialektów są już w [02 §4](02-format-paczki.md#4-normalizacja) |

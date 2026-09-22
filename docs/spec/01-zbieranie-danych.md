@@ -2,7 +2,7 @@
 
 Jak wpisy powstają i kiedy kolektor je przyjmuje. Format wpisu i paczki jest w [02](02-format-paczki.md), odbiorca paczki w [03](03-adaptery-wyjsciowe.md).
 
-Kod jeszcze nie istnieje. Każde zdanie poniżej opisuje zachowanie docelowe. Odwołania do Yii dotyczą wersji 2.0.45.
+Kod powstaje w etapie E0. Zdanie, którego kod jeszcze nie realizuje, opisuje zachowanie docelowe. Odwołania do Yii dotyczą wersji 2.0.55.
 
 ## 1. Komponent i konfiguracja
 

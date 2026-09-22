@@ -8,7 +8,7 @@
 
 ## Zadania
 
-- [ ] (^) **YQM-1** Szkielet pakietu Composer z PHPUnit, PHPStan i PHP CS Fixer
+- [x] (^) **YQM-1** Szkielet pakietu Composer z PHPUnit, PHPStan i PHP CS Fixer
       Spec: [00 §7](../spec/00-przeglad-i-zakres.md#7-środowiska)
       Gotowe, gdy: `composer test`, `composer stan` i `composer cs` działają na pustym pakiecie, a CI w GitHub Actions uruchamia je na PHP 8.1 i 8.4.
       Rozstrzyga otwartą kwestię 1 w spec 00 §9: nazwę pakietu i namespace.
@@ -34,7 +34,7 @@
 - [ ] (^) **YQM-5** Klasa `Command` mierząca `PDO::prepare()` i `PDOStatement::execute()`
       Spec: [01 §2](../spec/01-zbieranie-danych.md#2-źródło-sql) · ADR: [0001](../adr/0001-podmiana-klasy-command-zamiast-profilera.md) · Zależy od: YQM-4
       Gotowe, gdy: wyjątek z `prepare()` i z `execute()` daje wpis `result: error` z SQLSTATE i przechodzi przez konwersję wyjątków Yii bez zmian, ponowienie w `internalExecute()` daje dwa wpisy, drugie wykonanie tego samego przygotowanego polecenia nie dolicza czasu przygotowania, wiązanie parametrów działa jak w `yii\db\Command`, a `Connection::open()` i pobranie wyników nie wchodzą w `time_ms`.
-      Sonda ryzyka: `Command::prepare()` w Yii 2.0.45 robi `open()` i `pdo->prepare()` w jednej metodzie. Zadanie ustala, jak zmierzyć samo `pdo->prepare()`.
+      Sonda ryzyka: `Command::prepare()` w Yii 2.0.55 robi `open()` i `pdo->prepare()` w jednej metodzie. Zadanie ustala, jak zmierzyć samo `pdo->prepare()`.
 
 - [ ] (=) **YQM-6** Normalizator SQL z dialektami MySQL i PostgreSQL
       Spec: [02 §4](../spec/02-format-paczki.md#4-normalizacja) · ADR: [0004](../adr/0004-normalizacja-literalow-na-znak-zapytania.md) · Zależy od: YQM-1

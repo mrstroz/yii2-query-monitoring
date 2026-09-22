@@ -1,0 +1,15 @@
+services:
+  php:
+    build:
+      context: docker/php
+      args:
+        PHP_VERSION: ${PHP_VERSION:-8.1}
+    image: yii2-query-monitoring-php:${PHP_VERSION:-8.1}
+    user: "${UID:-1000}:${GID:-1000}"
+    volumes:
+      - .:/app
+      - composer-cache:/tmp/composer/cache
+    working_dir: /app
+
+volumes:
+  composer-cache:

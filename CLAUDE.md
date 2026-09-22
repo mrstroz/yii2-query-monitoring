@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## State of the repository
 
-Documentation only. No PHP code exists yet. The package is a Composer library for Yii 2 that collects a flat list of database queries (MySQL, PostgreSQL, MongoDB) per HTTP request or console run and hands one `QueryBatch` to an output adapter. Everything about what it must do is in `docs/`, and the first implementation task is `YQM-1` in `docs/plan/01-fundament-i-sql.md`.
+Milestone E0 in progress; `YQM-1` created the package skeleton (`mrstroz/yii2-query-monitoring`, namespace `mrstroz\querymonitoring`, code in `src/`, tests in `tests/`). The package is a Composer library for Yii 2 that collects a flat list of database queries (MySQL, PostgreSQL, MongoDB) per HTTP request or console run and hands one `QueryBatch` to an output adapter. Everything about what it must do is in `docs/`.
 
 ## Start here
 
@@ -23,13 +23,16 @@ Rules that hold across the tree: spec section numbers are addresses and are neve
 
 ## Commands
 
-None exist until `YQM-1` creates them. The plan's definition of done expects these Composer scripts, so create them with exactly these names:
+The host has no PHP or Composer. Everything runs in the package's own Docker image (PHP 8.1 by default, `PHP_VERSION=8.4` for another version). The container runs as `UID:GID` from `.env`; shells do not export them, so without `.env` it falls back to `1000:1000`. Once per checkout: `cp .env.dist .env` and set both to `id -u` and `id -g`.
 
 ```
-composer test   # PHPUnit
-composer stan   # PHPStan
-composer cs     # PHP CS Fixer, dry run
+docker compose run --rm php composer install
+docker compose run --rm php composer test   # PHPUnit 10.5
+docker compose run --rm php composer stan   # PHPStan 2, level 8
+docker compose run --rm php composer cs     # PHP CS Fixer, dry run
 ```
+
+These three scripts are the plan's definition of done; keep their names. Do not use or touch containers of other projects running on the host. `composer.lock` is not committed.
 
 Commit messages in English with the task id: `feat: YQM-5 measured Command class`.
 
@@ -44,4 +47,4 @@ These come from the ADRs and are easy to violate by accident:
 - Normalisation replaces literals with `?` and returns `query: null` when unsure (ADR-0004). Rules differ per dialect: `"..."` is a string in MySQL and an identifier in PostgreSQL. Only MySQL's default `sql_mode` is supported.
 - Parameter values, MongoDB documents and credentials never enter a batch. Field, table and collection names are treated as code, not data.
 - `yiisoft/yii2-mongodb` and `ext-mongodb` are optional (`suggest`). SQL-only applications must install without them.
-- Target: PHP 8.1+, Yii 2.0.45+, PHP-FPM request model. No RoadRunner/Swoole, no NFS.
+- Target: PHP 8.1+, Yii 2.0.55+, PHP-FPM request model. No RoadRunner/Swoole, no NFS.

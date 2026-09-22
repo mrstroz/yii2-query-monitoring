@@ -1,0 +1,49 @@
+{
+    "name": "mrstroz/yii2-query-monitoring",
+    "description": "Collects a flat list of database queries per request or console run in Yii 2 and hands it to an output adapter.",
+    "type": "yii2-extension",
+    "license": "MIT",
+    "keywords": ["yii2", "extension", "database", "monitoring", "queries"],
+    "require": {
+        "php": ">=8.1",
+        "ext-json": "*",
+        "ext-pdo": "*",
+        "yiisoft/yii2": "~2.0.55"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.64",
+        "phpstan/phpstan": "^2.1",
+        "phpunit/phpunit": "^10.5"
+    },
+    "suggest": {
+        "ext-mongodb": "Required to monitor MongoDB connections.",
+        "yiisoft/yii2-mongodb": "Required to monitor MongoDB connections."
+    },
+    "autoload": {
+        "psr-4": {
+            "mrstroz\\querymonitoring\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "mrstroz\\querymonitoring\\tests\\": "tests/"
+        }
+    },
+    "repositories": [
+        {
+            "type": "composer",
+            "url": "https://asset-packagist.org"
+        }
+    ],
+    "config": {
+        "allow-plugins": {
+            "yiisoft/yii2-composer": true
+        },
+        "sort-packages": true
+    },
+    "scripts": {
+        "test": "phpunit",
+        "stan": "phpstan analyse --no-progress --memory-limit=512M",
+        "cs": "php-cs-fixer fix --dry-run --diff"
+    }
+}
