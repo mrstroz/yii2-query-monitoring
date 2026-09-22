@@ -1,0 +1,47 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## State of the repository
+
+Documentation only. No PHP code exists yet. The package is a Composer library for Yii 2 that collects a flat list of database queries (MySQL, PostgreSQL, MongoDB) per HTTP request or console run and hands one `QueryBatch` to an output adapter. Everything about what it must do is in `docs/`, and the first implementation task is `YQM-1` in `docs/plan/01-fundament-i-sql.md`.
+
+## Start here
+
+`docs/plan/roadmap.md`, section "Stan na dziś". It names the current milestone, the last finished task and the next one. Do not start coding from memory of the conversation that produced the docs; read the spec sections the task links to.
+
+Documentation is in Polish. This file stays in English.
+
+## How the docs are organised
+
+- `docs/spec/` says **what** the system does. `00` scope, glossary and open questions; `01` how entries are collected (Command subclass for SQL, driver events for MongoDB, HTTP and console lifecycle); `02` the batch format, normalisation rules and limits; `03` adapter contract, file adapter, performance test.
+- `docs/adr/` says **why**. Seven accepted decisions. A changed parameter edits the ADR in place; a new decision gets a new ADR.
+- `docs/plan/` says **when**. Tasks are `YQM-NN`, numbered continuously, one task per commit. Only milestone E0 has tasks written out; E1–E4 have a goal and mandatory acceptance scenarios.
+- `docs/query-monitoring-library-brief.md` is the original brief. Where it disagrees with `spec/`, `spec/` wins.
+
+Rules that hold across the tree: spec section numbers are addresses and are never renumbered; plan tasks link to spec and never describe behaviour; if a task changes behaviour, fix the spec first, then the code; tick the checkbox and replace "Stan na dziś" in the same commit as the code.
+
+## Commands
+
+None exist until `YQM-1` creates them. The plan's definition of done expects these Composer scripts, so create them with exactly these names:
+
+```
+composer test   # PHPUnit
+composer stan   # PHPStan
+composer cs     # PHP CS Fixer, dry run
+```
+
+Commit messages in English with the task id: `feat: YQM-5 measured Command class`.
+
+## Architecture constraints that shape the code
+
+These come from the ADRs and are easy to violate by accident:
+
+- The library must never change the result of a database operation or the application response (`spec/00 §2`). Every collector and adapter call is wrapped; exceptions are logged once per process via `Yii::error` and not rethrown.
+- SQL is measured by replacing `commandClass` on configured connections, not by enabling Yii profiling (ADR-0001). Timing covers `PDO::prepare()` and `PDOStatement::execute()` only. `begin`/`commit`/`rollback` go through PDO directly and are out of scope; savepoints go through `Command` and are in.
+- The batch is a flat list, no aggregates (ADR-0002). Limits: 500 entries, 256 KB per batch, 2 KB per `query`. HTTP drops the excess and counts it in `dropped`; console flushes and starts a new batch.
+- Finalisation happens in `EVENT_AFTER_REQUEST` with a `register_shutdown_function` fallback (ADR-0003). The "finalised" flag is set before the batch is built and is never reset, so an adapter failure does not trigger a second attempt.
+- Normalisation replaces literals with `?` and returns `query: null` when unsure (ADR-0004). Rules differ per dialect: `"..."` is a string in MySQL and an identifier in PostgreSQL. Only MySQL's default `sql_mode` is supported.
+- Parameter values, MongoDB documents and credentials never enter a batch. Field, table and collection names are treated as code, not data.
+- `yiisoft/yii2-mongodb` and `ext-mongodb` are optional (`suggest`). SQL-only applications must install without them.
+- Target: PHP 8.1+, Yii 2.0.45+, PHP-FPM request model. No RoadRunner/Swoole, no NFS.
