@@ -27,7 +27,7 @@ Kontrakt między kolektorem a każdym adapterem. Zmiana pola oznacza nowe `v`.
 |---|---|---|
 | `db` | `mysql` \| `pgsql` \| `mongodb` | Z `driverName` połączenia SQL lub stałe dla MongoDB |
 | `conn` | string | Id komponentu połączenia z listy w konfiguracji |
-| `op` | string | Pierwsze słowo polecenia SQL małymi literami, albo nazwa polecenia MongoDB: `find`, `insert`, `update`, `delete`, `aggregate`, `getMore`, `count` |
+| `op` | string | Pierwsze słowo polecenia SQL małymi literami, po pominięciu białych znaków, komentarzy według dialektu z [§4](#4-normalizacja) i nawiasów otwierających (`WITH ...` daje `with`). Dla `db` spoza `mysql` i `pgsql` komentarzami są tylko `--` i `/* */`. Słowo to ciąg liter ASCII i `_`; gdy pierwszy jest inny znak albo niedomknięty komentarz, `op` jest pusty. Albo nazwa polecenia MongoDB: `find`, `insert`, `update`, `delete`, `aggregate`, `getMore`, `count` |
 | `query` | string \| null | Znormalizowany tekst, [§4](#4-normalizacja). `null`, gdy normalizacja jest niepewna |
 | `time_ms` | float | Czas według [01 §2](01-zbieranie-danych.md#2-źródło-sql) i [01 §3](01-zbieranie-danych.md#3-źródło-mongodb) |
 | `result` | `success` \| `error` | |
@@ -59,23 +59,34 @@ Założenie: nazwy pól, tabel, kolekcji i parametrów są kodem aplikacji, nie 
 |---|---|
 | Symbole parametrów `:name`, `?` | Zostają bez zmian |
 | Literały tekstowe `'...'` | Zamiana na `?`, także wewnątrz zapytania z parametrami |
-| Literały liczbowe, w tym w `LIMIT` i `OFFSET` | Zamiana na `?` |
-| Komentarze `--`, `/* */` | Usunięte |
+| Literały liczbowe, w tym w `LIMIT` i `OFFSET`, ułamki i wykładnik (`1.5`, `1e5`) | Zamiana na `?` |
+| Minus przed liczbą | Zostaje jako operator: `-2` daje `-?` |
+| Cyfry w identyfikatorze lub symbolu parametru (`table1`, `:qp0`, `$1`) | Zostają |
+| Cyfry, po których bez odstępu stoją litery (`123abc`, `1table`) | `query: null` |
+| Komentarze `--`, `/* */` | Zamiana na jedną spację |
+| Niedomknięty komentarz `/* ...` | `query: null` |
+| Białe znaki poza literałami | Ciąg zamieniany na jedną spację, bez spacji na początku i końcu |
 | Nazwy tabel i kolumn | Zostają |
 | `IN (?, ?, ?)` | Nie jest scalane. Różna długość listy daje różny `query` |
 | Niedomknięty literał, nieznana konstrukcja | `query: null` |
-| Długość | Obcięcie do `maxQueryLength` z `…` na końcu, dopiero po normalizacji |
+| `db` inne niż `mysql` i `pgsql` | `query: null` |
+| Tekst, który nie jest poprawnym UTF-8 | `query: null` |
+| Długość | Obcięcie do `maxQueryLength` bajtów UTF-8 razem z `…` na końcu, na granicy znaku, dopiero po normalizacji |
 
 **SQL, reguły dialektu.** Składnia MySQL i PostgreSQL różni się w cudzysłowie, więc normalizator wybiera reguły po `db`. Dla MySQL wspierany jest tylko domyślny `sql_mode` MySQL 8: `"..."` to literał, backslash w literale to znak ucieczki. `ANSI_QUOTES` i `NO_BACKSLASH_ESCAPES` są poza zakresem i nie są wykrywane. Aplikacja z takim trybem dostanie błędnie znormalizowany `query` z nazwami zamienionymi na `?`, ale bez wycieku wartości.
 
 | Element | MySQL | PostgreSQL |
 |---|---|---|
 | `"..."` | Literał tekstowy, zamiana na `?` | Cytowany identyfikator, zostaje |
+| Ucieczka w `'...'` | `\'` i `''` | Tylko `''`. Backslash jest zwykłym znakiem (`standard_conforming_strings` domyślnie włączone) |
+| `0x1F`, `X'1F'`, `b'01'` | Literał, zamiana na `?` | `X'1F'`, `B'01'` jako literał, zamiana na `?` |
 | `` `...` `` | Identyfikator, zostaje | Nie występuje |
-| Komentarz `#` | Usunięty | Nie jest komentarzem |
+| Komentarz `#` | Zamiana na jedną spację | Nie jest komentarzem |
+| `--` | Komentarz tylko, gdy po nim stoi biały znak lub koniec tekstu. `1--1` to dwa minusy | Komentarz |
 | `$1`, `$2` | Nie występuje | Symbol parametru, zostaje |
 | Rzutowanie `::int` | Nie występuje | Zostaje |
-| `E'...'`, `$$...$$` | Nie występuje | Literał, zamiana na `?`. Niedomknięty daje `null` |
+| Zagnieżdżony komentarz `/* /* */ */` | Nie występuje | `query: null`, `op` pusty |
+| `E'...'`, `$$...$$`, `$tag$...$tag$` | Nie występuje | Literał, zamiana na `?`. W `E'...'` backslash jest znakiem ucieczki. Niedomknięty daje `null`. Inny `$` niż `$cyfry` i otwarcie literału daje `null` |
 
 **MongoDB.** Postać tekstowa: kolekcja, potem sekcje polecenia w kolejności `filter`, `update`, `pipeline`, `sort`, `limit`, `skip`, każda jako `nazwa{...}` lub `nazwa:?`. Klucze w sekcji w kolejności z polecenia, bez spacji, np. `contacts filter{externalId:?,tenantId:?} sort{updatedAt:?} limit:?`.
 

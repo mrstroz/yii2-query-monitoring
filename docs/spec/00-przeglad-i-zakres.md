@@ -105,4 +105,4 @@ Wymagania: PHP 8.1 lub nowszy, Yii 2.0.55 lub nowszy. Starsze wydania 2.0.x maj�
 | 1 | Nazwa pakietu i namespace | **Rozstrzygnięte 2026-09-22 w YQM-1:** `mrstroz/yii2-query-monitoring` z `mrstroz\querymonitoring` | Zamknięte |
 | 2 | Czy `yii\mongodb\Connection` udostępnia `Manager` sterownika tak, żeby dało się podpiąć `CommandSubscriber` bez podmiany klasy połączenia | `addSubscriber` na `Manager`, albo podmiana klasy `Connection` | Sonda w pierwszym zadaniu etapu E2 |
 | 3 | Limity: 500 wpisów, 256 KB, 2 KB na `query`, 10 MB × 5 plików | Zostają, albo korekta | Wynik testu wydajności w E4 |
-| 4 | Organizacja normalizatora SQL: jedna klasa z parametrem dialektu, czy osobna klasa na dialekt | Jedna klasa, albo klasa na `db` | Decyzja przy YQM-6. Reguły dialektów są już w [02 §4](02-format-paczki.md#4-normalizacja) |
+| 4 | Organizacja normalizatora SQL: jedna klasa z parametrem dialektu, czy osobna klasa na dialekt | **Rozstrzygnięte 2026-09-22 w YQM-6:** jedna klasa `SqlNormalizer` z wewnętrznym enum dialektu niosącym reguły z [02 §4](02-format-paczki.md#4-normalizacja) | Zamknięte |

@@ -36,7 +36,7 @@
       Gotowe, gdy: wyjątek z `prepare()` i z `execute()` daje wpis `result: error` z SQLSTATE i przechodzi przez konwersję wyjątków Yii bez zmian, ponowienie w `internalExecute()` daje dwa wpisy, drugie wykonanie tego samego przygotowanego polecenia nie dolicza czasu przygotowania, wiązanie parametrów działa jak w `yii\db\Command`, a `Connection::open()` i pobranie wyników nie wchodzą w `time_ms`.
       Sonda ryzyka: `Command::prepare()` w Yii 2.0.55 robi `open()` i `pdo->prepare()` w jednej metodzie. Zadanie ustala, jak zmierzyć samo `pdo->prepare()`.
 
-- [ ] (=) **YQM-6** Normalizator SQL z dialektami MySQL i PostgreSQL
+- [x] (=) **YQM-6** Normalizator SQL z dialektami MySQL i PostgreSQL
       Spec: [02 §4](../spec/02-format-paczki.md#4-normalizacja) · ADR: [0004](../adr/0004-normalizacja-literalow-na-znak-zapytania.md) · Zależy od: YQM-1
       Gotowe, gdy: testy tabelaryczne pokrywają literały, komentarze, `LIMIT`, niedomknięty literał dający `null`, `SELECT "email" FROM "users"` z identyfikatorami dla `pgsql` i dwoma `?` dla `mysql`, a obcięcie daje najwyżej 2048 bajtów razem z `…`, poprawne UTF-8 i następuje po normalizacji.
       Rozstrzyga otwartą kwestię 4 w spec 00 §9.

@@ -20,7 +20,7 @@ Pakiet dostarcza komponent aplikacji Yii rejestrowany w `bootstrap`. Przy starci
 | `connections` | Lista id komponentów `Connection`, np. `['db', 'dbRead', 'mongodb']`. Połączenie w module jako `admin/db` | `[]` |
 | `maxEntries` | Limit wpisów w paczce | `500` |
 | `maxBatchBytes` | Limit rozmiaru JSON paczki | `262144` |
-| `maxQueryLength` | Limit długości `query` razem z wielokropkiem | `2048` |
+| `maxQueryLength` | Limit długości `query` w bajtach razem z wielokropkiem, najmniej `3` (długość `…`) | `2048` |
 | `flushIntervalSeconds` | Odstęp wysyłki w zadaniu konsolowym | `30` |
 | `adapter` | Klasa, obiekt lub `callable`. Brak oznacza adapter plikowy | `null` |
 | `file` | Ustawienia adaptera plikowego, [03 §3](03-adaptery-wyjsciowe.md#3-domyślny-adapter-plikowy) | |
