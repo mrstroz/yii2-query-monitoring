@@ -9,7 +9,7 @@ O katalogu decydują rzeczywiste zależności testu i kontrakt, który sprawdza 
 | Katalog | Co tam trafia |
 |---|---|
 | `Unit/` | Bez bazy, bez osobnego procesu, bez aplikacji Yii. Bez zapisu plików, katalogów tymczasowych i blokad; odczyt fixture'u z repozytorium jest w porządku |
-| `Integration/Yii/` | Prawdziwa aplikacja Yii, opcjonalnie MySQL albo PostgreSQL |
+| `Integration/Yii/` | Prawdziwa aplikacja Yii, opcjonalnie MySQL, PostgreSQL albo MongoDB |
 | `Integration/Filesystem/` | Prawdziwe pliki, katalogi, blokady, uprawnienia, rotacja |
 | `Integration/Process/` | Procesy potomne, bariery, timeouty, sygnały, kody wyjścia |
 
@@ -74,9 +74,11 @@ Test sięgający po urządzenie, limit systemowy albo uprawnienia dokumentuje u 
 
 ## Uruchamianie
 
+Obraz ma `ext-mongodb`, którego wymaga `yiisoft/yii2-mongodb` w `require-dev`. Po zmianie `docker/php/Dockerfile` obraz trzeba przebudować (`docker compose build`, dla PHP 8.4 z `PHP_VERSION=8.4`), zanim `composer install` zadziała.
+
 ```
 docker compose run --rm php composer test                 # wszystko
 docker compose run --rm php vendor/bin/phpunit --testsuite Unit
-# Bez baz. --no-deps jest konieczne: bez niego depends_on podnosi MySQL i PostgreSQL mimo pustych DSN.
-docker compose run --rm --no-deps -e QM_MYSQL_DSN= -e QM_PGSQL_DSN= php vendor/bin/phpunit --testsuite Unit,Filesystem,Process
+# Bez baz. --no-deps jest konieczne: bez niego depends_on podnosi MySQL, PostgreSQL i MongoDB mimo pustych DSN.
+docker compose run --rm --no-deps -e QM_MYSQL_DSN= -e QM_PGSQL_DSN= -e QM_MONGODB_DSN= php vendor/bin/phpunit --testsuite Unit,Filesystem,Process
 ```

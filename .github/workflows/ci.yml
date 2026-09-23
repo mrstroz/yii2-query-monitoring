@@ -9,7 +9,7 @@ jobs:
   checks:
     name: PHP ${{ matrix.php }}${{ matrix.dependencies == 'lowest' && ' (lowest)' || '' }}
     runs-on: ubuntu-latest
-    # The same database images as docker-compose.yml; the integration tests fail instead of skipping without them.
+    # The same database images and ext-mongodb version as docker-compose.yml and docker/php/Dockerfile; the integration tests fail instead of skipping without them.
     services:
       mysql:
         image: mysql:8.0
@@ -38,6 +38,15 @@ jobs:
           --health-interval 2s
           --health-timeout 5s
           --health-retries 60
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ping: 1}).ok'"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 60
     env:
       QM_MYSQL_DSN: "mysql:host=127.0.0.1;port=3306;dbname=qm"
       QM_MYSQL_USER: qm
@@ -45,6 +54,7 @@ jobs:
       QM_PGSQL_DSN: "pgsql:host=127.0.0.1;port=5432;dbname=qm"
       QM_PGSQL_USER: qm
       QM_PGSQL_PASSWORD: qm
+      QM_MONGODB_DSN: "mongodb://127.0.0.1:27017/qm"
     strategy:
       fail-fast: false
       matrix:
@@ -59,7 +69,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
-          extensions: pdo_mysql, pdo_pgsql
+          extensions: pdo_mysql, pdo_pgsql, mongodb-2.5.2
           coverage: none
 
       - run: composer validate --strict

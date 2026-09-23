@@ -71,6 +71,7 @@ return [
         'cache' => yii\caching\ArrayCache::class,
         'db' => $connection,
         'dbOther' => $connection,
+        'mongodb' => ['class' => yii\mongodb\Connection::class, 'dsn' => (string) getenv('QM_MONGODB_DSN')],
         'queryMonitor' => $monitor,
         ...$extra,
         // QM_DB_CACHE=1: URL rules cached in DbCache, so a query runs in Request::resolve(), before any controller (YQM-27).

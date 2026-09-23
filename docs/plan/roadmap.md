@@ -4,9 +4,9 @@
 
 | Pole | Wartość |
 |---|---|
-| **Etap** | E4. Źródło MongoDB, 0 z 10, zadania spisane |
-| **Ostatnio ukończone** | [YQM-30](04-kontekst-wpisu.md): `maxBatchBytes` 256 KB i `maxEntries` 500 zostają, na podstawie pomiaru na aplikacji rulewave (pozycja 3b w [spec 00 §9](../spec/00-przeglad-i-zakres.md#9-otwarte-kwestie) zamknięta). Test szczytu pamięci przy pełnej paczce i domyślne limity komponentu ze stałych kolektora przeszły do [E6](07-wydajnosc-i-odbior.md) |
-| **Następne** | [YQM-31](05-mongodb.md): MongoDB 7 w środowisku testowym. Po nim sonda YQM-32 z otwartej kwestii 2 w [spec 00 §9](../spec/00-przeglad-i-zakres.md#9-otwarte-kwestie) |
+| **Etap** | E4. Źródło MongoDB, 1 z 10 |
+| **Ostatnio ukończone** | [YQM-31](05-mongodb.md): MongoDB 7 w compose i CI, `ext-mongodb` 2.5.2 w obrazie, `yiisoft/yii2-mongodb` `^3.0.3` w `require-dev`, połączenie `mongodb` w aplikacji testowej. Po zmianie `docker/php/Dockerfile` obraz trzeba przebudować |
+| **Następne** | [YQM-32](05-mongodb.md): sonda dostępu do `Manager`, zasięgu subskrybenta, kształtu poleceń i głębokości stosu, rozstrzyga otwartą kwestię 2 w [spec 00 §9](../spec/00-przeglad-i-zakres.md#9-otwarte-kwestie) |
 
 Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trzeba zajrzeć na początku sesji.
 
@@ -18,7 +18,7 @@ Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trze
 | **E1** | [02-adapter-plikowy](02-adapter-plikowy.md) | Adapter plikowy z rotacją | Paczki w `runtime/logs`, bezpieczne przy 8 procesach | 6/6 |
 | **E2** | [03-testy](03-testy.md) | Architektura i konwencje testów | Cztery testsuite'y, konwencje spisane i zastosowane, żaden scenariusz nie zniknął | 8/8 |
 | **E3** | [04-kontekst-wpisu](04-kontekst-wpisu.md) | Kontekst wpisu i limity | Paczka `v: 2` z `route` w nagłówku i `caller` we wpisie, `maxQueryLength` 8192, limity paczki potwierdzone pomiarem | 4/4 |
-| **E4** | [05-mongodb](05-mongodb.md) | Źródło MongoDB | Jedna paczka z wpisami SQL i MongoDB | 0/10 |
+| **E4** | [05-mongodb](05-mongodb.md) | Źródło MongoDB | Jedna paczka z wpisami SQL i MongoDB | 1/10 |
 | **E5** | [06-konsola](06-konsola.md) | Zadania konsolowe | Wiele paczek z `seq` w jednym procesie | – |
 | **E6** | [07-wydajnosc-i-odbior](07-wydajnosc-i-odbior.md) | Test wydajności, dokumentacja | Narzut w progu, limity potwierdzone, README pakietu | – |
 

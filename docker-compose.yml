@@ -17,10 +17,13 @@ services:
       QM_PGSQL_DSN: "pgsql:host=pgsql;dbname=qm"
       QM_PGSQL_USER: qm
       QM_PGSQL_PASSWORD: qm
+      QM_MONGODB_DSN: "mongodb://mongodb:27017/qm"
     depends_on:
       mysql:
         condition: service_healthy
       pgsql:
+        condition: service_healthy
+      mongodb:
         condition: service_healthy
 
   mysql:
@@ -48,6 +51,16 @@ services:
       - /var/lib/postgresql/data
     healthcheck:
       test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "qm", "-d", "qm"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+
+  mongodb:
+    image: mongo:7
+    tmpfs:
+      - /data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand({ping: 1}).ok"]
       interval: 2s
       timeout: 5s
       retries: 60

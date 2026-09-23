@@ -8,7 +8,7 @@
 
 ## Zadania
 
-- [ ] (^) **YQM-31** MongoDB 7 w środowisku testowym: `ext-mongodb` w obrazie, usługa w `docker-compose.yml` i w CI, `yiisoft/yii2-mongodb` w `require-dev`, połączenie `mongodb` w aplikacji testowej
+- [x] (^) **YQM-31** MongoDB 7 w środowisku testowym: `ext-mongodb` w obrazie, usługa w `docker-compose.yml` i w CI, `yiisoft/yii2-mongodb` w `require-dev`, połączenie `mongodb` w aplikacji testowej
       Spec: [00 §7](../spec/00-przeglad-i-zakres.md#7-środowiska)
       Gotowe, gdy: test w `Integration/Yii` wykonuje `find` przez `yii\mongodb\Connection` aplikacji testowej lokalnie i w CI na PHP 8.1 i 8.4, `QM_MONGODB_DSN` jest ustawione w compose i w CI tak jak DSN SQL, więc przy `failOnSkipped` pełny bieg niczego nie pomija, a polecenie bez baz z [`tests/README.md`](../../tests/README.md) dostaje `-e QM_MONGODB_DSN=` i nadal przechodzi.
       Obraz ma dziś tylko `pdo_mysql` i `pdo_pgsql` (`docker/php/Dockerfile`), a w `vendor/` nie ma `yii2-mongodb`, więc sonda nie miałaby na czym działać.

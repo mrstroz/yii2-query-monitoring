@@ -29,7 +29,7 @@ Rozstrzygnięcia szczegółowe:
 5. Nie wprowadzamy złożonego constraintu obsługującego kilka głównych wersji PHPUnit zależnie od wersji PHP.
 6. Podział według zależności środowiskowych:
    - **Unit** — bez bazy, bez osobnego procesu, bez pełnej aplikacji Yii. Test jednostkowy nie zapisuje plików, nie tworzy katalogów tymczasowych i nie bierze blokad; odczyt fixture'u z repozytorium jest dozwolony.
-   - **Integration/Yii** — prawdziwa aplikacja Yii, opcjonalnie MySQL albo PostgreSQL.
+   - **Integration/Yii** — prawdziwa aplikacja Yii, opcjonalnie MySQL, PostgreSQL albo MongoDB.
    - **Integration/Filesystem** — prawdziwe pliki, katalogi, blokady, uprawnienia i rotacja.
    - **Integration/Process** — procesy potomne, bariery, timeouty, sygnały i kody wyjścia.
 7. Test korzystający z `/dev/full`, `flock`, `open_basedir`, `sh`, `ulimit`, `proc_open` albo osobnego procesu nie jest testem jednostkowym.
