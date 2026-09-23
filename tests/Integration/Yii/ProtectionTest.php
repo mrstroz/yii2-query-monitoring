@@ -14,29 +14,6 @@ use PHPUnit\Framework\Attributes\DataProvider;
 final class ProtectionTest extends IntegrationTestCase
 {
     /**
-     * Fault => [component, env, pattern of the one package error, calls of the adapter].
-     * Faults in the normaliser or the collector leave no entry, so the adapter is not called.
-     *
-     * @return array<string, array{array<string, mixed>, array<string, string>, string, int}>
-     */
-    private static function faults(): array
-    {
-        $faulty = ['class' => FaultyQueryMonitor::class];
-
-        return [
-            'adapter throws' => [[], ['QM_ADAPTER' => 'throw'], '/ failed in send with /', 1],
-            'serialisation fails' => [[], ['QM_ADAPTER' => 'json-fail'], '/ failed in send with JsonException$/', 1],
-            'normaliser fails' => [$faulty, ['QM_FAULT' => 'normalizer'], '/ failed in record with Error$/', 0],
-            // the uninitialised collector throws first in setAction() on EVENT_BEFORE_ACTION; its later
-            // calls in record and send are silenced by the guard
-            'collector fails' => [$faulty, ['QM_FAULT' => 'collector'], '/ failed in action with Error$/', 0],
-            'log target queries while logging the normaliser failure' => [$faulty, ['QM_FAULT' => 'normalizer', 'QM_LOG_QUERY' => '1'], '/ failed in record with Error$/', 0],
-            // the adapter's failure is logged while the collector is closed and paused: the log target's query is no entry
-            'log target queries while logging the adapter failure' => [[], ['QM_ADAPTER' => 'throw', 'QM_LOG_QUERY' => '1'], '/ failed in send with /', 1],
-        ];
-    }
-
-    /**
      * @return iterable<string, array{string, array<string, mixed>, array<string, string>, string, int}>
      */
     public static function faultsPerDatabase(): iterable
@@ -114,5 +91,28 @@ final class ProtectionTest extends IntegrationTestCase
         $this->assertProcessOk($result);
         self::assertSame([], $result->adapterCalls);
         $this->assertNoErrors($result);
+    }
+
+    /**
+     * Fault => [component, env, pattern of the one package error, calls of the adapter].
+     * Faults in the normaliser or the collector leave no entry, so the adapter is not called.
+     *
+     * @return array<string, array{array<string, mixed>, array<string, string>, string, int}>
+     */
+    private static function faults(): array
+    {
+        $faulty = ['class' => FaultyQueryMonitor::class];
+
+        return [
+            'adapter throws' => [[], ['QM_ADAPTER' => 'throw'], '/ failed in send with /', 1],
+            'serialisation fails' => [[], ['QM_ADAPTER' => 'json-fail'], '/ failed in send with JsonException$/', 1],
+            'normaliser fails' => [$faulty, ['QM_FAULT' => 'normalizer'], '/ failed in record with Error$/', 0],
+            // the uninitialised collector throws first in setAction() on EVENT_BEFORE_ACTION; its later
+            // calls in record and send are silenced by the guard
+            'collector fails' => [$faulty, ['QM_FAULT' => 'collector'], '/ failed in action with Error$/', 0],
+            'log target queries while logging the normaliser failure' => [$faulty, ['QM_FAULT' => 'normalizer', 'QM_LOG_QUERY' => '1'], '/ failed in record with Error$/', 0],
+            // the adapter's failure is logged while the collector is closed and paused: the log target's query is no entry
+            'log target queries while logging the adapter failure' => [[], ['QM_ADAPTER' => 'throw', 'QM_LOG_QUERY' => '1'], '/ failed in send with /', 1],
+        ];
     }
 }

@@ -25,19 +25,6 @@ final class ConnectionListTest extends IntegrationTestCase
 
     private const MAX_RUN_S = 2;
 
-    /**
-     * @return array<string, mixed>
-     */
-    private static function mastersOnly(string $db): array
-    {
-        return ['dbMasters' => [
-            'dsn' => null,
-            'masters' => [['dsn' => "{$db}:host=" . self::UNREACHABLE . ';dbname=qm']],
-            // pool members do not inherit pdoClass; without it an attempt would not go through TestPdo
-            'masterConfig' => ['pdoClass' => TestPdo::class, 'attributes' => [\PDO::ATTR_TIMEOUT => 1]],
-        ]];
-    }
-
     #[DataProvider('databases')]
     public function testConnectionWithoutDsnIsSkippedWithoutConnecting(string $db): void
     {
@@ -127,6 +114,19 @@ final class ConnectionListTest extends IntegrationTestCase
             self::assertCount(1, $entries, "{$marker}: one entry, not two");
             self::assertSame($expected, $entries[0]['conn']);
         }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function mastersOnly(string $db): array
+    {
+        return ['dbMasters' => [
+            'dsn' => null,
+            'masters' => [['dsn' => "{$db}:host=" . self::UNREACHABLE . ';dbname=qm']],
+            // pool members do not inherit pdoClass; without it an attempt would not go through TestPdo
+            'masterConfig' => ['pdoClass' => TestPdo::class, 'attributes' => [\PDO::ATTR_TIMEOUT => 1]],
+        ]];
     }
 
     /**
