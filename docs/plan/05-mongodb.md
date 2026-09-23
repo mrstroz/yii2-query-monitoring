@@ -52,7 +52,7 @@
       Gotowe, gdy: macierz CI biegnie z minimalnymi wersjami `ext-mongodb` i `yii2-mongodb` ustalonymi w YQM-32 oraz z bieżącymi, a osobny job instaluje pakiet z repozytorium `path` w fixture'ze aplikacji konsumenta bez `ext-mongodb` i `yii2-mongodb` i jego skrypt, uruchomiony bez PHPUnit, dostaje paczkę z wpisem SQL.
       `yii2-mongodb` od 3.0.3 wymaga `ext-mongodb` 1.20.1 (Packagist), więc `require-dev` pakietu nie instaluje się bez rozszerzenia, a `failOnSkipped` nie pozwala na PHPUnit z pominiętymi testami MongoDB. Skrypt poza PHPUnit nie zmienia podziału z ADR 0008; `tests/README.md` dostaje o nim akapit.
 
-- [ ] (=) **YQM-40** Jedna paczka z wpisami SQL i MongoDB, przykład konfiguracji MongoDB w `README.md`
+- [x] (=) **YQM-40** Jedna paczka z wpisami SQL i MongoDB, przykład konfiguracji MongoDB w `README.md`
       Spec: [00 §6](../spec/00-przeglad-i-zakres.md#6-kryteria-sukcesu) · Zależy od: YQM-36, YQM-37, YQM-38
       Gotowe, gdy: jedno żądanie aplikacji testowej z zapytaniami do MySQL i MongoDB, a osobno do PostgreSQL i MongoDB, daje jedną paczkę z wpisami obu źródeł w kolejności zakończenia, a przykład konfiguracji z MongoDB w `README.md` przechodzi w `ReadmeExampleTest` jak przykład SQL.
 

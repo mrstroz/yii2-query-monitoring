@@ -3,13 +3,13 @@
 Collects a flat list of the database queries run during one HTTP request of a Yii 2 application and hands
 it, as one batch, to an output adapter: by default a JSON Lines file, or an adapter you provide. Each
 entry has the connection, the operation, the normalised query text with literals replaced by `?`, the
-time of `PDO::prepare()` and `PDOStatement::execute()` and the result. Parameter values never enter a
-batch.
+time and the result: for SQL the time of `PDO::prepare()` and `PDOStatement::execute()`, for MongoDB the
+duration the driver reports for each command. Parameter values and documents never enter a batch.
 
 ## Status
 
-Milestone E1: MySQL and PostgreSQL over HTTP requests, written to a rotated JSON Lines file or handed to
-an adapter you write. MongoDB and console commands are planned and not available yet. The specification
+Milestone E4: MySQL, PostgreSQL and MongoDB over HTTP requests, written to a rotated JSON Lines file or
+handed to an adapter you write. Console commands are planned and not available yet. The specification
 (in Polish) is in [`docs/spec/`](docs/spec/).
 
 ## Requirements
@@ -18,6 +18,8 @@ an adapter you write. MongoDB and console commands are planned and not available
 - Yii 2.0.55 or newer
 - Composer 2.1 or newer (`caller` paths are relative to the root package Composer reports)
 - PHP-FPM request model (no RoadRunner or Swoole)
+- For MongoDB only: `ext-mongodb` 2.0 or newer and `yiisoft/yii2-mongodb` 3.0.4 or newer. An application
+  without MongoDB installs the package without them
 
 ## Installation
 
@@ -49,7 +51,7 @@ return [
 | Option | Default | Meaning |
 |---|---|---|
 | `app` | required | Application name written to every batch |
-| `connections` | `[]` | Ids of `yii\db\Connection` components to monitor |
+| `connections` | `[]` | Ids of `yii\db\Connection` and `yii\mongodb\Connection` components to monitor |
 | `adapter` | `null` | Class name, object implementing `BatchAdapterInterface`, or `callable(QueryBatch)`; `null` writes to a file |
 | `file` | `[]` | Settings of the file adapter, see below; ignored when `adapter` is set |
 | `enabled` | `true` | `false` installs nothing and sends nothing |
@@ -59,6 +61,37 @@ return [
 
 A monitored connection must not set its own `commandClass` or `commandMap` for its driver: the package
 measures queries by setting `commandMap` to its own `Command` class.
+
+### MongoDB
+
+List a `yii\mongodb\Connection` in `connections` like a SQL one. The package adds a command subscriber of
+the MongoDB driver to the connection's `Manager`, also when the connection was opened before the package
+and every time it is opened again. One batch then holds the entries of both kinds, in the order the
+commands ended:
+
+<!-- example:mongodb-config -->
+```php
+<?php
+
+return [
+    'bootstrap' => ['queryMonitor'],
+    'components' => [
+        'queryMonitor' => [
+            'class' => \mrstroz\querymonitoring\QueryMonitor::class,
+            'app' => 'shop-api',
+            'connections' => ['db', 'mongodb'],
+        ],
+    ],
+];
+```
+
+Each command the driver sends is one entry, `getMore` and every part of a split `insert` included; a
+`writeErrors` or `writeConcernError` in the reply makes it `result: error` with the server's code. The
+driver shares one client, and its subscribers, between connections with the same DSN, `options` and
+`driverOptions`: commands of such a connection that is not in `connections` are recorded under the listed
+one while that one has been opened in the same process, and two listed ones on one client are both
+recorded under the first. The reply of `find`, `getMore`, `aggregate` and `distinct` is not read, so a
+`writeConcernError` of an `aggregate` with `$out` or `$merge` is not an error entry.
 
 A wrong setting, including a wrong key of `file` when the file adapter is used, disables the package for
 the process with one `Yii::error`; the application runs as without it.
@@ -116,7 +149,7 @@ the adapter runs are not recorded.
 
 ## Development
 
-Everything runs in the package's Docker image, with MySQL 8 and PostgreSQL 16 started by
+Everything runs in the package's Docker image, with MySQL 8, PostgreSQL 16 and MongoDB 7 started by
 `docker-compose.yml`. Once per checkout, set your user and group ids so files created in the container
 belong to you:
 
@@ -128,14 +161,14 @@ docker compose run --rm php composer install
 The checks CI runs:
 
 ```
-docker compose run --rm php composer test   # PHPUnit; integration tests need both databases
+docker compose run --rm php composer test   # PHPUnit; integration tests need all three databases
 docker compose run --rm php composer stan   # PHPStan, level 8
 docker compose run --rm php composer cs     # PHP CS Fixer, dry run
 ```
 
 A skipped test fails the run, so `composer test` without the databases is red, not silently green
 (PHPUnit still prints "OK, but some tests were skipped!", with exit code 1). GitHub Actions runs the
-same checks against the same database images, started as service containers.
+same checks against the same database images.
 
 ### Test application
 

@@ -4,9 +4,9 @@
 
 | Pole | Wartość |
 |---|---|
-| **Etap** | E4. Źródło MongoDB, 9 z 10 |
-| **Ostatnio ukończone** | [YQM-39](05-mongodb.md): minimum to Yii 2.0.55, `yii2-mongodb` 3.0.4 i `ext-mongodb` 2.0.0, bo 3.0.4 z ext 1.x pada na deprecated `Cursor::getId()`; job CI lowest z tym minimum i job aplikacji konsumenta bez MongoDB (`tests/consumer/smoke.php`). CI sprawdzone lokalnie, nie na GitHubie |
-| **Następne** | [YQM-40](05-mongodb.md): jedna paczka z wpisami SQL i MongoDB oraz przykład konfiguracji MongoDB w `README.md` |
+| **Etap** | E4. Źródło MongoDB, 10 z 10, zakończony |
+| **Ostatnio ukończone** | [YQM-40](05-mongodb.md): jedno żądanie z MySQL albo PostgreSQL i MongoDB daje jedną paczkę z wpisami obu źródeł w kolejności zakończenia; przykład konfiguracji MongoDB w `README.md` sprawdza `ReadmeExampleTest` |
+| **Następne** | Spisanie zadań [E5](06-konsola.md) (zadania konsolowe) według obowiązkowych scenariuszy odbioru z tego pliku |
 
 Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trzeba zajrzeć na początku sesji.
 
@@ -18,7 +18,7 @@ Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trze
 | **E1** | [02-adapter-plikowy](02-adapter-plikowy.md) | Adapter plikowy z rotacją | Paczki w `runtime/logs`, bezpieczne przy 8 procesach | 6/6 |
 | **E2** | [03-testy](03-testy.md) | Architektura i konwencje testów | Cztery testsuite'y, konwencje spisane i zastosowane, żaden scenariusz nie zniknął | 8/8 |
 | **E3** | [04-kontekst-wpisu](04-kontekst-wpisu.md) | Kontekst wpisu i limity | Paczka `v: 2` z `route` w nagłówku i `caller` we wpisie, `maxQueryLength` 8192, limity paczki potwierdzone pomiarem | 4/4 |
-| **E4** | [05-mongodb](05-mongodb.md) | Źródło MongoDB | Jedna paczka z wpisami SQL i MongoDB | 9/10 |
+| **E4** | [05-mongodb](05-mongodb.md) | Źródło MongoDB | Jedna paczka z wpisami SQL i MongoDB | 10/10 |
 | **E5** | [06-konsola](06-konsola.md) | Zadania konsolowe | Wiele paczek z `seq` w jednym procesie | – |
 | **E6** | [07-wydajnosc-i-odbior](07-wydajnosc-i-odbior.md) | Test wydajności, dokumentacja | Narzut w progu, limity potwierdzone, README pakietu | – |
 

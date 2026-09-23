@@ -9,17 +9,18 @@ use mrstroz\querymonitoring\tests\app\Schema;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
- * YQM-11, YQM-15: the SQL configuration example in README.md runs as written and writes its batch to the
- * default file, and its option table matches the component.
+ * YQM-11, YQM-15, YQM-40: the SQL and MongoDB configuration examples in README.md run as written and write their
+ * batch to the default file, and the option table matches the component.
  */
 final class ReadmeExampleTest extends IntegrationTestCase
 {
     private const MARKER = '<!-- example:sql-config -->';
+    private const MONGODB_MARKER = '<!-- example:mongodb-config -->';
 
     #[DataProvider('provideDatabaseCases')]
     public function testConfigurationExampleRunsInTheTestApplication(string $db): void
     {
-        $example = $this->example();
+        $example = $this->example(self::MARKER);
         self::assertIsArray($example['bootstrap'] ?? null);
         self::assertContains('queryMonitor', $example['bootstrap']);
         $component = $example['components']['queryMonitor'] ?? null;
@@ -43,6 +44,22 @@ final class ReadmeExampleTest extends IntegrationTestCase
         self::assertSame($component['app'], $batch['app']);
         self::assertNotEmpty($batch['queries']);
         self::assertSame($component['connections'], array_values(array_unique(array_column($batch['queries'], 'conn'))));
+    }
+
+    public function testMongoDbExampleGivesOneBatchWithEntriesOfBothSources(): void
+    {
+        $component = $this->example(self::MONGODB_MARKER)['components']['queryMonitor'] ?? null;
+        self::assertIsArray($component);
+        self::assertSame(['db', 'mongodb'], $component['connections']);
+        $this->requireDatabase('mongodb');
+
+        $result = $this->scenario(self::ANY_DB, 'mixed', ['adapter' => null] + $component);
+
+        $this->assertProcessOk($result);
+        $this->assertNoErrors($result);
+        $batch = json_decode($result->runtimeFiles['logs/query-monitoring.jsonl'] ?? '', true, 512, JSON_THROW_ON_ERROR);
+        self::assertIsArray($batch);
+        self::assertSame(['db', 'mongodb', 'db', 'mongodb'], array_column($this->entriesWith($batch, 'qm_mixed_'), 'conn'));
     }
 
     public function testOptionTableListsEveryOptionWithItsDefault(): void
@@ -78,12 +95,12 @@ final class ReadmeExampleTest extends IntegrationTestCase
      *
      * @return array<mixed>
      */
-    private function example(): array
+    private function example(string $marker): array
     {
         $readme = $this->readme();
-        $at = strpos($readme, self::MARKER);
+        $at = strpos($readme, $marker);
         self::assertNotFalse($at, 'README has the example marker');
-        $code = preg_match('/\G\s*```php\n(.*?)\n```/s', $readme, $block, 0, $at + strlen(self::MARKER)) === 1 ? $block[1] : null;
+        $code = preg_match('/\G\s*```php\n(.*?)\n```/s', $readme, $block, 0, $at + strlen($marker)) === 1 ? $block[1] : null;
         self::assertNotNull($code, 'a php block right after the marker');
 
         $file = (string) tempnam(sys_get_temp_dir(), 'qm-readme-');
