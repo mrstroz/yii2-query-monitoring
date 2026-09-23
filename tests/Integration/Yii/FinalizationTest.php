@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace mrstroz\querymonitoring\tests\Integration;
+namespace mrstroz\querymonitoring\tests\Integration\Yii;
 
 use mrstroz\querymonitoring\support\Guard;
 use mrstroz\querymonitoring\tests\app\RunResult;

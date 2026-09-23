@@ -8,14 +8,14 @@
 
 ## Zadania
 
-- [ ] (^) **YQM-19** Podział `tests/Integration` na `Yii/`, `Filesystem/` i `Process/` z osobnymi testsuite'ami
+- [x] (^) **YQM-19** Podział `tests/Integration` na `Yii/`, `Filesystem/` i `Process/` z osobnymi testsuite'ami
       ADR: [0008](../adr/0008-architektura-i-konwencje-testow.md) · Konwencje: [`tests/README.md`](../../tests/README.md)
       Gotowe, gdy: `phpunit.xml.dist` ma cztery testsuite'y `Unit`, `Yii`, `Filesystem`, `Process`, `docker compose run --rm --no-deps -e QM_MYSQL_DSN= -e QM_PGSQL_DSN= php vendor/bin/phpunit --testsuite Unit,Filesystem,Process` przechodzi bez pominiętego testu, a znormalizowana lista przypadków nie różni się od baseline zdjętego przed pierwszą zmianą: `vendor/bin/phpunit --list-tests | sed -n 's/^ - //p' | sed -E 's/^([A-Za-z0-9_\\]*\\)?//' | sort`, porównane przez `diff`, bez różnic. Liczba zestawów danych na metodę też bez zmian.
-      `tests/Unit` zostaje w tym zadaniu nietknięte, przenosi je YQM-20. Do `Process/` idą dokładnie dwie klasy, `FileAdapterConcurrencyTest` i `ProcessGroupTest` — jedyne dziedziczące wprost z `TestCase`; pozostałe jedenaście stoi na `IntegrationTestCase` i wędruje z grupą `Yii/`. `FileAdapterProtectionTest` należy do `Yii/`, bo badanym kontraktem jest odpowiedź aplikacji, a nie blokada.
+      `tests/Unit` zostaje w tym zadaniu nietknięte, przenosi je YQM-20. `tests/Integration/Filesystem/` jest po tym zadaniu pusty, więc trzyma go `.gitkeep`, który znika w YQM-20; bez niego `TestSuiteMapper` rzuca `TestDirectoryNotFoundException` w świeżym klonie. Do `Process/` idą dokładnie dwie klasy, `FileAdapterConcurrencyTest` i `ProcessGroupTest` — jedyne dziedziczące wprost z `TestCase`; pozostałe jedenaście stoi na `IntegrationTestCase` i wędruje z grupą `Yii/`. `FileAdapterProtectionTest` należy do `Yii/`, bo badanym kontraktem jest odpowiedź aplikacji, a nie blokada.
 
 - [ ] (^) **YQM-20** `FileAdapterTest` i jego fixture poza `tests/Unit`
       ADR: [0008](../adr/0008-architektura-i-konwencje-testow.md) · Zależy od: YQM-19
-      Gotowe, gdy: `grep -rE 'proc_open|flock|/dev/full|open_basedir|ulimit|sys_get_temp_dir|mkdir\(' tests/Unit` kończy się kodem 1, wszystkie dotychczasowe przypadki `FileAdapterTest` są obecne na znormalizowanej liście z YQM-19, a `composer test` przechodzi.
+      Gotowe, gdy: `tests/Integration/Filesystem/.gitkeep` jest usunięty, `grep -rE 'proc_open|flock|/dev/full|open_basedir|ulimit|sys_get_temp_dir|mkdir\(' tests/Unit` kończy się kodem 1, wszystkie dotychczasowe przypadki `FileAdapterTest` są obecne na znormalizowanej liście z YQM-19, a `composer test` przechodzi.
       To jedyny plik w `tests/Unit` sięgający po środowisko: 14 trafień w `FileAdapterTest.php` i 2 w `fixtures/write-once.php`. Reszta `tests/Unit` nie ma powodu się ruszać.
 
 - [ ] (=) **YQM-21** Jednolita struktura klas i metod testowych
@@ -80,7 +80,7 @@ Poza tabelą nic nie traci drugiego silnika. `ReadmeExampleTest::testConfigurati
 | Miejsce | Co się dzieje |
 |---|---|
 | `ReadmeExampleTest.php:103` | `__DIR__ . '/../../README.md'` potrzebuje trzech poziomów po przejściu do `Integration/Yii` |
-| `FileAdapterConcurrencyTest.php:42`, `ProcessGroupTest.php:16` | `__DIR__ . '/workers/…'` musi być `dirname(__DIR__) . '/workers/…'`, bo `workers/` zostaje w `tests/Integration/` |
+| `FileAdapterConcurrencyTest.php:42`, `ProcessGroupTest.php:16` | `__DIR__ . '/workers/…'` musi być `__DIR__ . '/../workers/…'`, bo `workers/` zostaje w `tests/Integration/`. Nie `dirname(__DIR__)`: w `ProcessGroupTest` to `private const`, a wyrażenie stałe nie przyjmuje wywołania funkcji („Constant expression contains invalid operations"). Jeden idiom w obu plikach, żeby nikt ich nie „ujednolicił" z powrotem do fatala |
 | `FileAdapterTest.php:26`, `fixtures/write-once.php:11` | relacja test↔fixture i `use` po FQCN zmieniają się razem z namespace'em w YQM-20 |
 | `fixtures/write-once.php:13`, `FileAdapterTest.php:161` | `dirname(__DIR__, 4)` i `dirname(__DIR__, 3)` zostają bez zmian: `tests/Unit/adapter/fixtures` i `tests/Integration/Filesystem/fixtures` leżą na tej samej głębokości |
 | `LoggedTestCase.php:21`, `QueryBatchTest.php:18` | `__DIR__ . '/../..'` zostaje, dopóki plik nie zmienia głębokości |

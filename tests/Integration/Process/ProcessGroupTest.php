@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace mrstroz\querymonitoring\tests\Integration;
+namespace mrstroz\querymonitoring\tests\Integration\Process;
 
 use mrstroz\querymonitoring\tests\app\ProcessGroup;
 use mrstroz\querymonitoring\tests\app\ProcessResult;
@@ -13,7 +13,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class ProcessGroupTest extends TestCase
 {
-    private const PROBE = __DIR__ . '/workers/process-probe.php';
+    private const PROBE = __DIR__ . '/../workers/process-probe.php';
 
     public function testEightProcessesWorkAtTheSameTime(): void
     {

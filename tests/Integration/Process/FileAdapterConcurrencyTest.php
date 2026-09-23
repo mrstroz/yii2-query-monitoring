@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace mrstroz\querymonitoring\tests\Integration;
+namespace mrstroz\querymonitoring\tests\Integration\Process;
 
 use mrstroz\querymonitoring\tests\app\ProcessGroup;
 use PHPUnit\Framework\TestCase;
@@ -39,7 +39,7 @@ final class FileAdapterConcurrencyTest extends TestCase
     {
         // The directory does not exist yet: the eight processes race to create it.
         $path = $this->dir . '/logs/queries.jsonl';
-        $results = ProcessGroup::run(__DIR__ . '/workers/file-writer.php', self::PROCESSES, 120, [
+        $results = ProcessGroup::run(__DIR__ . '/../workers/file-writer.php', self::PROCESSES, 120, [
             'QM_PATH' => $path,
             'QM_MAX_SIZE' => (string) self::MAX_SIZE,
             'QM_MAX_FILES' => (string) self::MAX_FILES,

@@ -11,8 +11,14 @@
         <testsuite name="Unit">
             <directory>tests/Unit</directory>
         </testsuite>
-        <testsuite name="Integration">
-            <directory>tests/Integration</directory>
+        <testsuite name="Yii">
+            <directory>tests/Integration/Yii</directory>
+        </testsuite>
+        <testsuite name="Filesystem">
+            <directory>tests/Integration/Filesystem</directory>
+        </testsuite>
+        <testsuite name="Process">
+            <directory>tests/Integration/Process</directory>
         </testsuite>
     </testsuites>
     <source>

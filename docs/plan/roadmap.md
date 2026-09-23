@@ -4,9 +4,9 @@
 
 | Pole | Wartość |
 |---|---|
-| **Etap** | E2. Architektura i konwencje testów, zadania spisane, 0 z 8. E1 zakończony, 6 z 6 |
-| **Ostatnio ukończone** | [YQM-13..YQM-18](02-adapter-plikowy.md): `FileAdapter` z nieblokującą blokadą `<path>.lock`, przycięciem niepełnego zapisu i rotacją; domyślny adapter i klucz `file` w komponencie; `ProcessGroup` do testów wielu procesów; sonda ADR 0005: przy 8 procesach z rotacją każda paczka z `write() === true` jest w plikach dokładnie raz. Po code review: `Yii::error` niesie komunikat wyjątku adaptera plikowego (operacja i ścieżka, [spec 03 §2](../spec/03-adaptery-wyjsciowe.md#2-błąd-adaptera)), brak ostrzeżeń PHP poza `open_basedir`; pliki dwóch użytkowników (WWW i konsola) trafiły do scenariuszy [E4](05-konsola.md). Pełne testy przeszły na PHP 8.1 i 8.4 lokalnie; CI po pushu niepotwierdzone |
-| **Następne** | [YQM-19](03-testy.md) z [E2. Architektura i konwencje testów](03-testy.md): podział `tests/Integration` na `Yii/`, `Filesystem/` i `Process/` z czterema testsuite'ami. Zadania MongoDB spisuje się po E2, od YQM-27. Komendy przez Docker: `docker compose run --rm php composer test` (bazy startują same) |
+| **Etap** | E2. Architektura i konwencje testów, 1 z 8. E1 zakończony, 6 z 6 |
+| **Ostatnio ukończone** | [YQM-19](03-testy.md): `tests/Integration` podzielone na `Yii/` (12 klas), `Filesystem/` (pusty, trzyma go `.gitkeep` do YQM-20) i `Process/` (`FileAdapterConcurrencyTest`, `ProcessGroupTest`); `phpunit.xml.dist` ma cztery testsuite'y, więc `--testsuite Unit,Filesystem,Process` biegnie bez baz. Baseline listy przypadków z d9b4087 leży w `tests/baseline-yqm19*.txt` i służy za punkt odniesienia do YQM-26. `composer.json`, `phpstan.neon.dist` i `.php-cs-fixer.dist.php` nie wymagały zmian, bo biorą `tests` jako całość |
+| **Następne** | [YQM-20](03-testy.md): `FileAdapterTest` i jego fixture z `tests/Unit` do `Integration/Filesystem/`, razem z usunięciem `.gitkeep`. Zadania MongoDB spisuje się po E2, od YQM-27. Komendy przez Docker: `docker compose run --rm php composer test` (bazy startują same), a bieg bez baz wymaga `--no-deps` i pustych DSN |
 
 Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trzeba zajrzeć na początku sesji.
 
@@ -16,7 +16,7 @@ Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trze
 |---|---|---|---|---|
 | **E0** | [01-fundament-i-sql](01-fundament-i-sql.md) | Pakiet, kolektor, `Command`, cykl życia HTTP | Aplikacja z MySQL i PostgreSQL daje paczkę do jawnego adaptera, wyjątek nie gubi paczki | 12/12 |
 | **E1** | [02-adapter-plikowy](02-adapter-plikowy.md) | Adapter plikowy z rotacją | Paczki w `runtime/logs`, bezpieczne przy 8 procesach | 6/6 |
-| **E2** | [03-testy](03-testy.md) | Architektura i konwencje testów | Cztery testsuite'y, konwencje spisane i zastosowane, żaden scenariusz nie zniknął | 0/8 |
+| **E2** | [03-testy](03-testy.md) | Architektura i konwencje testów | Cztery testsuite'y, konwencje spisane i zastosowane, żaden scenariusz nie zniknął | 1/8 |
 | **E3** | [04-mongodb](04-mongodb.md) | Źródło MongoDB | Jedna paczka z wpisami SQL i MongoDB | – |
 | **E4** | [05-konsola](05-konsola.md) | Zadania konsolowe | Wiele paczek z `seq` w jednym procesie | – |
 | **E5** | [06-wydajnosc-i-odbior](06-wydajnosc-i-odbior.md) | Test wydajności, dokumentacja | Narzut w progu, limity potwierdzone, README pakietu | – |

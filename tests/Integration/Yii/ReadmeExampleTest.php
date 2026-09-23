@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace mrstroz\querymonitoring\tests\Integration;
+namespace mrstroz\querymonitoring\tests\Integration\Yii;
 
 use mrstroz\querymonitoring\QueryMonitor;
 use mrstroz\querymonitoring\tests\app\Schema;
@@ -100,6 +100,6 @@ final class ReadmeExampleTest extends IntegrationTestCase
 
     private function readme(): string
     {
-        return (string) file_get_contents(__DIR__ . '/../../README.md');
+        return (string) file_get_contents(__DIR__ . '/../../../README.md');
     }
 }
