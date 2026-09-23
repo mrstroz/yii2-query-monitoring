@@ -74,6 +74,17 @@ Testy MongoDB w `Unit/` budują dokumenty poleceń z canonical Extended JSON prz
 
 Test sięgający po urządzenie, limit systemowy albo uprawnienia dokumentuje u siebie, czego wymaga: Linux, proces bez uprawnień roota, dostępne `/dev/full`, `ulimit -f`. Jedno zdanie w komentarzu nad metodą wystarczy, ale musi być — bez niego czerwony wynik na innej maszynie wygląda jak błąd pakietu.
 
+## Aplikacja konsumenta bez MongoDB
+
+`tests/consumer/` to aplikacja tylko z SQL, która instaluje pakiet z repozytorium `path` bez `ext-mongodb` i `yiisoft/yii2-mongodb`. Jej `smoke.php` wykonuje jedno zapytanie i sprawdza paczkę z wpisem SQL. Biegnie poza PHPUnit, bo `require-dev` pakietu wymaga obu, więc w zestawie PHPUnit nie da się ich nie mieć. Nie zmienia to podziału z ADR 0008. Lokalnie potrzebny jest obraz bez rozszerzenia:
+
+```
+docker build --build-arg MONGODB_VERSION= -t yii2-query-monitoring-php:8.1-nomongodb docker/php
+docker run --rm -u "$(id -u):$(id -g)" --network yii2-query-monitoring_default -v "$PWD:/app" -w /app/tests/consumer \
+  -e 'QM_MYSQL_DSN=mysql:host=mysql;dbname=qm' -e QM_MYSQL_USER=qm -e QM_MYSQL_PASSWORD=qm \
+  yii2-query-monitoring-php:8.1-nomongodb sh -c 'composer install -q && php smoke.php'
+```
+
 ## Uruchamianie
 
 Obraz ma `ext-mongodb`, którego wymaga `yiisoft/yii2-mongodb` w `require-dev`. Po zmianie `docker/php/Dockerfile` obraz trzeba przebudować (`docker compose build`, dla PHP 8.4 z `PHP_VERSION=8.4`), zanim `composer install` zadziała.

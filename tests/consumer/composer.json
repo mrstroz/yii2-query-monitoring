@@ -1,0 +1,26 @@
+{
+    "name": "mrstroz/yii2-query-monitoring-consumer",
+    "description": "YQM-39: a SQL-only application that installs the package without ext-mongodb and yiisoft/yii2-mongodb.",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.1",
+        "mrstroz/yii2-query-monitoring": "@dev",
+        "yiisoft/yii2": "~2.0.55"
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../.."
+        },
+        {
+            "type": "composer",
+            "url": "https://asset-packagist.org"
+        }
+    ],
+    "config": {
+        "allow-plugins": {
+            "yiisoft/yii2-composer": true
+        }
+    }
+}

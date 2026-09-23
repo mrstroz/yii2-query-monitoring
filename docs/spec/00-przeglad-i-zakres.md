@@ -82,7 +82,7 @@ Z tego wynika reszta: wyjątek w kolektorze lub adapterze jest przechwytywany i 
 | CI | GitHub Actions | Matryca PHP 8.1 do 8.4 |
 | Produkcja | Aplikacje Yii 2 na PHP-FPM | Każda aplikacja podaje własne `app` w konfiguracji |
 
-Wymagania: PHP 8.1 lub nowszy, Yii 2.0.55 lub nowszy, Composer 2.1 lub nowszy (korzeń projektu dla `caller`, [ADR 0009](../adr/0009-caller-i-route-w-formacie-v2.md)). Starsze wydania 2.0.x mają security advisories, przez które domyślna polityka Composera 2.10 ich nie instaluje. `yiisoft/yii2-mongodb` i `ext-mongodb` są zależnościami opcjonalnymi w `suggest`. Aplikacja tylko z SQL instaluje pakiet bez MongoDB. Źródło MongoDB wymaga `yiisoft/yii2-mongodb` 3.0.4 lub nowszego i `ext-mongodb` 1.20.1 lub nowszego ([ADR 0010](../adr/0010-subskrybent-na-manager-polaczenia-mongodb.md)).
+Wymagania: PHP 8.1 lub nowszy, Yii 2.0.55 lub nowszy, Composer 2.1 lub nowszy (korzeń projektu dla `caller`, [ADR 0009](../adr/0009-caller-i-route-w-formacie-v2.md)). Starsze wydania 2.0.x mają security advisories, przez które domyślna polityka Composera 2.10 ich nie instaluje. `yiisoft/yii2-mongodb` i `ext-mongodb` są zależnościami opcjonalnymi w `suggest`. Aplikacja tylko z SQL instaluje pakiet bez MongoDB. Źródło MongoDB wymaga `yiisoft/yii2-mongodb` 3.0.4 lub nowszego i `ext-mongodb` 2.0 lub nowszego ([ADR 0010](../adr/0010-subskrybent-na-manager-polaczenia-mongodb.md)).
 
 ## 8. Słownik
 

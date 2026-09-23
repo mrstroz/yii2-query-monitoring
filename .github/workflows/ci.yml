@@ -7,7 +7,7 @@ on:
 
 jobs:
   checks:
-    name: PHP ${{ matrix.php }}${{ matrix.dependencies == 'lowest' && ' (lowest)' || '' }}
+    name: PHP ${{ matrix.php }}, ext-mongodb ${{ matrix.mongodb }}${{ matrix.dependencies == 'lowest' && ' (lowest)' || '' }}
     runs-on: ubuntu-latest
     # The same database images and ext-mongodb version as docker-compose.yml and docker/php/Dockerfile; the integration tests fail instead of skipping without them.
     services:
@@ -51,9 +51,13 @@ jobs:
       matrix:
         php: ['8.1', '8.2', '8.3', '8.4']
         dependencies: [highest]
+        mongodb: ['2.5.2']
         include:
+          # The supported minimum (spec 00 §7): Yii 2.0.55, yii2-mongodb 3.0.4 and ext-mongodb 2.0.0. yii2-mongodb 3.0.4
+          # with ext-mongodb 1.x fails on the deprecated Cursor::getId() (YQM-39).
           - php: '8.1'
             dependencies: lowest
+            mongodb: '2.0.0'
     steps:
       - uses: actions/checkout@v4
 
@@ -71,7 +75,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
-          extensions: pdo_mysql, pdo_pgsql, mongodb-2.5.2
+          extensions: pdo_mysql, pdo_pgsql, mongodb-${{ matrix.mongodb }}
           coverage: none
 
       - run: composer validate --strict
@@ -83,3 +87,39 @@ jobs:
       - run: composer test
       - run: composer stan
       - run: composer cs
+
+  # A SQL-only application installs the package from a path repository without ext-mongodb and yii2-mongodb and
+  # gets a SQL entry. Outside PHPUnit, because the package's require-dev needs both (tests/README.md).
+  consumer:
+    name: Consumer without MongoDB
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: qm
+          MYSQL_USER: qm
+          MYSQL_PASSWORD: qm
+          MYSQL_ROOT_PASSWORD: qm
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uqm -pqm"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 60
+    env:
+      QM_MYSQL_DSN: "mysql:host=127.0.0.1;port=3306;dbname=qm"
+      QM_MYSQL_USER: qm
+      QM_MYSQL_PASSWORD: qm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: pdo_mysql, :mongodb
+          coverage: none
+
+      - run: composer install --no-progress --working-dir=tests/consumer
+      - run: php tests/consumer/smoke.php

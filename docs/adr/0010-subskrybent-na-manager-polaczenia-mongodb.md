@@ -31,7 +31,7 @@ Sterownik wybiera odbiorców zdarzenia po kliencie libmongoc, a nie po `Manager`
 
 **Negatywne:** polecenie połączenia spoza listy, które dzieli klienta z połączeniem z listy, jest zapisywane jako polecenie tego połączenia. Drugie id z listy o tym samym kluczu nie ma osobnego `conn`. Klucz liczy pakiet, więc sterownik, który zmieni sposób łączenia klientów, może go rozjechać. Wykryje to `MongoDbProbeTest`. Klucz nie jest normalizowany, bo klucz mądrzejszy od sterownika połączyłby rozłączne klienty i zgubił polecenia drugiego.
 
-**Wymagania:** `yii2-mongodb` z publicznym `$manager` i `EVENT_AFTER_OPEN`, `ext-mongodb` z `Manager::addSubscriber()`. Wspierane są `yii2-mongodb` 3.0.4 lub nowszy i `ext-mongodb` 1.20.1 lub nowszy ([spec 00 §7](../spec/00-przeglad-i-zakres.md#7-środowiska)): 3.0.4 wymaga ext 1.20.1, a 3.0.3 woła jeszcze `Cursor::getId(true)` (`src/BatchQueryResult.php:132`), które ext 2.0 odrzuca. Minimum w CI potwierdza YQM-39.
+**Wymagania:** `yii2-mongodb` z publicznym `$manager` i `EVENT_AFTER_OPEN`, `ext-mongodb` z `Manager::addSubscriber()`. Wspierane są `yii2-mongodb` 3.0.4 lub nowszy i `ext-mongodb` 2.0 lub nowszy ([spec 00 §7](../spec/00-przeglad-i-zakres.md#7-środowiska)). 3.0.3 woła `Cursor::getId(true)` (`src/BatchQueryResult.php:132`), które ext 2.0 odrzuca, a 3.0.4 woła `getId()` bez argumentu, które ext 1.20 zgłasza jako deprecated, a Yii zamienia to w wyjątek (`src/Query.php:215`). Żadna para z ext 1.x nie działa więc w aplikacji Yii. Minimum Yii 2.0.55, `yii2-mongodb` 3.0.4 i ext 2.0.0 sprawdza job CI z `--prefer-lowest` (YQM-39).
 
 ## Rozważane warianty
 

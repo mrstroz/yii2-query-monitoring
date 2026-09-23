@@ -2,6 +2,12 @@ parameters:
     level: 8
     paths:
         - src
-        - tests
+        # Not `tests` as a whole: tests/consumer/vendor, installed by YQM-39's consumer fixture, links back to this
+        # checkout through its path repository, and PHPStan would walk the loop before any excludePaths applies.
+        - tests/Unit
+        - tests/Integration
+        - tests/app
+        - tests/bootstrap.php
+        - tests/consumer/smoke.php
     bootstrapFiles:
         - vendor/yiisoft/yii2/Yii.php

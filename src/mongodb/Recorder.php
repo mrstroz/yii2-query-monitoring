@@ -18,10 +18,14 @@ use mrstroz\querymonitoring\support\Guard;
  */
 final class Recorder
 {
-    /** Frames searched for `caller`, counted from the guard's closure in the end-event methods (spec 01 §3). */
+    /**
+     * Frames searched for `caller`, counted from the guard's closure in the end-event methods (spec 01 §3). The deepest
+     * first application frame measured sits at 32, in a GridView whose data provider nests `with()` two levels deep;
+     * each further level adds five frames (ADR-0009).
+     */
     public const TRACE_LIMIT = 64;
 
-    /** Commands whose reply carries result documents; it is not read for error codes (spec 01 §3). */
+    /** Commands whose reply carries result data (documents or values); it is not read for error codes (spec 01 §3). */
     private const REPLY_NOT_READ = ['find', 'getMore', 'aggregate', 'distinct'];
 
     /** @var array<string, array{string, ?string}> `op` and `query` by `requestId` */

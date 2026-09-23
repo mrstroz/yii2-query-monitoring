@@ -47,7 +47,7 @@
       Gotowe, gdy: każda ścieżka z pytania 5 [ustaleń](#ustalenia-do-yqm-32) daje `caller` z pierwszą ramką aplikacji tej ścieżki, spec 01 §3 nazywa ramki od domknięcia strażnika i granicę tak jak §2 dla SQL, a ADR-0009 ma liczby dla MongoDB obok liczb dla SQL.
       YQM-35 bierze ślad z granicą 64 i sprawdza go tylko na `find()->all()`. ADR-0009 każe zmierzyć `N` osobno, bo ślad jest brany w procedurze zdarzenia, a nie w `sql\Recorder::record()`.
 
-- [ ] (=) **YQM-39** Zależności opcjonalne w CI: minimalne i bieżące `ext-mongodb`, aplikacja konsumenta bez MongoDB
+- [x] (=) **YQM-39** Zależności opcjonalne w CI: minimalne i bieżące `ext-mongodb`, aplikacja konsumenta bez MongoDB
       Spec: [00 §7](../spec/00-przeglad-i-zakres.md#7-środowiska) · ADR: [0008](../adr/0008-architektura-i-konwencje-testow.md) · Zależy od: YQM-35
       Gotowe, gdy: macierz CI biegnie z minimalnymi wersjami `ext-mongodb` i `yii2-mongodb` ustalonymi w YQM-32 oraz z bieżącymi, a osobny job instaluje pakiet z repozytorium `path` w fixture'ze aplikacji konsumenta bez `ext-mongodb` i `yii2-mongodb` i jego skrypt, uruchomiony bez PHPUnit, dostaje paczkę z wpisem SQL.
       `yii2-mongodb` od 3.0.3 wymaga `ext-mongodb` 1.20.1 (Packagist), więc `require-dev` pakietu nie instaluje się bez rozszerzenia, a `failOnSkipped` nie pozwala na PHPUnit z pominiętymi testami MongoDB. Skrypt poza PHPUnit nie zmienia podziału z ADR 0008; `tests/README.md` dostaje o nim akapit.
