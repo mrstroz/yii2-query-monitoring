@@ -11,7 +11,8 @@ namespace mrstroz\querymonitoring\tests\app;
  * - `QM_SLOW_CONNECT_MS` — sleep in the constructor (Connection::open()),
  * - `QM_SLOW_PREPARE_MS` — sleep in prepare(),
  * - `QM_SLOW_FETCH_MS` — sleep in fetch()/fetchAll() of the returned statements,
- * - `QM_FAIL_PREPARE` — SQLSTATE; prepare() throws a PDOException with it instead of preparing.
+ * - `QM_FAIL_PREPARE` — SQLSTATE; prepare() throws a PDOException with it instead of preparing,
+ * - `QM_CALLER_PROBE` — file for {@see CallerProbe}, called by the returned statements before execute().
  * Without switches it behaves like PDO.
  */
 class TestPdo extends \PDO
@@ -23,7 +24,7 @@ class TestPdo extends \PDO
     {
         self::sleepFor('QM_SLOW_CONNECT_MS');
         parent::__construct($dsn, $username, $password, $options);
-        if (self::milliseconds('QM_SLOW_FETCH_MS') > 0) {
+        if (self::milliseconds('QM_SLOW_FETCH_MS') > 0 || CallerProbe::enabled()) {
             $this->setAttribute(\PDO::ATTR_STATEMENT_CLASS, [TestPdoStatement::class, []]);
         }
     }

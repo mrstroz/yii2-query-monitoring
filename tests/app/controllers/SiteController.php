@@ -10,6 +10,14 @@ use yii\web\Response;
 class SiteController extends Controller
 {
     /**
+     * Default route, reached with pretty URLs (`QM_DB_CACHE=1`). Runs no query.
+     */
+    public function actionIndex(): Response
+    {
+        return $this->asJson(['route' => $this->action?->uniqueId]);
+    }
+
+    /**
      * Error action, used when `QM_ERROR_ACTION=1`. Runs one query, so a request that ends here
      * still produces a batch.
      */

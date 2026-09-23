@@ -55,6 +55,8 @@ foreach (json_decode((string) getenv('QM_EXTRA_CONNECTIONS') ?: '{}', true) ?: [
 return [
     'id' => 'qm-test-app',
     'basePath' => __DIR__,
+    // The package's own vendor/, so `@vendor` points where the frames of Yii really are (YQM-27).
+    'vendorPath' => dirname(__DIR__, 2) . '/vendor',
     // A directory per run from AppRunner, so the default file adapter never writes into the repository.
     'runtimePath' => (string) getenv('QM_RUNTIME') ?: __DIR__ . '/runtime',
     'controllerNamespace' => 'mrstroz\querymonitoring\tests\app\controllers',
@@ -71,6 +73,11 @@ return [
         'dbOther' => $connection,
         'queryMonitor' => $monitor,
         ...$extra,
+        // QM_DB_CACHE=1: URL rules cached in DbCache, so a query runs in Request::resolve(), before any controller (YQM-27).
+        ...(getenv('QM_DB_CACHE') === '1' ? [
+            'cache' => ['class' => yii\caching\DbCache::class, 'cacheTable' => 'qm_cache'],
+            'urlManager' => ['enablePrettyUrl' => true, 'rules' => ['orders' => 'order/index']],
+        ] : []),
         'errorHandler' => [
             // A real exit(1) after an unhandled exception, as in production; YII_ENV_TEST would silence it.
             'silentExitOnException' => false,

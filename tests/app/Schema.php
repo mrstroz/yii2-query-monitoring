@@ -28,5 +28,9 @@ final class Schema
         $connection->createCommand(
             "CREATE TABLE IF NOT EXISTS qm_order (id {$id}, customer VARCHAR(100) NOT NULL, total DECIMAL(10,2) NOT NULL)",
         )->execute();
+        $blob = $connection->getDriverName() === 'pgsql' ? 'BYTEA' : 'LONGBLOB';
+        $connection->createCommand(
+            "CREATE TABLE IF NOT EXISTS qm_cache (id CHAR(128) NOT NULL PRIMARY KEY, expire INT, data {$blob})",
+        )->execute();
     }
 }
