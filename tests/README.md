@@ -42,9 +42,12 @@ Test sięgający po `/dev/full`, `flock`, `open_basedir`, `sh`, `ulimit`, `proc_
 - Każdy zestaw danych ma nazwę: `yield 'pgsql identifier' => [...]`, nie `yield [...]`. Bez nazw lista przypadków mówi `#0`, a zmiana kolejności staje się niewidoczna.
 - Provider deklaruje `@return iterable<string, array{…}>`. Przy tym typie PHPStan na poziomie 8 odrzuca `yield` bez nazwy, więc nazwane zestawy egzekwuje `composer stan`, a nie tylko przegląd.
 - Provider stoi bezpośrednio nad pierwszym testem, który go używa, a gdy używa go kilka testów — nad pierwszym z nich.
-- Rodzaj bazy parametryzujemy tylko wtedy, gdy zachowanie przechodzi przez sterownik albo przez implementację zależną od bazy, albo gdy świadomie potwierdzamy wsparcie obu silników. Scenariusz niezależny od bazy nie jest mnożony przez dwa silniki „na wszelki wypadek".
+- Rodzaj bazy parametryzujemy tylko wtedy, gdy test przechodzi jeden z trzech kroków, sprawdzanych **w tej kolejności**:
+  1. Kod pakietu jest podpięty pod sterownik (w SQL: `commandMap` podmieniony; w MongoDB: nasłuch zdarzeń sterownika) **i** asercja czyta coś, co z niego wyszło: wpis, paczkę — także zapisaną do pliku albo podaną adapterowi, więc `runtimeFiles` i `adapterCalls` się liczą — błąd pakietu zalogowany z toru zapytania albo znormalizowany `query`.
+  2. Jeśli nie: test wchodzi w rozgałęzienie zależne od bazy **i asercja obserwuje jego wynik**, czyli rodzaj bazy — dziś: klucz sterownika w `commandMap` — decyduje o asertowanej wartości. Wymagany odnośnik do linii w `src/`; bez niego przesłanka się nie liczy. Samo przejście przez `Connection::createCommand()` nie wystarcza: asercja o `yii\db\Command` tam, gdzie podmiana nie zaszła, czyta wartość domyślną, identyczną dla obu silników.
+  3. Jeśli nie: plan albo docblok metody nazywa ten test świadomym potwierdzeniem obu silników. Nienazwany — redukcja.
+- Scenariusz niezależny od bazy nie jest mnożony przez dwa silniki „na wszelki wypadek". Test, który nie przeszedł żadnego z trzech kroków, dostaje `IntegrationTestCase::ANY_DB` zamiast providera baz — stała nazywa decyzję w miejscu użycia.
 - Przypadki na MySQL i PostgreSQL idą przez wspólny mechanizm `IntegrationTestCase`, nie przez własną listę DSN w teście.
-- Scenariusz, którego wynik nie idzie przez sterownik, dostaje `IntegrationTestCase::ANY_DB` zamiast providera baz — stała nazywa decyzję w miejscu użycia.
 
 ## Komentarze
 

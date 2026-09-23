@@ -35,8 +35,10 @@ Rozstrzygnięcia szczegółowe:
 7. Test korzystający z `/dev/full`, `flock`, `open_basedir`, `sh`, `ulimit`, `proc_open` albo osobnego procesu nie jest testem jednostkowym.
 8. O katalogu decyduje badany kontrakt, nie mechanizm. Proces potomny użyty wyłącznie jako nośnik nieodwracalnego ustawienia (`ulimit -f`, `open_basedir`) albo jako model żądania PHP-FPM nie czyni testu testem procesów.
 9. Testy zależne od systemu operacyjnego są dopuszczalne, gdy sprawdzają istotny kontrakt i biegną w określonym środowisku Docker albo CI.
-10. Rodzaj bazy parametryzujemy tylko wtedy, gdy zachowanie przechodzi przez sterownik albo implementację zależną od bazy, albo gdy świadomie potwierdzamy wsparcie obu baz.
+10. Rodzaj bazy parametryzujemy tylko wtedy, gdy badane zachowanie powstaje w kodzie pakietu podpiętym pod sterownik — w SQL: podstawiony `Command` w `commandMap`; w MongoDB: nasłuch zdarzeń sterownika — **i asercja czyta jego wynik**: wpis, paczkę (także zapisaną do pliku albo podaną adapterowi), błąd pakietu zalogowany z toru zapytania, znormalizowany `query`. Albo gdy asertowana wartość zależy od implementacji rozgałęziającej się po bazie. Albo gdy świadomie potwierdzamy wsparcie obu silników — wtedy powód jest nazwany przy teście. Zapytanie wykonane w scenariuszu tylko po to, żeby scenariusz miał sens, nie czyni bazy wymiarem testu.
 11. Jeden test może mieć wiele asercji, ale wszystkie opisują jedno obserwowalne zachowanie.
+
+Punkt 10 ma dwa warunki, nie jeden, i to drugi rozstrzyga przypadki graniczne: sam fakt, że zapytanie padło, nic nie znaczy, jeśli asercja mówi o czymś innym niż jego wynik. Operacyjny sprawdzian w trzech krokach jest w [`tests/README.md`](../../tests/README.md).
 
 Punkt 8 jest tym, który rozstrzyga dzisiejsze przypadki graniczne: `FileAdapterTest` idzie do `Filesystem` mimo `proc_open`, bo jego przedmiotem jest zapis pliku; `FileAdapterProtectionTest` idzie do `Yii`, bo jego przedmiotem jest odpowiedź aplikacji; `FileAdapterConcurrencyTest` i `ProcessGroupTest` idą do `Process`, bo ich przedmiotem są równoległe procesy i sam runner.
 

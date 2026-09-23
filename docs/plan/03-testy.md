@@ -10,7 +10,7 @@
 
 - [x] (^) **YQM-19** Podział `tests/Integration` na `Yii/`, `Filesystem/` i `Process/` z osobnymi testsuite'ami
       ADR: [0008](../adr/0008-architektura-i-konwencje-testow.md) · Konwencje: [`tests/README.md`](../../tests/README.md)
-      Gotowe, gdy: `phpunit.xml.dist` ma cztery testsuite'y `Unit`, `Yii`, `Filesystem`, `Process`, `docker compose run --rm --no-deps -e QM_MYSQL_DSN= -e QM_PGSQL_DSN= php vendor/bin/phpunit --testsuite Unit,Filesystem,Process` przechodzi bez pominiętego testu, a znormalizowana lista przypadków nie różni się od baseline zdjętego przed pierwszą zmianą: `vendor/bin/phpunit --list-tests | sed -n 's/^ - //p' | sed -E 's/^([A-Za-z0-9_\\]*\\)?//' | sort`, porównane przez `diff`, bez różnic. Liczba zestawów danych na metodę też bez zmian.
+      Gotowe, gdy: `phpunit.xml.dist` ma cztery testsuite'y `Unit`, `Yii`, `Filesystem`, `Process`, `docker compose run --rm --no-deps -e QM_MYSQL_DSN= -e QM_PGSQL_DSN= php vendor/bin/phpunit --testsuite Unit,Filesystem,Process` przechodzi bez pominiętego testu, a znormalizowana lista przypadków nie różni się od baseline zdjętego przed pierwszą zmianą: `vendor/bin/phpunit --list-tests | sed -n 's/^ - //p' | sed -E 's/^([A-Za-z0-9_\\]*\\)?//' | LC_ALL=C sort`, porównane przez `diff`, bez różnic. `LC_ALL=C` jest częścią komendy, nie ozdobą: bez niego kolejność zależy od locale, a obraz kontenera ma wyłącznie `C`, `C.utf8` i `POSIX`, więc `LC_ALL=pl_PL.UTF-8` cicho spada tam do `C` i daje inny wynik niż na hoście. Obie strony porównania sortuje się tym samym poleceniem w chwili `diff`. Liczba zestawów danych na metodę też bez zmian.
       `tests/Unit` zostaje w tym zadaniu nietknięte, przenosi je YQM-20. `tests/Integration/Filesystem/` jest po tym zadaniu pusty, więc trzyma go `.gitkeep`, który znika w YQM-20; bez niego `TestSuiteMapper` rzuca `TestDirectoryNotFoundException` w świeżym klonie. Do `Process/` idą dokładnie dwie klasy, `FileAdapterConcurrencyTest` i `ProcessGroupTest` — jedyne dziedziczące wprost z `TestCase`; pozostałe jedenaście stoi na `IntegrationTestCase` i wędruje z grupą `Yii/`. `FileAdapterProtectionTest` należy do `Yii/`, bo badanym kontraktem jest odpowiedź aplikacji, a nie blokada.
 
 - [x] (^) **YQM-20** `FileAdapterTest` i jego fixture poza `tests/Unit`
@@ -37,8 +37,8 @@
 
 - [ ] (=) **YQM-24** Parametryzacja bazą tylko tam, gdzie zachowanie idzie przez sterownik
       ADR: [0008](../adr/0008-architektura-i-konwencje-testow.md) · Zależy od: YQM-22
-      Gotowe, gdy: tabela „Redukcja parametryzacji bazą" w „Uwagach" jest **przed redukcją** uzupełniona o każdą metodę i zestaw danych, który traci drugi silnik, wraz z powodem „nie przechodzi przez sterownik"; po zmianie zbiór nazw metod na znormalizowanej liście jest identyczny z baseline, a liczba zestawów danych na metodę jest identyczna wszędzie poza wierszami tej tabeli.
-      Kandydaci sprawdzeni w kodzie: `FileAdapterComponentTest::testEachFileKeyOverridesOnlyItself` (provider `overrides`) i `::testBadFileSettingDisablesThePackageBeforeTheCommandSwap` (provider `badFileSettings`) — obie badają walidację i ustawienia klucza `file`, baza jest tylko nośnikiem połączenia. **Nie wolno redukować** `ReadmeExampleTest::testConfigurationExampleRunsInTheTestApplication`: mimo nazwy naprawdę tworzy schemat, wykonuje żądanie `order/index` i sprawdza wynikową paczkę, więc idzie przez sterownik. To samo dotyczy całego `TestApplicationTest` — wszystkie jego metody wołają `Schema::create()` albo żądanie z zapytaniami. Sam licznik testów redukcji nie rozstrzygnie, bo jest zamierzona; rozstrzyga tabela.
+      Gotowe, gdy: tabela „Redukcja parametryzacji bazą" w „Uwagach" jest **przed redukcją** uzupełniona o każdą metodę i zestaw danych, który traci drugi silnik, wraz z numerem kroku sprawdzianu z [`tests/README.md`](../../tests/README.md), pod którym decyzja zapadła, oraz z linią albo komendą, którą da się ten powód obalić; po zmianie zbiór nazw metod na znormalizowanej liście jest identyczny z baseline, a liczba zestawów danych na metodę jest identyczna wszędzie poza wierszami tej tabeli.
+      Tabela pochodzi z audytu wszystkich 58 metod parametryzowanych bazą, przeprowadzonego pod sprawdzianem z [`tests/README.md`](../../tests/README.md); metoda audytu jest w „Uwagach", żeby YQM-26 mógł go powtórzyć. Każdy wiersz ma powód sprawdzalny komendą albo linią — powód, który brzmi wiarygodnie, ale nie da się go uruchomić, mówi o intencji, nie o kodzie. Sam licznik testów redukcji nie rozstrzygnie, bo jest zamierzona; rozstrzyga tabela i cztery liczby niżej.
 
 - [ ] (=) **YQM-25** Testy niezależne od kolejności i sprzątające po nieudanej asercji
       Konwencje: [`tests/README.md`](../../tests/README.md) · Zależy od: YQM-24
@@ -47,7 +47,7 @@
 
 - [ ] (=) **YQM-26** Odbiór etapu na skrajnych wersjach macierzy i obu bazach
       ADR: [0008](../adr/0008-architektura-i-konwencje-testow.md) · Zależy od: YQM-25
-      Gotowe, gdy: `composer test`, `composer stan` i `composer cs` przechodzą na PHP 8.1 i 8.4 na obu bazach, uruchomione lokalnie przez `docker run` jak w YQM-11, a znormalizowana lista przypadków zgadza się z baseline z YQM-19 co do zbioru nazw metod i co do liczby zestawów poza wierszami tabeli z YQM-24.
+      Gotowe, gdy: `composer test`, `composer stan` i `composer cs` przechodzą na PHP 8.1 i 8.4 na obu bazach, uruchomione lokalnie przez `docker run` jak w YQM-11; znormalizowana lista przypadków (sortowana w `LC_ALL=C`, jak w YQM-19) zgadza się z baseline co do zbioru nazw metod i co do liczby zestawów poza wierszami tabeli z YQM-24; `grep -rl ANY_DB tests/Integration/Yii --include='*Test.php'` daje dokładnie sześć klas (`ConnectionListTest`, `FileAdapterComponentTest`, `FinalizationTest`, `ProtectionTest`, `QueryMonitorComponentTest`, `TestApplicationTest`), a każde trafienie z `grep -rn` tym samym wzorcem leży w ciele jednej z dziewięciu metod tabeli z YQM-24 i każda z tych metod ma co najmniej jedno — dziewięć metod w sześciu klasach. Liczy się metody, nie wiersze: dwie metody zachowują providera z innym wymiarem, więc podstawiają stałą w każdym z trzech wywołań, a `--include='*Test.php'` wycina plik z definicją stałej (`IntegrationTestCase.php`). Warunek na liczbę wierszy wiązałby odbiór ze stylem zapisu, nie z faktem o kodzie; a audyt z „Uwag" powtórzony tym samym filtrem po **pozostałych** metodach parametryzowanych bazą nie daje żadnej kandydatki bez nazwanego powodu — pierwsza połowa sprawdza zbiór, druga to, że nic nie zostało poza tabelą. Samo „ten sam zbiór dziewięciu wierszy" jest po YQM-24 niewykonalne: siedem metod traci providera baz w całości, a `provideBadFileSettingCases` i `provideBadConfigurationCases` przestają iterować po `provideDatabaseCases`, więc powtórzony audyt zobaczy 49 metod i zero kandydatek; każdy powód w tabeli ma komendę albo linię, którą da się uruchomić — powód bez nich mówi o intencji, nie o kodzie; `tests/baseline-yqm19.txt` i `tests/baseline-yqm19-sets.txt` są usunięte.
       Workflow CI nie wymaga zmiany, bo `composer test` obejmuje wszystkie cztery testsuite'y. „Zielone CI na GitHubie" nie jest tu warunkiem, bo pierwszy push nie nastąpił i workflow pozostaje niepotwierdzony od E1.
 
 ## Czego reorganizacja nie robi
@@ -69,23 +69,49 @@ Katalogi `tests/app`, `tests/Integration/scenarios`, `tests/Integration/workers`
 
 Tabelę uzupełnia się przed zmianą, nie po niej; każdy wiersz jest sprawdzony w kodzie, zanim zacznie się redukcja.
 
-| Metoda | Zestawy przed | Po | Powód |
+| Metoda | Zestawy przed | Po | Powód (krok sprawdzianu) |
 |---|---|---|---|
-| `QueryMonitorComponentTest::testListedConnectionsGetMeasuredCommand` | 2 | 1 | czyta wyłącznie nazwy klas `Command` z kontenera; żadne zapytanie nie jest wykonywane |
-| `QueryMonitorComponentTest::testDisabledChangesNothingAndSendsNothing` | 2 | 1 | nazwy klas przy `enabled: false` i brak paczki; pakiet jest wyłączony |
-| `QueryMonitorComponentTest::testRequestWithoutQueriesSendsNothing` | 2 | 1 | trasa `no-queries` z definicji nie wykonuje zapytań |
-| `QueryMonitorComponentTest::testBadConfigurationDisablesPackageWithOneError` | 4 | 2 | walidacja konfiguracji komponentu; odpowiedź aplikacji i brak podmiany `Command` |
-| `ConnectionListTest::testListedConnectionIsNotOpenedByBootstrap` | 2 | 1 | sprawdza, że połączenie **nie** zostało otwarte; brak otwarcia to brak sterownika |
-| `FileAdapterComponentTest::testEachFileKeyOverridesOnlyItself` | 6 | 3 | ustawienia klucza `file`, baza jest tylko nośnikiem połączenia |
-| `FileAdapterComponentTest::testBadFileSettingDisablesThePackageBeforeTheCommandSwap` | 12 | 6 | walidacja ustawień `file` przed podmianą `Command` |
-| `TestApplicationTest::testApplicationRunsInAnotherProcess` | 2 | 1 | scenariusz `process` zwraca `pid` i `sapi`; nie wykonuje zapytań |
-| **Razem** | **32** | **16** | ubytek **16 zestawów** |
+| `ConnectionListTest::testConnectionWithoutDsnIsSkippedWithoutConnecting` | 2 | 1 | `:32-42` — `probe()` bez `QM_PROBE_QUERY`; czyta brak otwarcia, czas biegu i błąd z **bramy instalacji**, nie z toru zapytania. Dla `dbMasters` instalacja kończy się na `QueryMonitor.php:208` (własne `dsn` jest `null`), więc `getDriverName()` nie jest nawet wołane (krok 3) |
+| `ConnectionListTest::testListedConnectionIsNotOpenedByBootstrap` | 2 | 1 | `:56-60` — to samo bez `mastersOnly()`; mierzy brak otwarcia połączenia (krok 3) |
+| `FileAdapterComponentTest::testBadFileSettingDisablesThePackageBeforeTheCommandSwap` | 12 | 6 | `:89-102` — pakiet odrzucony przy walidacji klucza `file`; `:101-102` sprawdza wprost, że `Command` nie został podstawiony, więc trzy zapytania scenariusza `per-connection` idą przez `yii\db\Command` (krok 3) |
+| `FinalizationTest::testRequestWithoutQueriesSendsNothing` | 2 | 1 | `:69-77` — scenariusz `no-queries`; przez sterownik nie przechodzi nic (krok 3) |
+| `ProtectionTest::testDisabledPackageLeavesNoTrace` | 2 | 1 | `:87-93` — `['enabled' => false]`, brak podmiany, `adapterCalls` puste (krok 3) |
+| `QueryMonitorComponentTest::testDisabledChangesNothingAndSendsNothing` | 2 | 1 | `:91-100` — `enabled: false`; asercja `:94` czyta `yii\db\Command`, czyli wartość **domyślną**, identyczną dla obu silników (krok 3) |
+| `QueryMonitorComponentTest::testRequestWithoutQueriesSendsNothing` | 2 | 1 | `:103-110` — scenariusz `no-queries` (krok 3) |
+| `QueryMonitorComponentTest::testBadConfigurationDisablesPackageWithOneError` | 4 | 2 | `:127-138` — zła konfiguracja komponentu; `:138` czyta `yii\db\Command`, czyli brak podmiany (krok 3) |
+| `TestApplicationTest::testApplicationRunsInAnotherProcess` | 2 | 1 | `:31-36` — scenariusz `process` zwraca `pid` i `sapi`; nie wykonuje zapytań (krok 3) |
+| **Razem** | **30** | **15** | ubytek **15 zestawów** |
+
+Liczby zestawów pochodzą z `tests/baseline-yqm19-sets.txt`, nie z oględzin kodu.
 
 Redukcja usuwa provider tam, gdzie baza była jedynym wymiarem, i podstawia `IntegrationTestCase::ANY_DB`; stała nazywa decyzję w miejscu użycia zamiast zostawiać providera z jednym elementem. Na liście przypadków daje to trzy rodzaje zmian, które przy odbiorze trzeba rozróżnić: wiersze **usunięte** (warianty `pgsql`), wiersze ze **zmienioną etykietą** (`"mysql: unknown key"` → `"unknown key"` tam, gdzie provider miał więcej wymiarów niż baza) i wiersze **bez etykiety** (metody, w których provider zniknął w całości).
 
-Metoda audytu, żeby YQM-26 mogło go powtórzyć: z 58 metod parametryzowanych bazą filtr maszynowy po `entriesWith`, `singleBatch`, `->queries` i `batches[0]` odsiewa 38, które czytają wpisy z paczki, czyli na pewno przeszły przez sterownik; pozostałe 20 czyta się ręcznie. Osiem z nich nie dotyka sterownika — siedem znalazł ten audyt, ósme (`testApplicationRunsInAnotherProcess`) wyszło dopiero przy przeglądzie tabeli, bo chronił je zakaz oparty na nieprawdziwej przesłance, że wszystkie metody `TestApplicationTest` tworzą schemat albo wykonują zapytania.
+Metoda audytu, żeby YQM-26 mógł go powtórzyć. Filtr **odsiewa** metody, które na pewno przeszły przez sterownik, i zostawia resztę do ręcznej lektury; odsiewają wyłącznie markery odczytu wyjścia pakietu: `entriesWith`, `singleBatch`, `->queries`, `batches[0]`, `->batches[`, `singleLine`. Trzy zasady, każda kupiona błędem:
 
-Warunek sprawdza się czterema liczbami, nie trzema: wierszy przed, wierszy po, suma ubytków z tabeli oraz `diff` listy ograniczony do wierszy spoza tabeli — **pusty w obie strony**, bo wariant ze stałą dodaje wiersze bez etykiety, a nie tylko usuwa. Trzy pierwsze liczby mogą się domknąć przypadkiem, gdy coś zniknie i coś przybędzie; czwarta tego nie przepuści. Końcowej liczby wierszy plan nie przewiduje — wynika ona z tego, ile metod traci providera w całości (dochodzi im wiersz bez etykiety), a ile zachowuje go z innym wymiarem, i mierzy się ją przy odbiorze.
+- **Filtr stosuje się do ciała metody, nigdy do pliku.** `FinalizationTest.php` ma `singleBatch` i `entriesWith` w liniach 44–65, w zupełnie innych metodach niż kandydatka z `:69`; filtr po pliku przepuściłby ją po cichu.
+- **Marker nieobecności — `assertSame([], $result->batches)`, `adapterCalls`, `runtimeFiles` — jest znakiem kandydatki, nie powodem odsiania.** Wpisany do sita wyrzuca z ręcznej listy sześć z ośmiu kandydatek.
+- **`scenarioOutput` do filtru nie należy**: czyta wynik scenariusza, a nie wyjście pakietu. Z nim ręczna lista schodzi z 18 do 9 i znikają z niej cztery wiersze tabeli.
+
+Wynik: 58 metod parametryzowanych bazą, 40 odsianych, **18 do przeczytania ręcznie**, z nich 9 do tabeli. Liczby policzone niezależnie w dwóch przebiegach.
+
+Rozgałęzienia po bazie w `src/` — pełna lista wejść w krok 2 sprawdzianu (`grep -rn "Dialect\b\|driverName" src/` poza docblokami nie daje innych):
+
+| Miejsce | Co rozgałęzia |
+|---|---|
+| `QueryMonitor.php:211-212` | `getDriverName()` + `Dialect::tryFrom()`, a `:224` zapisuje `commandMap[$driver]` — brama instalacji |
+| `sql/SqlNormalizer.php:43,60,196,294` (plus predykaty `Dialect`) | reguły normalizacji per dialekt |
+| `sql/Recorder.php:22,40-45` | `driverName` wchodzi do normalizatora i do pola `db` wpisu |
+
+Dwa ostatnie leżą **za** podmianą `commandMap`, więc test, który do nich dociera, wykonał zapytanie przez nasz `Command` i zapada już krokiem 1. W całym audycie krok 2 zapadł **raz**, na bramie instalacji, i warto zobaczyć tę parę obok siebie, bo to ta sama mechanika z przeciwnym wynikiem:
+
+- `QueryMonitorComponentTest::testListedConnectionsGetMeasuredCommand` (`:81-88`) **zostaje na obu silnikach**. `Connection::createCommand()` (`vendor/yiisoft/yii2/db/Connection.php:759-766`) bierze klasę spod `commandMap[getDriverName()]`, więc asercja czyta wartość spod klucza silnika: na pgsql dowodzi instalacji pod `pgsql`, na mysql pod `mysql`. Przy zepsutym `Dialect` dla jednego silnika to jedyny test, który powie „instalacja pod tym kluczem nie zaszła", a nie „brak wpisów".
+- `::testDisabledChangesNothingAndSendsNothing` (`:94`) i `::testBadConfigurationDisablesPackageWithOneError` (`:138`) **są w tabeli**, choć ich asercje też idą przez `createCommand()`: czytają `yii\db\Command`, czyli wartość domyślną, identyczną dla obu silników i niezależną od klucza.
+
+Pytanie kroku 2 brzmi więc: **czy klucz sterownika decyduje o asertowanej wartości** — nie: czy rozgałęzienie gdzieś istnieje.
+
+Warunek sprawdza się czterema liczbami, nie trzema: wierszy przed, wierszy po, suma ubytków z tabeli oraz `diff` listy ograniczony do wierszy spoza tabeli — **pusty w obie strony**, bo wariant ze stałą dodaje wiersze bez etykiety, a nie tylko usuwa. Trzy pierwsze liczby mogą się domknąć przypadkiem, gdy coś zniknie i coś przybędzie; czwarta tego nie przepuści. Końcowej liczby wierszy plan nie przyjmuje z góry, tylko mierzy przy odbiorze; spodziewana wartość to 349 → 334 (siedem metod traci providera w całości: −7; `testBadFileSetting…` 12 → 6: −6; `testBadConfiguration…` 4 → 2: −2), a rozjazd wobec niej jest sygnałem, nie warunkiem.
+
+Czwarta liczba nie jest formalnością. Tabela sprzed audytu dawała tę samą sumę 32 → 16 przy **innym zbiorze wierszy**: wypadł z niej `testEachFileKeyOverridesOnlyItself` (−6/−3), a doszły trzy metody po 2. Kto sprawdza tylko sumę, nie zauważy, że zmienił się cały zbiór.
 
 Bieg z ustawionym wyłącznie `QM_PGSQL_DSN` pominąłby metody z `ANY_DB` i przy `failOnSkipped` byłby czerwony; compose i CI ustawiają oba DSN, więc dziś takiego biegu nie ma. To znane ograniczenie mechanizmu, nie jego wada.
 
@@ -96,7 +122,14 @@ Osiem wierszy zmieniło etykietę w YQM-22, bez utraty silnika i bez zmiany licz
 | `SqlNormalizerTest::testLimitSmallerThanEllipsisIsRejected` | `#0`, `#1`, `#2` | `zero`, `shorter than the ellipsis`, `negative` |
 | `SqlNormalizerTest::testUnsupportedDbGivesNull` | `#0`..`#4` | `sqlite`, `mongodb`, `oci`, `empty name`, `mysql in upper case` |
 
-Poza tabelą nic nie traci drugiego silnika. `ReadmeExampleTest::testConfigurationExampleRunsInTheTestApplication` zostaje na obu bazach, bo tworzy schemat i wykonuje żądanie `order/index`. `TestApplicationTest` zostaje na obu bazach w czterech z pięciu metod: trzy tworzą schemat albo wykonują zapytania, a `testRouteWithoutQueriesGivesNoBatch` jest świadomym potwierdzeniem obu silników w rozumieniu reguły 10 ADR 0008 — pusta paczka to dowód, że przez sterownik nic nie przeszło. Piąta, `testApplicationRunsInAnotherProcess`, jest w tabeli: sprawdza tożsamość procesu, nie zachowanie bazy.
+Poza tabelą nic nie traci drugiego silnika. Dwa testy zostają na obu silnikach pod trzecią przesłanką reguły 10, każdy z nazwanym powodem — nienazwany test tej przesłanki nie dostaje:
+
+| Test | Powód |
+|---|---|
+| `TestApplicationTest::testRouteWithoutQueriesGivesNoBatch` (`:81-89`) | konstrukcja „brak zapytań = brak paczki" ma w zestawie trzy instancje; ta jedna idzie przez `AppRunner` i prawdziwą trasę `order/none`, pozostałe dwie (`QueryMonitorComponentTest:103`, `FinalizationTest:69`) są jej bliźniakami na poziomie komponentu i cyklu życia i są w tabeli. Jedno potwierdzenie, nie zero i nie trzy |
+| `TestApplicationTest::testSchemaIsCreatedAndCreationIsIdempotent` (`:18-28`) | jedyny test, którego przedmiotem jest sam fixture: wywołuje `Schema::create()` dwa razy (`:23-24`) — żaden inny test w zestawie tego nie robi (`grep -rn "Schema::create" tests/`). Wymiar bazy jest tu realny, bo DDL różni się tekstem per sterownik (`tests/app/Schema.php:27`, `SERIAL PRIMARY KEY` wobec `INT AUTO_INCREMENT PRIMARY KEY`), a `IF NOT EXISTS` to semantyka każdego silnika osobno. Bez niego zepsuty DDL wychodzi jako mylna diagnoza „pakiet nie działa" zamiast „fixture nie działa" |
+
+`ReadmeExampleTest::testConfigurationExampleRunsInTheTestApplication` zostaje na obu bazach krokiem 1: tworzy schemat, wykonuje żądanie `order/index` i czyta zapisaną paczkę (`:38-45`).
 
 Ścieżki, które trzeba poprawić przy przenoszeniu, i te, których nie wolno „poprawić":
 
