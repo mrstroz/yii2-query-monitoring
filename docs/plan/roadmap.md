@@ -4,9 +4,9 @@
 
 | Pole | Wartość |
 |---|---|
-| **Etap** | E4. Źródło MongoDB, 4 z 10 |
-| **Ostatnio ukończone** | [YQM-34](05-mongodb.md): `mongodb\MongoDbNormalizer` według poprawionej [spec 02 §4](../spec/02-format-paczki.md#4-normalizacja): tabela poleceń z sekcjami (`updates[0].q`, `deletes[0].q`, `query` w `count` i `findAndModify`), tablice bez scalania, obiekty BSON jako `?`, do pięciu poziomów kluczy (ADR-0004) |
-| **Następne** | [YQM-35](05-mongodb.md): subskrybent, `mongodb\Recorder` i `mongodb\Source` na połączeniach z listy |
+| **Etap** | E4. Źródło MongoDB, 5 z 10 |
+| **Ostatnio ukończone** | [YQM-35](05-mongodb.md): `mongodb\Source`, `mongodb\Subscriber` i `mongodb\Recorder`: jeden subskrybent na klucz klienta sterownika, podpinany przy instalacji i w każdym `EVENT_AFTER_OPEN`, wpis na parę zdarzeń po `requestId`, `CommandFailed` z kodem serwera |
+| **Następne** | [YQM-36](05-mongodb.md): `writeErrors` i `writeConcernError` w `CommandSucceeded`, razem z [YQM-37](05-mongodb.md) (`getMore` i podzielony `insert`) |
 
 Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trzeba zajrzeć na początku sesji.
 
@@ -18,7 +18,7 @@ Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trze
 | **E1** | [02-adapter-plikowy](02-adapter-plikowy.md) | Adapter plikowy z rotacją | Paczki w `runtime/logs`, bezpieczne przy 8 procesach | 6/6 |
 | **E2** | [03-testy](03-testy.md) | Architektura i konwencje testów | Cztery testsuite'y, konwencje spisane i zastosowane, żaden scenariusz nie zniknął | 8/8 |
 | **E3** | [04-kontekst-wpisu](04-kontekst-wpisu.md) | Kontekst wpisu i limity | Paczka `v: 2` z `route` w nagłówku i `caller` we wpisie, `maxQueryLength` 8192, limity paczki potwierdzone pomiarem | 4/4 |
-| **E4** | [05-mongodb](05-mongodb.md) | Źródło MongoDB | Jedna paczka z wpisami SQL i MongoDB | 4/10 |
+| **E4** | [05-mongodb](05-mongodb.md) | Źródło MongoDB | Jedna paczka z wpisami SQL i MongoDB | 5/10 |
 | **E5** | [06-konsola](06-konsola.md) | Zadania konsolowe | Wiele paczek z `seq` w jednym procesie | – |
 | **E6** | [07-wydajnosc-i-odbior](07-wydajnosc-i-odbior.md) | Test wydajności, dokumentacja | Narzut w progu, limity potwierdzone, README pakietu | – |
 

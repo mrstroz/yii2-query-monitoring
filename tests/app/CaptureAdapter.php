@@ -14,7 +14,8 @@ use mrstroz\querymonitoring\batch\QueryBatch;
  * - `throw` — throws a RuntimeException instead of writing the batch,
  * - `json-fail` — fails in `json_encode()` with JSON_THROW_ON_ERROR, as a serialising adapter would,
  * - `query` — runs `SELECT 4242 AS qm_in_adapter` through the monitored `db`, records the result in the
- *   call line (`"query": "4242"`) and then writes the batch.
+ *   call line (`"query": "4242"`) and then writes the batch,
+ * - `mongodb-query` — runs `find` on `qm_in_adapter` through the monitored `mongodb`, then writes the batch.
  */
 final class CaptureAdapter implements BatchAdapterInterface
 {
@@ -26,6 +27,11 @@ final class CaptureAdapter implements BatchAdapterInterface
         $mode = (string) getenv('QM_ADAPTER');
         if ($mode === 'query') {
             $call['query'] = (string) \Yii::$app?->getDb()->createCommand('SELECT 4242 AS qm_in_adapter')->queryScalar();
+        }
+        if ($mode === 'mongodb-query') {
+            $mongodb = \Yii::$app?->get('mongodb');
+            assert($mongodb instanceof \yii\mongodb\Connection);
+            $mongodb->getCollection('qm_in_adapter')->findOne([]);
         }
         $file = (string) getenv('QM_CAPTURE_FILE');
         file_put_contents($file . '.calls', json_encode($call) . "\n", FILE_APPEND | LOCK_EX);

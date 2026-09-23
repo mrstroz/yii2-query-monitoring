@@ -52,6 +52,12 @@ foreach (json_decode((string) getenv('QM_EXTRA_CONNECTIONS') ?: '{}', true) ?: [
     }
 }
 
+$mongodb = ['class' => yii\mongodb\Connection::class, 'dsn' => (string) getenv('QM_MONGODB_DSN')];
+// Extra MongoDB connections: {"id": {overrides of $mongodb}}, e.g. other `options` for another driver client.
+foreach (json_decode((string) getenv('QM_MONGODB_EXTRA') ?: '{}', true) ?: [] as $id => $spec) {
+    $extra[$id] = array_replace($mongodb, is_array($spec) ? $spec : []);
+}
+
 return [
     'id' => 'qm-test-app',
     'basePath' => __DIR__,
@@ -60,7 +66,14 @@ return [
     // A directory per run from AppRunner, so the default file adapter never writes into the repository.
     'runtimePath' => (string) getenv('QM_RUNTIME') ?: __DIR__ . '/runtime',
     'controllerNamespace' => 'mrstroz\querymonitoring\tests\app\controllers',
-    'bootstrap' => ['log', 'queryMonitor'],
+    // QM_MONGODB_EARLY=1: `mongodb` is opened in bootstrap before the package, as by an earlier component (YQM-35).
+    'bootstrap' => getenv('QM_MONGODB_EARLY') === '1'
+        ? ['log', static function (yii\base\Application $app): void {
+            $mongodb = $app->get('mongodb');
+            assert($mongodb instanceof yii\mongodb\Connection);
+            $mongodb->open();
+        }, 'queryMonitor']
+        : ['log', 'queryMonitor'],
     'modules' => [
         'admin' => [
             'class' => AdminModule::class,
@@ -71,7 +84,7 @@ return [
         'cache' => yii\caching\ArrayCache::class,
         'db' => $connection,
         'dbOther' => $connection,
-        'mongodb' => ['class' => yii\mongodb\Connection::class, 'dsn' => (string) getenv('QM_MONGODB_DSN')],
+        'mongodb' => $mongodb,
         'queryMonitor' => $monitor,
         ...$extra,
         // QM_DB_CACHE=1: URL rules cached in DbCache, so a query runs in Request::resolve(), before any controller (YQM-27).

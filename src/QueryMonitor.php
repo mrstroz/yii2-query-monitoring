@@ -10,6 +10,8 @@ use mrstroz\querymonitoring\adapter\FileAdapter;
 use mrstroz\querymonitoring\batch\BatchType;
 use mrstroz\querymonitoring\batch\QueryBatch;
 use mrstroz\querymonitoring\collector\QueryCollector;
+use mrstroz\querymonitoring\mongodb\MongoDbNormalizer;
+use mrstroz\querymonitoring\mongodb\Source as MongoDbSource;
 use mrstroz\querymonitoring\sql\Source as SqlSource;
 use mrstroz\querymonitoring\sql\SqlNormalizer;
 use mrstroz\querymonitoring\support\CallerFrames;
@@ -156,7 +158,10 @@ class QueryMonitor extends Component implements BootstrapInterface
      */
     protected function createSources(QueryCollector $collector, Guard $guard, CallerFrames $callers): array
     {
-        return [new SqlSource($collector, $guard, $callers, fn(): SqlNormalizer => $this->createNormalizer())];
+        return [
+            new SqlSource($collector, $guard, $callers, fn(): SqlNormalizer => $this->createNormalizer()),
+            new MongoDbSource($collector, $guard, $callers, fn(): MongoDbNormalizer => new MongoDbNormalizer($this->maxQueryLength)),
+        ];
     }
 
     private function install(Application $app, Guard $guard): void
