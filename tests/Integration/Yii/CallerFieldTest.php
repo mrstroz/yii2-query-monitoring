@@ -11,9 +11,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
  * YQM-28, spec 02 §2: every entry of a batch from the test application carries `caller`, the application
  * frames nearest to the query, relative to the project root, without the entry script.
  *
- * The three application paths of YQM-27 also guard `N`: their deepest query (schema of `qm_order` under
- * GridView, position 29) sits one frame inside `Recorder::TRACE_LIMIT`; a Yii update that deepens the stack
- * turns its `caller` into `[]` and fails here.
+ * The application paths also guard `N`: the deepest query, the second level of `with()` under GridView in
+ * `caller-grid-with` (position 31 on both engines), lies beyond the 30 frames of YQM-28 and inside
+ * `Recorder::TRACE_LIMIT`; a limit that no longer reaches it turns its `caller` into `[]` and fails here.
  */
 final class CallerFieldTest extends IntegrationTestCase
 {
@@ -23,7 +23,7 @@ final class CallerFieldTest extends IntegrationTestCase
     public static function provideApplicationPathCases(): iterable
     {
         foreach (self::provideDatabaseCases() as [$db]) {
-            foreach (['caller-ar', 'caller-command', 'caller-grid'] as $path) {
+            foreach (['caller-ar', 'caller-command', 'caller-grid', 'caller-grid-with'] as $path) {
                 yield "{$db} {$path}" => [$db, $path];
             }
         }

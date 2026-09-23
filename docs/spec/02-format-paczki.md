@@ -30,7 +30,7 @@ Kontrakt między kolektorem a każdym adapterem. Zmiana pola oznacza nowe `v`.
 | `time_ms` | float | Czas według [01 §2](01-zbieranie-danych.md#2-źródło-sql) i [01 §3](01-zbieranie-danych.md#3-źródło-mongodb) |
 | `result` | `success` \| `error` | |
 | `error` | string | Tylko przy `result: error`. SQLSTATE dla SQL, np. `"23000"`. Kod liczbowy sterownika jako tekst dla MongoDB, np. `"11000"`. Jeden typ dla obu źródeł |
-| `caller` | array of string | Zawsze obecne. Najwyżej trzy ramki aplikacji, od najbliższej zapytaniu, każda jako `ścieżka:linia`, ze ścieżką względną wobec korzenia projektu. Szukane w pierwszych 30 ramkach śladu wywołań ([01 §2](01-zbieranie-danych.md#2-źródło-sql)). `[]` znaczy, że w tych granicach nie ma ramki aplikacji, a nie że zapytania nie wystawił kod aplikacji |
+| `caller` | array of string | Zawsze obecne. Najwyżej trzy ramki aplikacji, od najbliższej zapytaniu, każda jako `ścieżka:linia`, ze ścieżką względną wobec korzenia projektu. Szukane w pierwszych 64 ramkach śladu wywołań ([01 §2](01-zbieranie-danych.md#2-źródło-sql)). `[]` znaczy, że w tych granicach nie ma ramki aplikacji, a nie że zapytania nie wystawił kod aplikacji |
 
 Jeden wpis to jedno polecenie faktycznie wysłane do bazy.
 

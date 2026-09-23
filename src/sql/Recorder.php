@@ -20,9 +20,10 @@ final class Recorder
 {
     /**
      * Frames searched for `caller`, counted from the guard's closure in {@see self::record()} (spec 01 §2).
-     * YQM-27 measured the deepest first application frame at 29.
+     * The deepest first application frame measured sits at 31, in a GridView whose data provider nests
+     * `with()` two levels deep, and at 32 through `via()`; each further level adds five frames (ADR-0009).
      */
-    public const TRACE_LIMIT = 30;
+    public const TRACE_LIMIT = 64;
 
     public function __construct(
         private readonly string $connectionId,
