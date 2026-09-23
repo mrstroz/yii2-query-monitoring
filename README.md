@@ -55,7 +55,7 @@ return [
 | `enabled` | `true` | `false` installs nothing and sends nothing |
 | `maxEntries` | `500` | Entries per batch; the excess is counted in `dropped` |
 | `maxBatchBytes` | `262144` | Size of the batch JSON; the excess is counted in `dropped` |
-| `maxQueryLength` | `2048` | Bytes of one normalised `query`, cut with `…` |
+| `maxQueryLength` | `8192` | Bytes of one normalised `query`, cut with `…` |
 
 A monitored connection must not set its own `commandClass` or `commandMap` for its driver: the package
 measures queries by setting `commandMap` to its own `Command` class.

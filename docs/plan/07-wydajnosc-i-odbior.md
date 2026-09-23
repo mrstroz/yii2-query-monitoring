@@ -8,4 +8,4 @@
 
 ## Zadania
 
-Zadania zostaną spisane, gdy E5 się zakończy. Etap rozstrzyga otwartą kwestię 3 w [spec 00 §9](../spec/00-przeglad-i-zakres.md#9-otwarte-kwestie).
+Zadania zostaną spisane, gdy E5 się zakończy. Etap rozstrzyga człon 3c otwartej kwestii 3 w [spec 00 §9](../spec/00-przeglad-i-zakres.md#9-otwarte-kwestie): rotację plików.

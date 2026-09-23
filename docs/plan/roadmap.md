@@ -4,9 +4,9 @@
 
 | Pole | Wartość |
 |---|---|
-| **Etap** | E3. Kontekst wpisu i limity, 2 z 4 |
-| **Ostatnio ukończone** | [YQM-28](04-kontekst-wpisu.md): format `v: 2` ([ADR 0009](../adr/0009-caller-i-route-w-formacie-v2.md)). Nagłówek ma `route` zamiast `module`, `controller` i `action`, każdy wpis ma `caller` z najwyżej trzema ramkami aplikacji, `plik:linia` względem korzenia projektu, szukanymi w 30 ramkach od domknięcia strażnika w `Recorder::record()`. Skrypt wejściowy, vendor i `src/` pakietu są wykluczone; korzeń projektu z `Composer\InstalledVersions`, więc pakiet wymaga Composera 2. Strażnikiem `N` przy aktualizacji Yii jest `CallerFieldTest` na trzech ścieżkach aplikacyjnych i obu bazach |
-| **Następne** | [YQM-29](04-kontekst-wpisu.md): `maxQueryLength` 8192 i rozdzielenie otwartej kwestii 3 w [spec 00 §9](../spec/00-przeglad-i-zakres.md#9-otwarte-kwestie) na trzy człony. Testy pisze się według [`tests/README.md`](../../tests/README.md) — o katalogu decyduje kontrakt, a rodzaj bazy parametryzuje się tylko wtedy, gdy asercja czyta wynik kodu podpiętego pod sterownik |
+| **Etap** | E3. Kontekst wpisu i limity, 3 z 4 |
+| **Ostatnio ukończone** | [YQM-29](04-kontekst-wpisu.md): domyślne `maxQueryLength` to 8192 (`SqlNormalizer::DEFAULT_MAX_QUERY_LENGTH`, z niej bierze komponent). Otwarta kwestia 3 w [spec 00 §9](../spec/00-przeglad-i-zakres.md#9-otwarte-kwestie) rozdzielona: 3a zamknięte, 3b (`maxBatchBytes`, `maxEntries`) czeka na YQM-30, 3c (rotacja) na E6 |
+| **Następne** | [YQM-30](04-kontekst-wpisu.md): `maxBatchBytes` i `maxEntries` z pomiaru. **Zablokowane** pozycją 3b w [spec 00 §9](../spec/00-przeglad-i-zakres.md#9-otwarte-kwestie): potrzebny pomiar rozmiaru paczki z `caller` na rzeczywistym ruchu, spoza tego repozytorium. Decyzja użytkownika 2026-09-23: E4 i dalsze etapy czekają na koniec E3, więc do tego pomiaru prace w planie stoją |
 
 Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trzeba zajrzeć na początku sesji.
 
@@ -17,7 +17,7 @@ Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trze
 | **E0** | [01-fundament-i-sql](01-fundament-i-sql.md) | Pakiet, kolektor, `Command`, cykl życia HTTP | Aplikacja z MySQL i PostgreSQL daje paczkę do jawnego adaptera, wyjątek nie gubi paczki | 12/12 |
 | **E1** | [02-adapter-plikowy](02-adapter-plikowy.md) | Adapter plikowy z rotacją | Paczki w `runtime/logs`, bezpieczne przy 8 procesach | 6/6 |
 | **E2** | [03-testy](03-testy.md) | Architektura i konwencje testów | Cztery testsuite'y, konwencje spisane i zastosowane, żaden scenariusz nie zniknął | 8/8 |
-| **E3** | [04-kontekst-wpisu](04-kontekst-wpisu.md) | Kontekst wpisu i limity | Paczka `v: 2` z `route` w nagłówku i `caller` we wpisie, `maxQueryLength` 8192 | 2/4 |
+| **E3** | [04-kontekst-wpisu](04-kontekst-wpisu.md) | Kontekst wpisu i limity | Paczka `v: 2` z `route` w nagłówku i `caller` we wpisie, `maxQueryLength` 8192 | 3/4 |
 | **E4** | [05-mongodb](05-mongodb.md) | Źródło MongoDB | Jedna paczka z wpisami SQL i MongoDB | – |
 | **E5** | [06-konsola](06-konsola.md) | Zadania konsolowe | Wiele paczek z `seq` w jednym procesie | – |
 | **E6** | [07-wydajnosc-i-odbior](07-wydajnosc-i-odbior.md) | Test wydajności, dokumentacja | Narzut w progu, limity potwierdzone, README pakietu | – |

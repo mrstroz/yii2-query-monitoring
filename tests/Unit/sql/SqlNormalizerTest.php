@@ -148,7 +148,7 @@ final class SqlNormalizerTest extends TestCase
 
     public function testDefaultMaxQueryLength(): void
     {
-        self::assertSame(2048, SqlNormalizer::DEFAULT_MAX_QUERY_LENGTH);
+        self::assertSame(8192, SqlNormalizer::DEFAULT_MAX_QUERY_LENGTH);
     }
 
     /**
@@ -214,16 +214,35 @@ final class SqlNormalizerTest extends TestCase
 
     public function testLongQueryIsCutToDefaultLimitWithValidUtf8(): void
     {
-        $sql = 'SELECT zażółć FROM t WHERE id IN (' . implode(', ', range(1, 3000)) . ')';
+        // 5000 literals give about 15 KB after normalisation, well over the default limit.
+        $sql = 'SELECT zażółć FROM t WHERE id IN (' . implode(', ', range(1, 5000)) . ')';
 
         $result = (new SqlNormalizer())->normalize($sql, 'mysql');
 
         self::assertIsString($result);
-        self::assertLessThanOrEqual(2048, strlen($result));
-        self::assertGreaterThanOrEqual(2046, strlen($result));
+        self::assertLessThanOrEqual(8192, strlen($result));
+        self::assertGreaterThanOrEqual(8190, strlen($result));
         self::assertStringEndsWith('…', $result);
         self::assertStringStartsWith('SELECT zażółć FROM t WHERE id IN (?, ?, ?', $result);
         self::assertTrue(mb_check_encoding($result, 'UTF-8'));
+    }
+
+    public function testQueryOfExactlyDefaultLimitIsKept(): void
+    {
+        $sql = 'SELECT ' . str_repeat('a', SqlNormalizer::DEFAULT_MAX_QUERY_LENGTH - 7);
+
+        self::assertSame($sql, (new SqlNormalizer())->normalize($sql, 'mysql'), '8192 bytes fit');
+    }
+
+    public function testQueryOneByteOverDefaultLimitIsCut(): void
+    {
+        $sql = 'SELECT ' . str_repeat('a', SqlNormalizer::DEFAULT_MAX_QUERY_LENGTH - 6);
+
+        $result = (new SqlNormalizer())->normalize($sql, 'mysql');
+
+        self::assertIsString($result);
+        self::assertSame(8192, strlen($result), '8193 bytes are cut to 8189 plus the 3-byte ellipsis');
+        self::assertStringEndsWith('…', $result);
     }
 
     /**

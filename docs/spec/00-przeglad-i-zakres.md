@@ -105,5 +105,7 @@ Wymagania: PHP 8.1 lub nowszy, Yii 2.0.55 lub nowszy, Composer 2 (korzeń projek
 |---|---|---|---|
 | 1 | Nazwa pakietu i namespace | **Rozstrzygnięte 2026-09-22 w YQM-1:** `mrstroz/yii2-query-monitoring` z `mrstroz\querymonitoring` | Zamknięte |
 | 2 | Czy `yii\mongodb\Connection` udostępnia `Manager` sterownika tak, żeby dało się podpiąć `CommandSubscriber` bez podmiany klasy połączenia | `addSubscriber` na `Manager`, albo podmiana klasy `Connection` | Sonda w pierwszym zadaniu etapu E4 |
-| 3 | Limity: 500 wpisów, 256 KB, 2 KB na `query`, 10 MB × 5 plików | Zostają, albo korekta | Wynik testu wydajności w E6 |
+| 3a | Limit `maxQueryLength` | **Rozstrzygnięte 2026-09-23 w YQM-29:** 8192 bajty. 2 KB obcinało zapytania, które w rzeczywistej aplikacji mają kilka kilobajtów, a obcięty `query` nie daje się odtworzyć | Zamknięte |
+| 3b | Limity `maxBatchBytes` 256 KB i `maxEntries` 500 | Zostają, albo korekta | Pomiar rozmiaru paczki z `caller` na rzeczywistym ruchu, YQM-30 |
+| 3c | Rotacja pliku: 10 MB × 5 plików | Zostaje, albo korekta | Wynik testu wydajności w E6 |
 | 4 | Organizacja normalizatora SQL: jedna klasa z parametrem dialektu, czy osobna klasa na dialekt | **Rozstrzygnięte 2026-09-22 w YQM-6:** jedna klasa `SqlNormalizer` z wewnętrznym enum dialektu niosącym reguły z [02 §4](02-format-paczki.md#4-normalizacja) | Zamknięte |

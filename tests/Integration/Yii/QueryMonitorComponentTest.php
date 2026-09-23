@@ -98,6 +98,24 @@ final class QueryMonitorComponentTest extends IntegrationTestCase
         $this->assertNoErrors($result);
     }
 
+    /**
+     * YQM-29: with the default configuration the component hands the normaliser 8192 bytes, not 2048.
+     */
+    #[DataProvider('provideDatabaseCases')]
+    public function testDefaultMaxQueryLengthCutsLongQueryAt8192Bytes(string $db): void
+    {
+        $result = $this->scenario($db, 'long-query');
+
+        self::assertSame(['value' => 1], $this->scenarioOutput($result));
+        $entries = $this->entriesWith($this->singleBatch($result), 'qm_long_query');
+        self::assertCount(1, $entries);
+        $query = $entries[0]['query'];
+        self::assertIsString($query);
+        self::assertGreaterThanOrEqual(8190, strlen($query), 'cut on a character boundary just under the limit');
+        self::assertLessThanOrEqual(8192, strlen($query));
+        self::assertStringEndsWith('…', $query);
+    }
+
     public function testRequestWithoutQueriesSendsNothing(): void
     {
         $result = $this->scenario(self::ANY_DB, 'no-queries');

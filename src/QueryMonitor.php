@@ -58,7 +58,7 @@ class QueryMonitor extends Component implements BootstrapInterface
 
     public int $maxBatchBytes = 262144;
 
-    public int $maxQueryLength = 2048;
+    public int $maxQueryLength = SqlNormalizer::DEFAULT_MAX_QUERY_LENGTH;
 
     /**
      * Class name, {@see BatchAdapterInterface} object or `callable(QueryBatch): mixed` (spec 03 §1);

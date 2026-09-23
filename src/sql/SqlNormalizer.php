@@ -12,7 +12,7 @@ namespace mrstroz\querymonitoring\sql;
  */
 final class SqlNormalizer
 {
-    public const DEFAULT_MAX_QUERY_LENGTH = 2048;
+    public const DEFAULT_MAX_QUERY_LENGTH = 8192;
     public const ELLIPSIS = '…';
 
     private const WHITESPACE = " \t\n\r\f\v";
