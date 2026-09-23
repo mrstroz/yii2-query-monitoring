@@ -113,7 +113,9 @@ final class FileAdapterTest extends TestCase
         $message = $this->sendFailure(new FileAdapter($path));
 
         // spec 03 §2 promises the kind of operation and the path; the rest of the message comes from PHP
-        // and depends on its version and locale, so it is not part of the contract
+        // and depends on its version and locale, so it is not part of the contract. Not assertStringStartsWith
+        // either: the real message opens with `File adapter `, which the spec does not promise, so the stronger
+        // assertion would tie the test to something outside the contract
         self::assertStringContainsString('could not write to ' . $path . ': ', $message);
         self::assertFileExists($path . '.lock');
         $this->assertNoWarning();

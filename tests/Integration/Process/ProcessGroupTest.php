@@ -19,6 +19,14 @@ final class ProcessGroupTest extends TestCase
 
     private const PROBE = __DIR__ . '/../workers/process-probe.php';
 
+    /** Prefix of the markers a process creates when it outlives its kill; empty until a test composes it. */
+    private string $marker = '';
+
+    protected function tearDown(): void
+    {
+        self::removeTemporaryFiles($this->marker);
+    }
+
     public function testEightProcessesWorkAtTheSameTime(): void
     {
         $results = ProcessGroup::run(self::PROBE, 8, 20, ['QM_PROBE' => 'interval']);
@@ -52,10 +60,10 @@ final class ProcessGroupTest extends TestCase
 
     public function testDeadlineKillsProcessesThatAreStillWorking(): void
     {
-        $marker = self::temporaryPath('group');
+        $this->marker = self::temporaryPath('group');
 
         $started = microtime(true);
-        $results = ProcessGroup::run(self::PROBE, 3, 0.5, ['QM_PROBE' => 'sleep', 'QM_SLEEP' => '1.5', 'QM_MARKER' => $marker]);
+        $results = ProcessGroup::run(self::PROBE, 3, 0.5, ['QM_PROBE' => 'sleep', 'QM_SLEEP' => '1.5', 'QM_MARKER' => $this->marker]);
         $elapsed = microtime(true) - $started;
 
         self::assertLessThan(1.5, $elapsed);
@@ -65,7 +73,7 @@ final class ProcessGroupTest extends TestCase
         }
         // A process that survived the kill would create its marker after 1.5 s of sleep.
         usleep(1_500_000);
-        self::assertSame([], glob($marker . '.*'));
+        self::assertSame([], glob($this->marker . '.*'));
     }
 
     public function testDeadlineKillsEveryProcessWhenOneNeverReportsReady(): void

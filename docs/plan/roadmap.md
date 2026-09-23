@@ -4,9 +4,9 @@
 
 | Pole | Wartość |
 |---|---|
-| **Etap** | E2. Architektura i konwencje testów, 6 z 8. E1 zakończony, 6 z 6 |
-| **Ostatnio ukończone** | [YQM-24](03-testy.md): parametryzacja bazą tylko tam, gdzie asercja czyta wynik kodu podpiętego pod sterownik. Reguła 10 [ADR 0008](../adr/0008-architektura-i-konwencje-testow.md) przepisana i rozwinięta w [`tests/README.md`](../../tests/README.md) w trzy kroki sprawdzane w kolejności; tabela redukcji zbudowana z audytu wszystkich 58 metod parametryzowanych bazą. Dziewięć metod traci drugi silnik i dostaje `IntegrationTestCase::ANY_DB`: 30 → 15 zestawów, lista przypadków 349 → 334, zbiór nazw metod bez zmian |
-| **Następne** | [YQM-25](03-testy.md): testy niezależne od kolejności (`--order-by=random` z dwoma ziarnami) i sprzątające po nieudanej asercji — to drugie sprawdzalne wyłącznie przez wymuszony błąd. Komendy przez Docker: `docker compose run --rm php composer test` (bazy startują same), bieg bez baz wymaga `--no-deps` i pustych DSN, a porównania z baseline sortują obie strony w `LC_ALL=C` |
+| **Etap** | E2. Architektura i konwencje testów, 7 z 8. E1 zakończony, 6 z 6 |
+| **Ostatnio ukończone** | [YQM-25](03-testy.md): zestaw przechodzi przy `--order-by=random` z dwoma ziarnami, a sprzątanie działa także po nieudanej asercji. `ProcessGroupTest` zostawiał w `sys_get_temp_dir()` markery procesów, które przeżyły zabicie — trait `TemporaryDirectory` ma teraz drugi tryb (`removeTemporaryFiles()`), a dowodem jest porównanie kontrolowane: trzy pliki przed poprawką, brak różnicy w listingach po niej |
+| **Następne** | [YQM-26](03-testy.md): odbiór etapu — `test`/`stan`/`cs` na PHP 8.1 i 8.4 na obu bazach przez `docker run` jak w YQM-11, powtórzony audyt, usunięcie plików baseline. Każdy pełny bieg zapisuje wyjście **na hoście**: w YQM-25 jeden bieg dał `rc=1, Failures: 2`, którego nie odtworzono w 48 kolejnych i którego nazw nie ma, bo wyjście zniknęło z kontenerem |
 
 Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trzeba zajrzeć na początku sesji.
 
@@ -16,7 +16,7 @@ Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trze
 |---|---|---|---|---|
 | **E0** | [01-fundament-i-sql](01-fundament-i-sql.md) | Pakiet, kolektor, `Command`, cykl życia HTTP | Aplikacja z MySQL i PostgreSQL daje paczkę do jawnego adaptera, wyjątek nie gubi paczki | 12/12 |
 | **E1** | [02-adapter-plikowy](02-adapter-plikowy.md) | Adapter plikowy z rotacją | Paczki w `runtime/logs`, bezpieczne przy 8 procesach | 6/6 |
-| **E2** | [03-testy](03-testy.md) | Architektura i konwencje testów | Cztery testsuite'y, konwencje spisane i zastosowane, żaden scenariusz nie zniknął | 6/8 |
+| **E2** | [03-testy](03-testy.md) | Architektura i konwencje testów | Cztery testsuite'y, konwencje spisane i zastosowane, żaden scenariusz nie zniknął | 7/8 |
 | **E3** | [04-mongodb](04-mongodb.md) | Źródło MongoDB | Jedna paczka z wpisami SQL i MongoDB | – |
 | **E4** | [05-konsola](05-konsola.md) | Zadania konsolowe | Wiele paczek z `seq` w jednym procesie | – |
 | **E5** | [06-wydajnosc-i-odbior](06-wydajnosc-i-odbior.md) | Test wydajności, dokumentacja | Narzut w progu, limity potwierdzone, README pakietu | – |

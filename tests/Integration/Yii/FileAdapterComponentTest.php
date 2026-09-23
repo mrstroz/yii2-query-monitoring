@@ -115,6 +115,10 @@ final class FileAdapterComponentTest extends IntegrationTestCase
     /**
      * The only line of a file written by the adapter, decoded.
      *
+     * It stays a wrapper over JsonLines::decode() rather than a plain call, because "the file has exactly
+     * one line" is a statement about the component, not a technicality of reading JSON Lines: a second line
+     * would mean a second batch per request.
+     *
      * @return array<string, mixed>
      */
     private function singleLine(string $content): array
