@@ -29,7 +29,7 @@
 - [x] (=) **YQM-4** Komponent Yii z konfiguracją, bootstrapem, nagłówkiem paczki i podpięciem listy połączeń
       Spec: [01 §1](../spec/01-zbieranie-danych.md#1-komponent-i-konfiguracja) · [02 §1](../spec/02-format-paczki.md#1-nagłówek) · Zależy od: YQM-3, YQM-12
       Gotowe, gdy: nagłówek ma losowe `id`, `app`, `host`, `ts` w UTC i `seq: 1`, połączenie spoza listy nie daje wpisów, `admin/db` z modułu jest znajdowane, a `enabled: false` nie podmienia klasy `Command` i nie wywołuje adaptera.
-      W E0 konfiguracja obsługuje tylko SQL i jawnie podany adapter. Klucze `file` i połączenia MongoDB dochodzą w E1 i E2.
+      W E0 konfiguracja obsługuje tylko SQL i jawnie podany adapter. Klucze `file` i połączenia MongoDB dochodzą w E1 i E3.
 
 - [x] (^) **YQM-5** Klasa `Command` mierząca `PDO::prepare()` i `PDOStatement::execute()`
       Spec: [01 §2](../spec/01-zbieranie-danych.md#2-źródło-sql) · ADR: [0001](../adr/0001-podmiana-klasy-command-zamiast-profilera.md) · Zależy od: YQM-4

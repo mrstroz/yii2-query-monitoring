@@ -16,7 +16,7 @@ Jedna paczka to jeden wiersz JSON. Zapis i rotacja biorą `flock` z `LOCK_EX | L
 
 ## Konsekwencje
 
-**Pozytywne:** żądanie nie czeka na zajętą blokadę. Sam zapis i rotacja nadal zajmują czas procesu, mierzony w E4. Rotacja i zapis nie mogą się przeplatać. Format czytelny przez `jq` i przez przyszły worker.
+**Pozytywne:** żądanie nie czeka na zajętą blokadę. Sam zapis i rotacja nadal zajmują czas procesu, mierzony w E5. Rotacja i zapis nie mogą się przeplatać. Format czytelny przez `jq` i przez przyszły worker.
 
 **Negatywne:** przy dużym ruchu część paczek przepada bez śladu w pliku. NFS jest poza zakresem, bo `flock` na NFS nie jest wiarygodny.
 

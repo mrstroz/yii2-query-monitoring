@@ -37,6 +37,7 @@ Zmieniasz zachowanie? Najpierw poprawiasz specyfikację, potem kod, i edytujesz 
 | [0005](adr/0005-adapter-plikowy-z-blokada-i-utrata-paczki.md) | Adapter plikowy JSON Lines z blokadą nieblokującą | Zaakceptowany |
 | [0006](adr/0006-blad-adaptera-gubi-paczke.md) | Błąd adaptera gubi paczkę, bez ponowień | Zaakceptowany |
 | [0007](adr/0007-zadanie-konsolowe-to-jeden-proces.md) | Zadanie konsolowe to jedno uruchomienie procesu | Zaakceptowany |
+| [0008](adr/0008-architektura-i-konwencje-testow.md) | Architektura testów i wersja PHPUnit | Zaakceptowany |
 
 Szablon nowego ADR: [`adr/template.md`](adr/template.md).
 

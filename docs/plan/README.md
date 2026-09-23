@@ -11,9 +11,10 @@ Plan nie opisuje zachowania systemu. Każde zadanie wskazuje sekcję specyfikacj
 | [`roadmap.md`](roadmap.md) | Stan na dziś, etapy, kolejność, ryzyka |
 | [`01-fundament-i-sql.md`](01-fundament-i-sql.md) | E0: pakiet, kolektor, źródło SQL, cykl życia HTTP, aplikacja testowa |
 | [`02-adapter-plikowy.md`](02-adapter-plikowy.md) | E1: adapter plikowy z rotacją |
-| [`03-mongodb.md`](03-mongodb.md) | E2: źródło MongoDB |
-| [`04-konsola.md`](04-konsola.md) | E3: zadania konsolowe |
-| [`05-wydajnosc-i-odbior.md`](05-wydajnosc-i-odbior.md) | E4: test wydajności, dokumentacja użytkownika |
+| [`03-testy.md`](03-testy.md) | E2: architektura i konwencje testów |
+| [`04-mongodb.md`](04-mongodb.md) | E3: źródło MongoDB |
+| [`05-konsola.md`](05-konsola.md) | E4: zadania konsolowe |
+| [`06-wydajnosc-i-odbior.md`](06-wydajnosc-i-odbior.md) | E5: test wydajności, dokumentacja użytkownika |
 
 ## Format zadania
 
@@ -29,7 +30,7 @@ Plan nie opisuje zachowania systemu. Każde zadanie wskazuje sekcję specyfikacj
 - **Checkbox** niesie stan: `[ ]` otwarte, `[x]` zrobione, `[-]` odrzucone.
 - **Priorytet** stoi między checkboxem a numerem. `(^)`: reszta etapu na to czeka. `(=)`: domyślny, wymagane, ale nic na tym nie wisi. `(v)`: etap zamyka się bez tego. Brak tokenu czyta się jako `(=)`. `(^)` mówi, co idzie *pierwsze*, nie co jest *konieczne*. Najwyżej jedna trzecia otwartych zadań etapu może go mieć.
 - **Tytuł** mówi, co powstaje, nie jak.
-- **Spec** i **ADR**: linki względne z numerem sekcji w tekście. Gdy nagłówek się zmieni i kotwica przestanie działać, `02 §1` nadal prowadzi w dobre miejsce. Najwyżej dwa dokumenty na zadanie.
+- **Spec** i **ADR**: linki względne z numerem sekcji w tekście. Etap porządkujący testy nie zmienia zachowania produktu, więc jego zadania linkują [ADR 0008](../adr/0008-architektura-i-konwencje-testow.md) i [`tests/README.md`](../../tests/README.md) zamiast specyfikacji. Gdy nagłówek się zmieni i kotwica przestanie działać, `02 §1` nadal prowadzi w dobre miejsce. Najwyżej dwa dokumenty na zadanie.
 - **Zależy od**: tylko zadania z tego planu.
 - **Blokada**: coś spoza planu, co musi wydarzyć się pierwsze. Projekt nie ma zależności w innych repozytoriach, więc blokady rozstrzyga tabela otwartych kwestii w [`spec/00 §9`](../spec/00-przeglad-i-zakres.md#9-otwarte-kwestie). Zablokowane zadanie czeka, aż wpis tam zostanie rozstrzygnięty.
 - **Gotowe, gdy**: tylko tam, gdzie warunek nie wynika z tytułu. Jeden warunek, sprawdzalny testem albo na działającym systemie.

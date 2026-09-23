@@ -21,5 +21,6 @@ Każdy plik opisuje jedną decyzję: kontekst, wybór, konsekwencje i odrzucone 
 | [0005](0005-adapter-plikowy-z-blokada-i-utrata-paczki.md) | Adapter plikowy JSON Lines z blokadą nieblokującą | Zaakceptowany | 2026-09-22 |
 | [0006](0006-blad-adaptera-gubi-paczke.md) | Błąd adaptera gubi paczkę, bez ponowień | Zaakceptowany | 2026-09-22 |
 | [0007](0007-zadanie-konsolowe-to-jeden-proces.md) | Zadanie konsolowe to jedno uruchomienie procesu | Zaakceptowany | 2026-09-22 |
+| [0008](0008-architektura-i-konwencje-testow.md) | Architektura testów i wersja PHPUnit | Zaakceptowany | 2026-09-22 |
 
 Szablon: [`template.md`](template.md).
