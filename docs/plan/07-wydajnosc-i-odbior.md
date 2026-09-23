@@ -1,4 +1,4 @@
-# E5. Wydajność i odbiór
+# E6. Wydajność i odbiór
 
 **Cel:** pomiar narzutu, korekta limitów i dokumentacja użytkownika pakietu.
 
@@ -8,4 +8,4 @@
 
 ## Zadania
 
-Zadania zostaną spisane, gdy E4 się zakończy. Etap rozstrzyga otwartą kwestię 3 w [spec 00 §9](../spec/00-przeglad-i-zakres.md#9-otwarte-kwestie).
+Zadania zostaną spisane, gdy E5 się zakończy. Etap rozstrzyga otwartą kwestię 3 w [spec 00 §9](../spec/00-przeglad-i-zakres.md#9-otwarte-kwestie).

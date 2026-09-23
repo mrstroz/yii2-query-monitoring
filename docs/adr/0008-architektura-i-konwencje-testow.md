@@ -14,7 +14,7 @@ Nazwy data providerów mają cztery style, część zestawów danych nie ma nazw
 
 Osobno stoi pytanie o wersję PHPUnit. Pakiet wymaga PHP 8.1 (`composer.json`), a `phpunit/phpunit:^10.5` to ostatnia główna wersja zgodna z PHP 8.1; PHPUnit 11 wymaga co najmniej PHP 8.2. Macierz CI (`.github/workflows/ci.yml`) obejmuje PHP 8.1–8.4 oraz osobny bieg z najniższymi wersjami zależności.
 
-Kolejne etapy dokładają MongoDB (E3) i tryb konsolowy (E4), czyli dwa nowe źródła testów. Bez rozstrzygnięcia podziału powstaną w tym samym układzie, w którym dziś nie wiadomo, gdzie test ma leżeć.
+Kolejne etapy dokładają MongoDB i tryb konsolowy, czyli dwa nowe źródła testów. Bez rozstrzygnięcia podziału powstaną w tym samym układzie, w którym dziś nie wiadomo, gdzie test ma leżeć.
 
 ## Decyzja
 
@@ -56,7 +56,7 @@ Operacyjne reguły pisania testów — nazwy, providery, helpery, komentarze, uk
 
 | Wariant | Dlaczego odrzucony |
 |---|---|
-| Zostawić obecną strukturę | Katalog `tests/Unit` zawiera test biorący blokady i uruchamiający procesy, więc nazwa katalogu nie niesie informacji. E3 i E4 powieliłyby ten stan w dwóch nowych obszarach |
+| Zostawić obecną strukturę | Katalog `tests/Unit` zawiera test biorący blokady i uruchamiający procesy, więc nazwa katalogu nie niesie informacji. MongoDB i konsola powieliłyby ten stan w dwóch nowych obszarach |
 | Wszystko do jednego katalogu `Integration` | Znika jedyne tanie uruchomienie bez baz i bez środowiska; każdy bieg lokalny wymagałby MySQL i PostgreSQL |
 | Testować kilka głównych wersji PHPUnit naraz | Constraint zależny od wersji PHP plus podwójna macierz CI; koszt utrzymania bez korzyści, bo API, którego używamy, jest wspólne |
 | Podnieść minimalne PHP do 8.2 tylko po to, żeby podnieść PHPUnit | Odcina użytkowników PHP 8.1 z powodu wygody narzędzia developerskiego. Minimalne PHP wyznaczają odbiorcy pakietu, nie zależności `require-dev` |

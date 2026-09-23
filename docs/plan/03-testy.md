@@ -102,7 +102,7 @@ Metoda audytu, żeby YQM-26 mógł go powtórzyć. Filtr **odsiewa** metody, kt�
 
 Wynik: 58 metod parametryzowanych bazą, 40 odsianych, **18 do przeczytania ręcznie**, z nich 9 do tabeli. Liczby policzone niezależnie w dwóch przebiegach.
 
-Po redukcji tych metod jest 49 i ta liczba jest **sygnałem, nie warunkiem** — przy odbiorze YQM-26 zadziałała dokładnie tak: skrypt audytu szukał atrybutu `#[DataProvider]` do dwunastu wierszy wstecz, więc gdy siedem metod straciło atrybut w YQM-24, przypisywał im atrybut metody poprzedniej i naliczył 54 z pięcioma nieistniejącymi kandydatkami. Złapała to niezgodność z 49, a nie przegląd kodu. Dlatego takie wartości zostają w planie także dla E3, choć nie są warunkami.
+Po redukcji tych metod jest 49 i ta liczba jest **sygnałem, nie warunkiem** — przy odbiorze YQM-26 zadziałała dokładnie tak: skrypt audytu szukał atrybutu `#[DataProvider]` do dwunastu wierszy wstecz, więc gdy siedem metod straciło atrybut w YQM-24, przypisywał im atrybut metody poprzedniej i naliczył 54 z pięcioma nieistniejącymi kandydatkami. Złapała to niezgodność z 49, a nie przegląd kodu. Dlatego takie wartości zostają w planie także dla E4, choć nie są warunkami.
 
 Rozgałęzienia po bazie w `src/` — pełna lista wejść w krok 2 sprawdzianu (`grep -rn "Dialect\b\|driverName" src/` poza docblokami nie daje innych):
 

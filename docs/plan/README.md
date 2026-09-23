@@ -12,9 +12,10 @@ Plan nie opisuje zachowania systemu. Każde zadanie wskazuje sekcję specyfikacj
 | [`01-fundament-i-sql.md`](01-fundament-i-sql.md) | E0: pakiet, kolektor, źródło SQL, cykl życia HTTP, aplikacja testowa |
 | [`02-adapter-plikowy.md`](02-adapter-plikowy.md) | E1: adapter plikowy z rotacją |
 | [`03-testy.md`](03-testy.md) | E2: architektura i konwencje testów |
-| [`04-mongodb.md`](04-mongodb.md) | E3: źródło MongoDB |
-| [`05-konsola.md`](05-konsola.md) | E4: zadania konsolowe |
-| [`06-wydajnosc-i-odbior.md`](06-wydajnosc-i-odbior.md) | E5: test wydajności, dokumentacja użytkownika |
+| [`04-kontekst-wpisu.md`](04-kontekst-wpisu.md) | E3: kontekst wpisu (`caller`, `route`), format `v: 2`, limity |
+| [`05-mongodb.md`](05-mongodb.md) | E4: źródło MongoDB |
+| [`06-konsola.md`](06-konsola.md) | E5: zadania konsolowe |
+| [`07-wydajnosc-i-odbior.md`](07-wydajnosc-i-odbior.md) | E6: test wydajności, dokumentacja użytkownika |
 
 ## Format zadania
 
