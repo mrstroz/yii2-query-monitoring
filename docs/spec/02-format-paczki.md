@@ -25,7 +25,7 @@ Kontrakt między kolektorem a każdym adapterem. Zmiana pola oznacza nowe `v`.
 |---|---|---|
 | `db` | `mysql` \| `pgsql` \| `mongodb` | Z `driverName` połączenia SQL lub stałe dla MongoDB |
 | `conn` | string | Id komponentu połączenia z listy w konfiguracji |
-| `op` | string | Pierwsze słowo polecenia SQL małymi literami, po pominięciu białych znaków, komentarzy według dialektu z [§4](#4-normalizacja) i nawiasów otwierających (`WITH ...` daje `with`). Dla `db` spoza `mysql` i `pgsql` komentarzami są tylko `--` i `/* */`. Słowo to ciąg liter ASCII i `_`; gdy pierwszy jest inny znak albo niedomknięty komentarz, `op` jest pusty. Albo nazwa polecenia MongoDB: `find`, `insert`, `update`, `delete`, `aggregate`, `getMore`, `count` |
+| `op` | string | Pierwsze słowo polecenia SQL małymi literami, po pominięciu białych znaków, komentarzy według dialektu z [§4](#4-normalizacja) i nawiasów otwierających (`WITH ...` daje `with`). Dla `db` spoza `mysql` i `pgsql` komentarzami są tylko `--` i `/* */`. Słowo to ciąg liter ASCII i `_`; gdy pierwszy jest inny znak albo niedomknięty komentarz, `op` jest pusty. Albo nazwa polecenia MongoDB z `getCommandName()` bez zmiany wielkości liter, np. `find`, `insert`, `getMore`, `findAndModify` ([01 §3](01-zbieranie-danych.md#3-źródło-mongodb)) |
 | `query` | string \| null | Znormalizowany tekst, [§4](#4-normalizacja). `null`, gdy normalizacja jest niepewna |
 | `time_ms` | float | Czas według [01 §2](01-zbieranie-danych.md#2-źródło-sql) i [01 §3](01-zbieranie-danych.md#3-źródło-mongodb) |
 | `result` | `success` \| `error` | |

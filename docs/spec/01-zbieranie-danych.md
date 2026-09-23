@@ -27,7 +27,7 @@ Pakiet dostarcza komponent aplikacji Yii rejestrowany w `bootstrap`. Przy starci
 
 Połączenie spoza listy nie jest mierzone. Połączenie tworzone dynamicznie w kodzie i własna klasa `Command` są poza zakresem.
 
-Pakiet nie łączy się z bazą w bootstrapie: driver odczytuje z prefiksu `dsn`. Z jednym `Yii::error` pomijane są, a reszta listy działa: nieznane id połączenia lub modułu, połączenie bez `dsn` (np. tylko `masters`/`slaves`), driver inny niż `mysql` i `pgsql`, połączenie z własnym `commandClass` albo własnym `commandMap` dla swojego drivera oraz ten sam obiekt połączenia pod drugim id z listy (liczy się pierwsze id). Błędna konfiguracja pakietu (np. brak `app`, `maxQueryLength` poniżej `3`, przy `adapter: null` także nieznany klucz `file`, pusty `file.path` lub nieznany alias w nim albo `file.maxSize` lub `file.maxFiles` poniżej `1`) i wersja Yii, w której `yii\db\Command` nie ma prywatnych pól `_isolationLevel` i `_retryHandler` używanych przez pomiar ([ADR-0001](../adr/0001-podmiana-klasy-command-zamiast-profilera.md)), wyłączają pakiet w tym procesie: bez podmiany `Command` i bez wysyłki, z jednym `Yii::error`. Aplikacja odpowiada normalnie.
+Pakiet nie łączy się z bazą w bootstrapie: driver odczytuje z prefiksu `dsn`. Z jednym `Yii::error` pomijane są, a reszta listy działa: nieznane id połączenia lub modułu, połączenie bez `dsn` (np. tylko `masters`/`slaves`), driver inny niż `mysql` i `pgsql`, połączenie z własnym `commandClass` albo własnym `commandMap` dla swojego drivera oraz ten sam obiekt połączenia pod drugim id z listy (liczy się pierwsze id). Błędna konfiguracja pakietu (np. brak `app`, `maxQueryLength` poniżej `3`, przy `adapter: null` także nieznany klucz `file`, pusty `file.path` lub nieznany alias w nim albo `file.maxSize` lub `file.maxFiles` poniżej `1`) wyłącza pakiet w tym procesie: bez podmiany `Command`, bez subskrybenta MongoDB i bez wysyłki, z jednym `Yii::error`. Wersja Yii, w której `yii\db\Command` nie ma prywatnych pól `_isolationLevel` i `_retryHandler` używanych przez pomiar ([ADR-0001](../adr/0001-podmiana-klasy-command-zamiast-profilera.md)), wyłącza tylko źródło SQL: połączenia SQL z listy są pomijane z jednym `Yii::error`, a połączenia MongoDB są mierzone. Aplikacja odpowiada normalnie.
 
 ## 2. Źródło SQL
 
@@ -48,15 +48,21 @@ Pakiet dostarcza klasę rozszerzającą `yii\db\Command`. Podmiana przez `comman
 
 ## 3. Źródło MongoDB
 
-Pakiet rejestruje `MongoDB\Driver\Monitoring\CommandSubscriber` dla `Manager` połączenia z listy. Każda para zdarzeń `CommandStarted` i `CommandSucceeded` lub `CommandFailed` daje jeden wpis.
+Pakiet rejestruje `MongoDB\Driver\Monitoring\CommandSubscriber` dla `Manager` połączenia z listy. Każda para zdarzeń `CommandStarted` i `CommandSucceeded` lub `CommandFailed` daje jeden wpis, niezależnie od nazwy polecenia: `find` z Active Record, `createIndexes` z migracji, `killCursors` wysłane przez sterownik i dowolne polecenie z `Connection::createCommand()`. Połączenie otwarte przed bootstrapem pakietu jest mierzone od bootstrapu, a po `close()` i ponownym otwarciu dalej. Jeden `Manager` ma najwyżej jednego subskrybenta pakietu.
 
 | Co | Zachowanie |
 |---|---|
-| Pomiar | `durationMicros` ze zdarzenia sterownika |
+| `op` | `getCommandName()` zdarzenia bez zmiany wielkości liter, np. `getMore`, `findAndModify` |
+| `query` | Z dokumentu polecenia według [02 §4](02-format-paczki.md#4-normalizacja). Polecenie, którego normalizacja nie opisuje, daje `null` |
+| Pomiar | `durationMicros` zdarzenia końca podzielone przez 1000 i zaokrąglone do trzech miejsc po przecinku |
 | `CommandFailed` | `result: error` z kodem liczbowym |
-| `writeErrors` lub `writeConcernError` w `CommandSucceeded` | `result: error` z pierwszym kodem liczbowym |
+| `writeErrors` lub `writeConcernError` w `CommandSucceeded` | `result: error` z kodem pierwszego elementu `writeErrors`, a bez `writeErrors` z kodem `writeConcernError`. Błąd pojedynczej instrukcji jest dokładniejszy niż niepotwierdzony zapis |
 | `getMore` | Osobny wpis z `op: getMore` |
 | Podzielony `insertMany` | Tyle wpisów, ile poleceń sterownik wysłał |
+
+Zdarzenia początku i końca łączy `requestId`. Przy `CommandStarted` pakiet wylicza `op` i `query` i do zdarzenia końca trzyma tylko te dwie wartości. Dokument polecenia i odpowiedź nie żyją w pakiecie dłużej niż wywołanie subskrybenta. Gdy kolektor nie przyjmuje wpisów (po finalizacji, podczas `send()` adaptera), `CommandStarted` nie zapisuje stanu. Gdy paczka jest pełna ([02 §5](02-format-paczki.md#5-limity)), `CommandStarted` od razu zwiększa `dropped`, bez normalizacji i bez zapisu stanu.
+
+Zdarzenie końca najpierw usuwa zapisany stan, potem buduje wpis tak jak źródło SQL: po finalizacji go pomija, przy pełnej paczce zwiększa `dropped`. Zdarzenie końca bez zapisanego stanu nie daje wpisu i nie zmienia `dropped`. Tak kończy się polecenie rozpoczęte przed instalacją subskrybenta albo takie, którego normalizacja rzuciła wyjątek. `caller` powstaje przy zdarzeniu końca, z granicą 64 ramek jak w [§2](#2-źródło-sql). Wyjątek w subskrybencie jest obsłużony jak w [§6](#6-ochrona-aplikacji) i nie wraca do sterownika.
 
 Sposób dostępu do `Manager` z `yii\mongodb\Connection` jest otwartą kwestią 2 w [00 §9](00-przeglad-i-zakres.md#9-otwarte-kwestie).
 
