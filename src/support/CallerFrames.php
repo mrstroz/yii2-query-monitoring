@@ -12,13 +12,19 @@ use yii\base\InvalidConfigException;
  * Picks the application frames of a trace for the entry's `caller` (spec 02 §2, ADR-0009).
  *
  * An application frame has a file under the project root that is neither in Composer's vendor
- * directory nor in the package's `src/`, and is not the entry script. The directories are compared
+ * directory nor in the package's `src/`, and is neither the entry script nor code run by `eval()`. The directories are compared
  * as prefixes computed once, never with `realpath()` per frame. Frames outside the project root are
  * skipped, so an absolute path never reaches the batch.
  */
 final class CallerFrames
 {
     public const MAX_FRAMES = 3;
+
+    /**
+     * What PHP appends to the file of a frame inside `eval()`'d code, e.g. `views/x.php(3) : eval()'d code`.
+     * Such a frame is skipped: the trace also holds the `eval` call itself as a frame with a real file and line.
+     */
+    private const EVAL_MARKER = ": eval()'d code";
 
     private readonly string $rootPrefix;
     private readonly string $vendorPrefix;
@@ -82,6 +88,7 @@ final class CallerFrames
                 || str_starts_with($file, $this->vendorPrefix)
                 || str_starts_with($file, $this->srcPrefix)
                 || $file === $this->entryScript
+                || str_contains($file, self::EVAL_MARKER)
             ) {
                 continue;
             }

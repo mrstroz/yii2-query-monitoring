@@ -34,7 +34,7 @@ Kontrakt między kolektorem a każdym adapterem. Zmiana pola oznacza nowe `v`.
 
 Jeden wpis to jedno polecenie faktycznie wysłane do bazy.
 
-**Ramka aplikacji** to ramka śladu z plikiem pod korzeniem projektu, który nie leży w katalogu vendor Composera ani w `src/` pakietu i nie jest skryptem wejściowym. Korzeń projektu to katalog pakietu głównego Composera (`InstalledVersions::getRootPackage()`), katalog vendor to ten, z którego Composer załadował swój `ClassLoader`, a skrypt wejściowy to pierwszy plik wykonany przez PHP, z pominięciem pliku `auto_prepend_file` (`web/index.php`, `yii`). Ramki spoza korzenia projektu są pomijane. Argumenty funkcji nie są odczytywane.
+**Ramka aplikacji** to ramka śladu z plikiem pod korzeniem projektu, który nie leży w katalogu vendor Composera ani w `src/` pakietu i nie jest skryptem wejściowym. Korzeń projektu to katalog pakietu głównego Composera (`InstalledVersions::getRootPackage()`), katalog vendor to ten, z którego Composer załadował swój `ClassLoader`, a skrypt wejściowy to pierwszy plik wykonany przez PHP, z pominięciem pliku `auto_prepend_file` (`web/index.php`, `yii`). Ramki spoza korzenia projektu są pomijane. Ramka kodu wykonanego przez `eval()`, czyli taka, której plik zawiera `: eval()'d code`, nie jest ramką aplikacji: miejscem jest samo wywołanie `eval()`, które ślad podaje jako osobną ramkę i które podlega tym samym regułom. Argumenty funkcji nie są odczytywane.
 
 ## 3. Przykład
 

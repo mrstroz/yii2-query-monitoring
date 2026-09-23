@@ -11,7 +11,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * YQM-28, spec 02 §2: `caller` holds at most three application frames, nearest first, as `path:line`
  * relative to the project root. An application frame has a file under the project root, outside vendor,
- * outside the package's own directory, and is not the entry script.
+ * outside the package's own directory, is not the entry script and is not code run by `eval()`.
  */
 final class CallerFramesTest extends TestCase
 {
@@ -116,6 +116,87 @@ final class CallerFramesTest extends TestCase
         ];
 
         self::assertSame(['src2/Helper.php:7', 'tests/app/Scenario.php:9'], $frames->frames($trace));
+    }
+
+    /**
+     * spec 02 §2: PHP reports code run by `eval()` under a pseudo-file and follows it with a frame of `eval`
+     * itself at the line of the call; only the call is an application frame.
+     *
+     * @return iterable<string, array{list<array{file: string, line: int, function: string}>, list<string>}>
+     */
+    public static function provideEvalCases(): iterable
+    {
+        yield 'eval under the project root' => [
+            [
+                self::frame(self::ROOT . "/views/x.php(3) : eval()'d code", 5),
+                self::frame(self::ROOT . '/views/x.php', 3),
+                self::frame(self::ROOT . '/controllers/SiteController.php', 9),
+            ],
+            ['views/x.php:3', 'controllers/SiteController.php:9'],
+        ];
+        yield 'nested eval' => [
+            [
+                self::frame(self::ROOT . "/a.php(8) : eval()'d code(1) : eval()'d code", 1),
+                self::frame(self::ROOT . "/a.php(8) : eval()'d code", 1),
+                self::frame(self::ROOT . '/a.php', 8),
+            ],
+            ['a.php:8'],
+        ];
+        yield 'eval in vendor' => [
+            [
+                self::frame(self::VENDOR . "/twig/Template.php(3) : eval()'d code", 5),
+                self::frame(self::VENDOR . '/twig/Template.php', 3),
+                self::frame(self::ROOT . '/models/Order.php', 20),
+            ],
+            ['models/Order.php:20'],
+        ];
+        yield 'eval in the entry script' => [
+            [
+                self::frame(self::ENTRY . "(4) : eval()'d code", 2),
+                self::frame(self::ENTRY, 4),
+            ],
+            [],
+        ];
+        yield 'parentheses in an ordinary file name' => [
+            [self::frame(self::ROOT . '/views/x(1).php', 4)],
+            ['views/x(1).php:4'],
+        ];
+    }
+
+    /**
+     * @param list<array{file: string, line: int, function: string}> $trace
+     * @param list<string> $expected
+     */
+    #[DataProvider('provideEvalCases')]
+    public function testCodeRunByEvalIsNotAnApplicationFrame(array $trace, array $expected): void
+    {
+        self::assertSame($expected, $this->frames()->frames($trace));
+    }
+
+    /**
+     * The same with the trace PHP builds, so the pseudo-file format of the running version is pinned.
+     */
+    public function testRealEvalGivesTheLineOfTheCallOnce(): void
+    {
+        $root = dirname(__DIR__, 3);
+        $frames = new CallerFrames($root, $root . '/vendor', $root . '/src', null);
+
+        $line = __LINE__ + 2;
+        /** @var list<array<string, mixed>> $trace */
+        $trace = eval('return ' . self::class . '::trace();');
+        /** @var list<array<string, mixed>> $nested */
+        $nested = eval('return eval("return ' . addslashes(self::class) . '::trace();");');
+
+        self::assertSame(["tests/Unit/support/CallerFramesTest.php:{$line}"], $frames->frames($trace));
+        self::assertSame(['tests/Unit/support/CallerFramesTest.php:' . ($line + 2)], $frames->frames($nested));
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public static function trace(): array
+    {
+        return debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
     }
 
     public function testWithoutEntryScriptItIsAnOrdinaryApplicationFrame(): void
