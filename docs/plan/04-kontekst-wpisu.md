@@ -4,7 +4,7 @@
 
 **Koniec etapu:** paczka z aplikacji testowej ma `v: 2`, w nagłówku `route` zamiast `module`, `controller` i `action`, a w każdym wpisie pole `caller`: ścieżki `plik:linia` kodu aplikacji tam, gdzie ramka aplikacji mieści się w granicach `N`, a `[]` w pozostałych; `maxQueryLength` ma wartość 8192, `maxBatchBytes` i `maxEntries` mają wartości z pomiaru, a koszt śladu wywołań jest zmierzony i zapisany.
 
-**Zależności zewnętrzne:** wartości `maxBatchBytes` i `maxEntries` pochodzą z pomiaru na rzeczywistym ruchu, poza tym repozytorium. YQM-30 czeka na ten pomiar.
+**Zależności zewnętrzne:** wartości `maxBatchBytes` i `maxEntries` pochodzą z pomiaru na rzeczywistym ruchu, poza tym repozytorium. Pomiar dostarczony 2026-09-23 z aplikacji rulewave i rozstrzygnięty w YQM-30.
 
 ## Zadania
 
@@ -34,11 +34,11 @@
       Gotowe, gdy: wartość początkowa `maxQueryLength` to `8192`, a pozycja 3 w [spec 00 §9](../spec/00-przeglad-i-zakres.md#9-otwarte-kwestie) jest rozdzielona na trzy człony — `maxQueryLength` (rozstrzygnięty tutaj), `maxBatchBytes` i `maxEntries` (rozstrzyga pomiar na rzeczywistym ruchu, YQM-30), rotacja plików (nadal E6).
       2 KB obcinało zapytania, które w rzeczywistej aplikacji mają kilka kilobajtów, a obcięty `query` nie daje się odtworzyć. W zakresie: zdanie „Wpis z `query` obciętym do `maxQueryLength` mieści się w `maxBatchBytes` przy wartościach początkowych” z [spec 02 §5](../spec/02-format-paczki.md#5-limity) zostaje prawdziwe: wpis z `query` długości 8192 daje paczkę około 8,5 KB wobec 256 KB. Zmienia się liczba takich wpisów w paczce — około 30 zamiast około 110 — więc przy długich zapytaniach `maxBatchBytes` kończy przyjmowanie dużo wcześniej niż `maxEntries`. To wejście do YQM-30, razem z bajtami `caller`, a nie powód do ruszania limitu paczki tutaj. Po rozdzieleniu wiersza na 3a, 3b i 3c [`07-wydajnosc-i-odbior.md`](07-wydajnosc-i-odbior.md) rozstrzyga już tylko człon 3c, o rotacji.
 
-- [ ] (=) **YQM-30** `maxBatchBytes` i `maxEntries` z pomiaru na rzeczywistym ruchu
+- [x] (=) **YQM-30** `maxBatchBytes` i `maxEntries` z pomiaru na rzeczywistym ruchu
       Spec: [01 §1](../spec/01-zbieranie-danych.md#1-komponent-i-konfiguracja) · [03 §4](../spec/03-adaptery-wyjsciowe.md#4-test-wydajności) · Zależy od: YQM-29
       **Blokada:** pozycja 3b w [spec 00 §9](../spec/00-przeglad-i-zakres.md#9-otwarte-kwestie), założona przez YQM-29. Rozstrzyga ją pomiar rozmiaru paczki na rzeczywistym ruchu, po dodaniu `caller`.
-      Gotowe, gdy: `maxBatchBytes` i `maxEntries` mają wartości początkowe z tego pomiaru, a paczka wypełniona do obu tych limitów wpisami z `caller` daje w jednym procesie przyrost `memory_get_peak_usage(true)` poniżej 2 MB z [spec 03 §4](../spec/03-adaptery-wyjsciowe.md#4-test-wydajności).
-      Oba limity idą przez ten sam licznik i to samo `full`, więc dobranie jednego bez drugiego jest połową pomiaru. Szczyt pamięci przy pełnej paczce jest własnością jednego procesu, nie współbieżności, więc mierzy się go bez stanowiska z E6. Jeśli pomiar pokaże, że trzy ramki `caller` wypychają paczkę ponad rozsądny limit, to tutaj obniża się liczbę zapisywanych ramek — `N` z YQM-28 zostaje bez zmian, bo to osobna liczba o osobnym powodzie. W zakresie: `QueryMonitor::$maxEntries` i `$maxBatchBytes` biorą wartości początkowe ze stałych `QueryCollector::DEFAULT_MAX_ENTRIES` i `DEFAULT_MAX_BATCH_BYTES`, dziś powtórzonych w komponencie jako literały, tak jak `maxQueryLength` od YQM-29 bierze `SqlNormalizer::DEFAULT_MAX_QUERY_LENGTH`, a `QueryMonitorDefaultsTest` sprawdza obie wartości. Bez tego zmiana samych stałych nie zmieni wartości w komponencie.
+      Gotowe, gdy: `maxBatchBytes` i `maxEntries` mają wartości początkowe z tego pomiaru, a wynik stoi w pozycji 3b [spec 00 §9](../spec/00-przeglad-i-zakres.md#9-otwarte-kwestie). Decyzją użytkownika z 2026-09-23 dwa punkty pierwotnego zakresu przeszły do [E6](07-wydajnosc-i-odbior.md): przyrost `memory_get_peak_usage(true)` poniżej 2 MB przy paczce wypełnionej do obu limitów wpisami z `caller` oraz domyślne `maxEntries` i `maxBatchBytes` komponentu brane ze stałych kolektora.
+      Oba limity idą przez ten sam licznik i to samo `full`, więc dobranie jednego bez drugiego jest połową pomiaru. Szczyt pamięci przy pełnej paczce jest własnością jednego procesu, nie współbieżności, więc mierzy się go bez stanowiska z E6. Jeśli pomiar pokaże, że trzy ramki `caller` wypychają paczkę ponad rozsądny limit, to tutaj obniża się liczbę zapisywanych ramek — `N` z YQM-28 zostaje bez zmian, bo to osobna liczba o osobnym powodzie.
 
 ## Ustalenia do YQM-27
 
