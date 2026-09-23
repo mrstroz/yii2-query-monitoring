@@ -25,11 +25,10 @@ final class ConnectionListTest extends IntegrationTestCase
 
     private const MAX_RUN_S = 2;
 
-    #[DataProvider('provideDatabaseCases')]
-    public function testConnectionWithoutDsnIsSkippedWithoutConnecting(string $db): void
+    public function testConnectionWithoutDsnIsSkippedWithoutConnecting(): void
     {
         $started = microtime(true);
-        $result = $this->probe($db, ['db', 'dbMasters', 'admin/db'], self::mastersOnly($db), state: ['dbMasters'], env: [
+        $result = $this->probe(self::ANY_DB, ['db', 'dbMasters', 'admin/db'], self::mastersOnly(self::ANY_DB), state: ['dbMasters'], env: [
             // every connection attempt through TestPdo sleeps first, so one attempt shows in the run time
             'QM_SLOW_CONNECT_MS' => (string) (self::SLOW_CONNECT_S * 1000),
         ]);
@@ -50,10 +49,9 @@ final class ConnectionListTest extends IntegrationTestCase
         self::assertCount(1, $this->entriesWith($this->singleBatch($result), 'qm_on_db'));
     }
 
-    #[DataProvider('provideDatabaseCases')]
-    public function testListedConnectionIsNotOpenedByBootstrap(string $db): void
+    public function testListedConnectionIsNotOpenedByBootstrap(): void
     {
-        $result = $this->probe($db, ['db', 'admin/db'], [], state: ['db']);
+        $result = $this->probe(self::ANY_DB, ['db', 'admin/db'], [], state: ['db']);
 
         self::assertFalse($this->scenarioOutput($result)['open']['db']);
         $this->assertNoErrors($result);

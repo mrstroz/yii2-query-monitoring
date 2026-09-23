@@ -87,22 +87,20 @@ final class QueryMonitorComponentTest extends IntegrationTestCase
         self::assertSame(\yii\db\Command::class, $classes['dbOther']);
     }
 
-    #[DataProvider('provideDatabaseCases')]
-    public function testDisabledChangesNothingAndSendsNothing(string $db): void
+    public function testDisabledChangesNothingAndSendsNothing(): void
     {
-        $classes = $this->scenarioOutput($this->scenario($db, 'command-classes', ['enabled' => false]));
+        $classes = $this->scenarioOutput($this->scenario(self::ANY_DB, 'command-classes', ['enabled' => false]));
         self::assertSame(['db' => \yii\db\Command::class, 'dbOther' => \yii\db\Command::class, 'admin/db' => \yii\db\Command::class], $classes);
 
-        $result = $this->scenario($db, 'per-connection', ['enabled' => false]);
+        $result = $this->scenario(self::ANY_DB, 'per-connection', ['enabled' => false]);
         $this->assertProcessOk($result);
         self::assertSame([], $result->batches, 'adapter must not be called');
         $this->assertNoErrors($result);
     }
 
-    #[DataProvider('provideDatabaseCases')]
-    public function testRequestWithoutQueriesSendsNothing(string $db): void
+    public function testRequestWithoutQueriesSendsNothing(): void
     {
-        $result = $this->scenario($db, 'no-queries');
+        $result = $this->scenario(self::ANY_DB, 'no-queries');
 
         self::assertSame('nothing', $this->scenarioOutput($result));
         self::assertSame([], $result->batches);
@@ -110,22 +108,22 @@ final class QueryMonitorComponentTest extends IntegrationTestCase
     }
 
     /**
-     * @return iterable<string, array{string, array<string, mixed>}>
+     * @return iterable<string, array{array<string, mixed>}>
      */
     public static function provideBadConfigurationCases(): iterable
     {
-        foreach (self::provideDatabaseCases() as [$db]) {
-            yield "{$db}: maxQueryLength below 3" => [$db, ['maxQueryLength' => 2]];
-            yield "{$db}: empty app" => [$db, ['app' => '']];
-        }
+        yield 'maxQueryLength below 3' => [['maxQueryLength' => 2]];
+        yield 'empty app' => [['app' => '']];
     }
 
     /**
      * @param array<string, mixed> $component
      */
     #[DataProvider('provideBadConfigurationCases')]
-    public function testBadConfigurationDisablesPackageWithOneError(string $db, array $component): void
+    public function testBadConfigurationDisablesPackageWithOneError(array $component): void
     {
+        $db = self::ANY_DB;
+
         $without = $this->scenario($db, 'per-connection', ['enabled' => false]);
         $result = $this->scenario($db, 'per-connection', $component);
 

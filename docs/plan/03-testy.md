@@ -35,7 +35,7 @@
       Powstają trzy pliki w `tests/Integration/support/`: trait `TemporaryDirectory` (`temporaryPath()` składa ścieżkę, `removeTemporaryDirectory()` sprząta; tworzenie katalogu zostaje jawne w każdej klasie, bo przy testach systemu plików moment jego powstania jest krokiem scenariusza), trait `ProcessAssertions` (`assertFinished()`) i `final class JsonLines` (`decode()`). `singleLine()` zostaje jako nakładka z `assertCount(1, …)`, bo „plik ma dokładnie jedną linię" jest stwierdzeniem o komponencie, nie technikalią.
       `removeTemporaryDirectory()` przywraca prawa katalogowi głównemu i podkatalogom, bo `FileHelper::findDirectories()` zwraca tylko te drugie. Żaden dzisiejszy test nie odbiera praw katalogowi głównemu — jedyny `chmod 0555` w zestawie dotyczy podkatalogu (`FileAdapterProtectionTest:74`) — więc ta linia jest zabezpieczeniem zgodnym z docblokiem traitu, nie naprawą czegoś, co pada. `ProcessGroupTest` wciąga cały trait dla jednej ścieżki i zostawia `$dir` nieużywane: to świadomy wybór, bo jedno źródło przedrostków (`qm-file-`, `qm-protection-`, `qm-concurrency-`, `qm-group-`) jest częścią warunku sprzątania w YQM-25, a nie estetyką. Asercja o nieudanym zapisie używa `assertStringContainsString`, nie `assertStringStartsWith`: prawdziwy komunikat ma przedrostek `File adapter `, którego spec nie obiecuje, więc mocniejszy wariant wiązałby test z czymś spoza kontraktu.
 
-- [ ] (=) **YQM-24** Parametryzacja bazą tylko tam, gdzie zachowanie idzie przez sterownik
+- [x] (=) **YQM-24** Parametryzacja bazą tylko tam, gdzie zachowanie idzie przez sterownik
       ADR: [0008](../adr/0008-architektura-i-konwencje-testow.md) · Zależy od: YQM-22
       Gotowe, gdy: tabela „Redukcja parametryzacji bazą" w „Uwagach" jest **przed redukcją** uzupełniona o każdą metodę i zestaw danych, który traci drugi silnik, wraz z numerem kroku sprawdzianu z [`tests/README.md`](../../tests/README.md), pod którym decyzja zapadła, oraz z linią albo komendą, którą da się ten powód obalić; po zmianie zbiór nazw metod na znormalizowanej liście jest identyczny z baseline, a liczba zestawów danych na metodę jest identyczna wszędzie poza wierszami tej tabeli.
       Tabela pochodzi z audytu wszystkich 58 metod parametryzowanych bazą, przeprowadzonego pod sprawdzianem z [`tests/README.md`](../../tests/README.md); metoda audytu jest w „Uwagach", żeby YQM-26 mógł go powtórzyć. Każdy wiersz ma powód sprawdzalny komendą albo linią — powód, który brzmi wiarygodnie, ale nie da się go uruchomić, mówi o intencji, nie o kodzie. Sam licznik testów redukcji nie rozstrzygnie, bo jest zamierzona; rozstrzyga tabela i cztery liczby niżej.
@@ -109,7 +109,36 @@ Dwa ostatnie leżą **za** podmianą `commandMap`, więc test, który do nich do
 
 Pytanie kroku 2 brzmi więc: **czy klucz sterownika decyduje o asertowanej wartości** — nie: czy rozgałęzienie gdzieś istnieje.
 
-Warunek sprawdza się czterema liczbami, nie trzema: wierszy przed, wierszy po, suma ubytków z tabeli oraz `diff` listy ograniczony do wierszy spoza tabeli — **pusty w obie strony**, bo wariant ze stałą dodaje wiersze bez etykiety, a nie tylko usuwa. Trzy pierwsze liczby mogą się domknąć przypadkiem, gdy coś zniknie i coś przybędzie; czwarta tego nie przepuści. Końcowej liczby wierszy plan nie przyjmuje z góry, tylko mierzy przy odbiorze; spodziewana wartość to 349 → 334 (siedem metod traci providera w całości: −7; `testBadFileSetting…` 12 → 6: −6; `testBadConfiguration…` 4 → 2: −2), a rozjazd wobec niej jest sygnałem, nie warunkiem.
+Warunek sprawdza się czterema liczbami, nie trzema: wierszy przed, wierszy po, suma ubytków z tabeli oraz `diff` listy ograniczony do wierszy spoza **obu** tabel z „Uwag" — tej wyżej i tej z etykietami zmienionymi w YQM-22 — **pusty w obie strony**, bo wariant ze stałą dodaje wiersze bez etykiety, a nie tylko usuwa. Trzy pierwsze liczby mogą się domknąć przypadkiem, gdy coś zniknie i coś przybędzie; czwarta tego nie przepuści. Wyłączenie obejmuje obie tabele, bo osiem wierszy z drugiej zmieniło etykiety w YQM-22 i różni się od baseline z tego powodu; warunek wykonany dosłownie na jednej tabeli pokazuje te osiem wierszy i wygląda na niezgodność, którą nie jest:
+
+```
+cat > /tmp/qm-excluded.txt <<'EOF'
+ConnectionListTest::testConnectionWithoutDsnIsSkippedWithoutConnecting
+ConnectionListTest::testListedConnectionIsNotOpenedByBootstrap
+FileAdapterComponentTest::testBadFileSettingDisablesThePackageBeforeTheCommandSwap
+FinalizationTest::testRequestWithoutQueriesSendsNothing
+ProtectionTest::testDisabledPackageLeavesNoTrace
+QueryMonitorComponentTest::testDisabledChangesNothingAndSendsNothing
+QueryMonitorComponentTest::testRequestWithoutQueriesSendsNothing
+QueryMonitorComponentTest::testBadConfigurationDisablesPackageWithOneError
+TestApplicationTest::testApplicationRunsInAnotherProcess
+SqlNormalizerTest::testLimitSmallerThanEllipsisIsRejected
+SqlNormalizerTest::testUnsupportedDbGivesNull
+EOF
+
+docker compose run --rm --no-deps -e QM_MYSQL_DSN= -e QM_PGSQL_DSN= php \
+    vendor/bin/phpunit --list-tests \
+  | sed -n 's/^ - //p' | sed -E 's/^([A-Za-z0-9_\\]*\\)?//' | LC_ALL=C sort > /tmp/qm-after.txt
+
+diff <(grep -vFf /tmp/qm-excluded.txt tests/baseline-yqm19.txt) \
+     <(grep -vFf /tmp/qm-excluded.txt /tmp/qm-after.txt)
+```
+
+To jest komenda uruchomiona, nie przepisana. Jedenaście nazw stoi wprost, bo zastępnik nie da się wykonać, a rozjazd między tą listą a tabelami widać wtedy gołym okiem; wyciąganie listy z tabel `grep`-em po samym dokumencie wiązałoby warunek z formatowaniem kolumn. Nazwy są w postaci `Klasa::metoda`, bo `grep -vFf` dopasowuje podciągi: sama nazwa metody wycięłaby też każdy dłuższy identyfikator z tym prefiksem, a `testRequestWithoutQueriesSendsNothing` występuje w dwóch klasach. `--no-deps` i puste DSN są konieczne — bez nich compose podniesie bazy, których ta komenda nie potrzebuje. Blok uruchamia się przez `bash`: podstawienia procesu `<(...)` nie ma w POSIX-owym `sh`, a domyślna powłoka obrazu to `dash`, więc `sh -c` odpowie `Syntax error: "(" unexpected` i nie powie, że chodzi o powłokę.
+
+Końcowej liczby wierszy plan nie przyjmuje z góry, tylko mierzy ją przy odbiorze. Zmierzone przy odbiorze YQM-24: **349 → 334** — siedem metod traci providera w całości (−7), `testBadFileSettingDisablesThePackageBeforeTheCommandSwap` 12 → 6 (−6), `testBadConfigurationDisablesPackageWithOneError` 4 → 2 (−2), razem −15. Rozjazd wobec tej wartości jest sygnałem, nie warunkiem: warunkiem są cztery liczby wyżej.
+
+Miarą odbioru jest liczba testów i zestawów, nie suma asercji: sonda z [ADR 0005](../adr/0005-adapter-plikowy-z-blokada-i-utrata-paczki.md) traci losową liczbę paczek na zajętej blokadzie, więc `FileAdapterConcurrencyTest` z założenia nie daje stałej liczby asercji. Trzy biegi niezmienionego zestawu dały 2652, 2654 i 2656 asercji przy niezmiennych 334 testach; wahanie siedzi w testsuite `Process` i nie jest objawem niczego.
 
 Czwarta liczba nie jest formalnością. Tabela sprzed audytu dawała tę samą sumę 32 → 16 przy **innym zbiorze wierszy**: wypadł z niej `testEachFileKeyOverridesOnlyItself` (−6/−3), a doszły trzy metody po 2. Kto sprawdza tylko sumę, nie zauważy, że zmienił się cały zbiór.
 

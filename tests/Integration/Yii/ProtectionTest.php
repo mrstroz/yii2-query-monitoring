@@ -83,10 +83,9 @@ final class ProtectionTest extends IntegrationTestCase
         self::assertSame(['qm-t1 application error'], array_column($this->errors($result), 'message'));
     }
 
-    #[DataProvider('provideDatabaseCases')]
-    public function testDisabledPackageLeavesNoTrace(string $db): void
+    public function testDisabledPackageLeavesNoTrace(): void
     {
-        $result = $this->scenario($db, 'protection', ['enabled' => false], ['QM_ADAPTER' => 'throw']);
+        $result = $this->scenario(self::ANY_DB, 'protection', ['enabled' => false], ['QM_ADAPTER' => 'throw']);
 
         $this->assertProcessOk($result);
         self::assertSame([], $result->adapterCalls);

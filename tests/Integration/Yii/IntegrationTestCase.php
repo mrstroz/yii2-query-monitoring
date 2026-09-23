@@ -17,6 +17,15 @@ abstract class IntegrationTestCase extends TestCase
     protected const APP = 't1-test';
 
     /**
+     * The database for a test whose behaviour does not depend on the engine: rule 10 of ADR 0008 and the
+     * three-step check in tests/README.md. The constant names the decision where it is used instead of
+     * leaving a provider with one element. It is the first engine of {@see self::provideDatabaseCases()},
+     * so a run with only QM_PGSQL_DSN would skip these methods and be red under failOnSkipped; compose
+     * and CI set both DSNs.
+     */
+    protected const ANY_DB = 'mysql';
+
+    /**
      * @return iterable<string, array{string}>
      */
     public static function provideDatabaseCases(): iterable

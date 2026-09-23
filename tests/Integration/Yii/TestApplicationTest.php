@@ -27,10 +27,9 @@ final class TestApplicationTest extends IntegrationTestCase
         $connection->close();
     }
 
-    #[DataProvider('provideDatabaseCases')]
-    public function testApplicationRunsInAnotherProcess(string $db): void
+    public function testApplicationRunsInAnotherProcess(): void
     {
-        $out = $this->scenarioOutput($this->scenario($db, 'process'));
+        $out = $this->scenarioOutput($this->scenario(self::ANY_DB, 'process'));
 
         self::assertNotSame(getmypid(), $out['pid']);
     }

@@ -65,10 +65,9 @@ final class FinalizationTest extends IntegrationTestCase
         self::assertCount($end === 'throw' ? 1 : 0, $this->entriesWith($batch, 'qm_life_after_send'));
     }
 
-    #[DataProvider('provideDatabaseCases')]
-    public function testRequestWithoutQueriesSendsNothing(string $db): void
+    public function testRequestWithoutQueriesSendsNothing(): void
     {
-        $result = $this->scenario($db, 'no-queries');
+        $result = $this->scenario(self::ANY_DB, 'no-queries');
 
         $this->assertProcessOk($result);
         self::assertSame([], $result->batches);

@@ -68,26 +68,26 @@ final class FileAdapterComponentTest extends IntegrationTestCase
     }
 
     /**
-     * @return iterable<string, array{string, array<string, mixed>}>
+     * @return iterable<string, array{array<string, mixed>}>
      */
     public static function provideBadFileSettingCases(): iterable
     {
-        foreach (self::provideDatabaseCases() as [$db]) {
-            yield "{$db}: empty path" => [$db, ['path' => '']];
-            yield "{$db}: maxSize 0" => [$db, ['maxSize' => 0]];
-            yield "{$db}: maxFiles 0" => [$db, ['maxFiles' => 0]];
-            yield "{$db}: maxSize not an integer" => [$db, ['maxSize' => '1024']];
-            yield "{$db}: unknown key" => [$db, ['maxsize' => 1024]];
-            yield "{$db}: unknown alias" => [$db, ['path' => '@nowhere/queries.jsonl']];
-        }
+        yield 'empty path' => [['path' => '']];
+        yield 'maxSize 0' => [['maxSize' => 0]];
+        yield 'maxFiles 0' => [['maxFiles' => 0]];
+        yield 'maxSize not an integer' => [['maxSize' => '1024']];
+        yield 'unknown key' => [['maxsize' => 1024]];
+        yield 'unknown alias' => [['path' => '@nowhere/queries.jsonl']];
     }
 
     /**
      * @param array<string, mixed> $file
      */
     #[DataProvider('provideBadFileSettingCases')]
-    public function testBadFileSettingDisablesThePackageBeforeTheCommandSwap(string $db, array $file): void
+    public function testBadFileSettingDisablesThePackageBeforeTheCommandSwap(array $file): void
     {
+        $db = self::ANY_DB;
+
         $component = ['adapter' => null, 'file' => $file];
         $without = $this->scenario($db, 'per-connection', ['enabled' => false]);
         $result = $this->scenario($db, 'per-connection', $component);
