@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace mrstroz\querymonitoring\tests\Unit\adapter;
+namespace mrstroz\querymonitoring\tests\Integration\Filesystem;
 
 use mrstroz\querymonitoring\adapter\FileAdapter;
 use mrstroz\querymonitoring\adapter\FileAdapterException;

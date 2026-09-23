@@ -8,7 +8,7 @@ declare(strict_types=1);
  */
 
 use mrstroz\querymonitoring\adapter\FileAdapter;
-use mrstroz\querymonitoring\tests\Unit\adapter\FileAdapterTest;
+use mrstroz\querymonitoring\tests\Integration\Filesystem\FileAdapterTest;
 
 $root = dirname(__DIR__, 4);
 require $root . '/vendor/autoload.php';
