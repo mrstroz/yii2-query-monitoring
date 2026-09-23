@@ -128,6 +128,8 @@ return static function (\yii\web\Application $app): array {
             \yii\grid\GridView::widget(['dataProvider' => new \yii\data\ActiveDataProvider(['query' => Contact::find(), 'db' => $mongodb])]);
             foreach (Contact::find()->batch(1, $mongodb) as $_) {
             }
+            // Nested eager loading in a list view, the deepest SQL path of ADR-0009.
+            \yii\grid\GridView::widget(['dataProvider' => new \yii\data\ActiveDataProvider(['query' => Contact::find()->with('same.same'), 'db' => $mongodb])]);
 
             return ['events' => $probe->events];
 

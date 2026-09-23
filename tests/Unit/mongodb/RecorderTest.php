@@ -89,6 +89,7 @@ final class RecorderTest extends LoggedTestCase
         yield 'find' => ['find'];
         yield 'getMore' => ['getMore'];
         yield 'aggregate' => ['aggregate'];
+        yield 'distinct' => ['distinct'];
     }
 
     #[DataProvider('provideReplyNotReadCases')]

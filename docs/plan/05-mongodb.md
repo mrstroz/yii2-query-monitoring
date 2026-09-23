@@ -42,7 +42,7 @@
       Spec: [01 §3](../spec/01-zbieranie-danych.md#3-źródło-mongodb) · Zależy od: YQM-35
       Gotowe, gdy: odczyt kursora dłuższego niż pierwsza porcja daje wpis `op: find` i po jednym wpisie `op: getMore` na każdą następną porcję, a `batchInsert` większy niż `maxWriteBatchSize` serwera daje tyle wpisów `op: insert`, ile zdarzeń `CommandStarted` polecenia `insert` zobaczył niezależny subskrybent testowy.
 
-- [ ] (=) **YQM-38** `caller` wpisu MongoDB z granicą zmierzoną dla ścieżki zdarzeń sterownika
+- [x] (=) **YQM-38** `caller` wpisu MongoDB z granicą zmierzoną dla ścieżki zdarzeń sterownika
       Spec: [01 §3](../spec/01-zbieranie-danych.md#3-źródło-mongodb) · ADR: [0009](../adr/0009-caller-i-route-w-formacie-v2.md) · Zależy od: YQM-35
       Gotowe, gdy: każda ścieżka z pytania 5 [ustaleń](#ustalenia-do-yqm-32) daje `caller` z pierwszą ramką aplikacji tej ścieżki, spec 01 §3 nazywa ramki od domknięcia strażnika i granicę tak jak §2 dla SQL, a ADR-0009 ma liczby dla MongoDB obok liczb dla SQL.
       YQM-35 bierze ślad z granicą 64 i sprawdza go tylko na `find()->all()`. ADR-0009 każe zmierzyć `N` osobno, bo ślad jest brany w procedurze zdarzenia, a nie w `sql\Recorder::record()`.

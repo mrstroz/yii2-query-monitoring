@@ -75,15 +75,15 @@ final class MongoDbProbeTest extends IntegrationTestCase
         self::assertSame($expected, $sent, 'command names and top-level keys, in the order the probe sends them');
     }
 
-    public function testFirstApplicationFrameOfTheEndEventIsWithinTheLimitOfTheSqlSource(): void
+    public function testFirstApplicationFrameOfTheEndEventIsWithinTheLimit(): void
     {
         $out = $this->probe('stack');
 
         $succeeded = array_values(array_filter($out['events'], static fn(array $event): bool => $event['event'] === 'succeeded'));
-        self::assertSame(['find', 'insert', 'count', 'find', 'find', 'getMore'], array_column($succeeded, 'name'));
+        self::assertSame(['find', 'insert', 'count', 'find', 'find', 'getMore', 'count', 'find', 'find', 'find'], array_column($succeeded, 'name'));
         foreach ($succeeded as $event) {
             self::assertStringStartsWith('tests/Integration/scenarios/mongodb-probe.php:', $event['app'][0]['at'], "first application frame of {$event['name']}");
-            // Deepest measured: 22 (GridView over ActiveDataProvider); the SQL source searches 64 frames (ADR-0009).
+            // Deepest measured: 32 (GridView with with() two levels deep); the limit is 64 frames (ADR-0009).
             self::assertLessThan(64, $event['app'][0]['position'], "position of {$event['name']}");
         }
     }

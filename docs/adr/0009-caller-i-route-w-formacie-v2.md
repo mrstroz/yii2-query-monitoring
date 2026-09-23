@@ -16,7 +16,8 @@ Pomiar w YQM-27 ([`roadmap.md`](../plan/roadmap.md), tabela ryzyk), PHP 8.1 i 8.
 - pierwsza ramka aplikacji, licząc od domknięcia strażnika w `Recorder::record()`, stoi na pozycji 7–24, a przy zapytaniach ładujących schemat tabeli do 29;
 - 200 wywołań `debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 30)` kosztuje 0,08–0,3 ms, czyli wariant pierwszy z [`04-kontekst-wpisu.md`](../plan/04-kontekst-wpisu.md);
 - pomiar po przeglądzie kodu YQM-27..29: lista `GridView` z `with()` zagnieżdżonym na dwa poziomy stawia pierwszą ramkę aplikacji na pozycji 31, a z `via()` na 32, na MySQL i PostgreSQL; każdy kolejny poziom `with()` dodaje 5 ramek. Przy stosie 80 ramek 200 wywołań kosztuje 0,20–0,23 ms przy granicy 30, 0,38–0,46 ms przy 64 i 0,50–0,58 ms bez granicy (PHP 8.1 i 8.4);
-- przed kontrolerem skrypt wejściowy `index.php` jest jedyną ramką spoza vendor i stoi na pozycji 23–25 albo 33–37.
+- przed kontrolerem skrypt wejściowy `index.php` jest jedyną ramką spoza vendor i stoi na pozycji 23–25 albo 33–37;
+- źródło MongoDB (YQM-38, `yii2-mongodb` 3.0.4, ext 2.5.2) liczy od domknięcia strażnika w metodzie zdarzenia końca `mongodb\Recorder`: pierwsza ramka aplikacji stoi na 7 (`Collection::insert()`, `getMore` z `batch()`), 10 (`find()->one()`), 11 (`find` z `batch()`), 22 (`count` i `find` z `ActiveDataProvider` w `GridView`), a z `with()` na dwa poziomy na 27 i 32. Każdy poziom `with()` dodaje 5 ramek, jak w SQL, więc granica 64 obowiązuje dla obu źródeł.
 
 Pakiet nie ma jeszcze wydania (brak tagów w repozytorium), więc zmiana publicznych pól `QueryBatch` nie łamie opublikowanego API.
 
@@ -55,6 +56,6 @@ Wpis dostaje pole `caller`: najwyżej trzy ramki aplikacji z pierwszych 64 ramek
 ## Kiedy wrócić do tej decyzji
 
 - Gdy aktualizacja Yii pogłębi stos i pierwsza ramka aplikacji najgłębszej zmierzonej ścieżki (lista z `with()` na dwa poziomy, dziś 31–32) przejdzie za pozycję 63; test ścieżek aplikacyjnych w `tests/Integration/Yii/` to wykrywa.
-- Gdy źródło MongoDB (E4) będzie brało ślad w innym miejscu: tam `N` trzeba zmierzyć osobno.
+- Gdy źródło MongoDB zacznie brać ślad w innym miejscu niż metoda zdarzenia końca `mongodb\Recorder`: `N` trzeba zmierzyć od nowa.
 - Gdy Composer zmieni API `InstalledVersions` albo pakiet będzie instalowany bez Composera.
 - Przy pierwszym wydaniu: od niego każda zmiana pól nagłówka jest zmianą łamiącą.

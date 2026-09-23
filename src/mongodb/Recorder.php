@@ -22,7 +22,7 @@ final class Recorder
     public const TRACE_LIMIT = 64;
 
     /** Commands whose reply carries result documents; it is not read for error codes (spec 01 §3). */
-    private const REPLY_NOT_READ = ['find', 'getMore', 'aggregate'];
+    private const REPLY_NOT_READ = ['find', 'getMore', 'aggregate', 'distinct'];
 
     /** @var array<string, array{string, ?string}> `op` and `query` by `requestId` */
     private array $pending = [];
