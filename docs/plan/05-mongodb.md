@@ -18,7 +18,7 @@
       Gotowe, gdy: pozycja 2 w spec 00 §9 jest rozstrzygnięta, ADR-0010 zapisuje sposób podpięcia i [podział klas](#podział-klas), spec 01 §3 i 00 §7 mówią, jak pakiet dochodzi do `Manager` i od jakich wersji `ext-mongodb` i `yii2-mongodb`, a odpowiedzi na sześć pytań z [ustaleń](#ustalenia-do-yqm-32) stoją w tabeli ryzyk w [`roadmap.md`](roadmap.md). Zakres poleceń, czas, pierwszeństwo kodów błędu i parowanie zdarzeń są już w spec 01 §3; sonda je poprawia tylko wtedy, gdy sterownik na to nie pozwala.
       Sonda nie dodaje kodu w `src/`. Pomiar stosu żyje w `Integration/Yii` jak `CallerProbeTest` z YQM-27.
 
-- [ ] (=) **YQM-33** Instalacja źródła SQL wydzielona z `QueryMonitor` za interfejs źródła
+- [x] (=) **YQM-33** Instalacja źródła SQL wydzielona z `QueryMonitor` za interfejs źródła
       Spec: [01 §1](../spec/01-zbieranie-danych.md#1-komponent-i-konfiguracja)
       Gotowe, gdy: `QueryMonitor` oddaje komponent spod każdego id pierwszemu źródłu, którego `supports()` go przyjmuje, a źródło SQL ma w sobie `Command::supportsInstalledYii()`, sprawdzenia drivera i `commandMap` oraz normalizator z `createNormalizer()`, tworzony przy pierwszym połączeniu SQL; test z fałszywymi źródłami pokazuje, że źródło rzucające przy instalacji błąd zgodności nie blokuje następnego połączenia, a log ma jeden błąd; dotychczasowe testy przechodzą bez zmian.
       Wersja Yii bez pól z ADR-0001 wyłącza według spec 01 §1 tylko źródło SQL, a dziś `QueryMonitor::install()` wyłącza nią cały pakiet. `createNormalizer()` zostaje, bo `tests/app/FaultyQueryMonitor.php:25` wymusza przez niego błąd normalizatora z YQM-9.

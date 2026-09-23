@@ -10,9 +10,7 @@ use mrstroz\querymonitoring\adapter\FileAdapter;
 use mrstroz\querymonitoring\batch\BatchType;
 use mrstroz\querymonitoring\batch\QueryBatch;
 use mrstroz\querymonitoring\collector\QueryCollector;
-use mrstroz\querymonitoring\sql\Command;
-use mrstroz\querymonitoring\sql\Dialect;
-use mrstroz\querymonitoring\sql\Recorder;
+use mrstroz\querymonitoring\sql\Source as SqlSource;
 use mrstroz\querymonitoring\sql\SqlNormalizer;
 use mrstroz\querymonitoring\support\CallerFrames;
 use mrstroz\querymonitoring\support\Guard;
@@ -22,7 +20,6 @@ use yii\base\BootstrapInterface;
 use yii\base\Component;
 use yii\base\Event;
 use yii\base\InvalidConfigException;
-use yii\db\Connection;
 
 /**
  * Application component and the package's only entry point (spec 01 §1).
@@ -42,7 +39,8 @@ use yii\db\Connection;
  *
  * All work happens inside one {@see support\Guard}: a wrong setting disables the package for the
  * process with one `Yii::error`, and the application answers as without the package.
- * {@see self::createNormalizer()} and {@see self::createCollector()} are the only extension points.
+ * {@see self::createNormalizer()}, {@see self::createCollector()} and {@see self::createSources()} are the only
+ * extension points.
  */
 class QueryMonitor extends Component implements BootstrapInterface
 {
@@ -51,7 +49,7 @@ class QueryMonitor extends Component implements BootstrapInterface
     /** Application name for the batch header; required. */
     public string $app = '';
 
-    /** @var list<string> ids of `yii\db\Connection` components; `module/id` for a connection inside a module */
+    /** @var list<string> ids of connection components; `module/id` for a connection inside a module */
     public array $connections = [];
 
     public int $maxEntries = 500;
@@ -83,7 +81,7 @@ class QueryMonitor extends Component implements BootstrapInterface
     private bool $finalized = false;
 
     /**
-     * Validates the settings, installs the measured `Command` on the listed connections, captures the
+     * Validates the settings, installs a source on each listed connection, captures the
      * entry action and subscribes {@see self::finalize()} to `Application::EVENT_AFTER_REQUEST` and to shutdown.
      * With `enabled: false` it does nothing; a wrong setting disables the package with one `Yii::error`.
      */
@@ -129,7 +127,7 @@ class QueryMonitor extends Component implements BootstrapInterface
     }
 
     /**
-     * Creates the normaliser shared by all monitored connections.
+     * Creates the normaliser shared by all monitored SQL connections, on the first of them.
      */
     protected function createNormalizer(): SqlNormalizer
     {
@@ -151,6 +149,16 @@ class QueryMonitor extends Component implements BootstrapInterface
         );
     }
 
+    /**
+     * The sources a listed component is offered to, in order; the first whose `supports()` accepts it installs.
+     *
+     * @return list<SourceInterface>
+     */
+    protected function createSources(QueryCollector $collector, Guard $guard, CallerFrames $callers): array
+    {
+        return [new SqlSource($collector, $guard, $callers, fn(): SqlNormalizer => $this->createNormalizer())];
+    }
+
     private function install(Application $app, Guard $guard): void
     {
         if ($this->app === '') {
@@ -159,15 +167,15 @@ class QueryMonitor extends Component implements BootstrapInterface
         if ($this->maxEntries < 1 || $this->maxBatchBytes < 1) {
             throw new InvalidConfigException('QueryMonitor::$maxEntries and $maxBatchBytes must be positive.');
         }
-        if (!Command::supportsInstalledYii()) {
-            throw new InvalidConfigException('The installed yii\\db\\Command lacks the private fields the measured Command reads; see ADR-0001.');
+        // Checked here, not by the lazily created normaliser: a wrong setting disables the whole package (spec 01 §1).
+        if ($this->maxQueryLength < strlen(SqlNormalizer::ELLIPSIS)) {
+            throw new InvalidConfigException('QueryMonitor::$maxQueryLength must be at least ' . strlen(SqlNormalizer::ELLIPSIS) . ' bytes.');
         }
-        $normalizer = $this->createNormalizer();
         $adapter = $this->resolveAdapter();
         $collector = $this->createCollector($app);
-        $callers = CallerFrames::forProcess();
+        $sources = $this->createSources($collector, $guard, CallerFrames::forProcess());
         foreach ($this->connections as $id) {
-            $guard->run(fn() => $this->installOn($app, $id, $normalizer, $collector, $guard, $callers), "connection {$id}");
+            $guard->run(fn() => $this->installOn($app, $id, $sources), "connection {$id}");
         }
         $this->collector = $collector;
         $this->batchAdapter = $adapter;
@@ -200,50 +208,39 @@ class QueryMonitor extends Component implements BootstrapInterface
         $app->on(Application::EVENT_BEFORE_ACTION, $handler);
     }
 
-    private function installOn(Application $app, string $id, SqlNormalizer $normalizer, QueryCollector $collector, Guard $guard, CallerFrames $callers): void
+    /**
+     * @param list<SourceInterface> $sources
+     */
+    private function installOn(Application $app, string $id, array $sources): void
     {
-        $connection = $this->connection($app, $id);
-        // Without a DSN prefix getDriverName() would open a connection; with one it only reads the DSN
-        // (or an explicit driverName) and returns the key createCommand() looks up in commandMap.
-        if (!str_contains((string) $connection->dsn, ':')) {
-            throw new InvalidConfigException("Connection {$id} has no DSN to read the driver from.");
+        $component = $this->component($app, $id);
+        foreach ($sources as $source) {
+            if ($source->supports($component)) {
+                $source->install($id, $component);
+
+                return;
+            }
         }
-        $driver = (string) $connection->getDriverName();
-        if (Dialect::tryFrom($driver) === null) {
-            throw new InvalidConfigException("Connection {$id} uses driver {$driver}, which is not monitored.");
-        }
-        if ($connection->commandClass !== \yii\db\Command::class) {
-            throw new InvalidConfigException("Connection {$id} sets its own commandClass.");
-        }
-        $current = $connection->commandMap[$driver] ?? \yii\db\Command::class;
-        if (is_array($current) && ($current['class'] ?? null) === Command::class) {
-            throw new InvalidConfigException("Connection {$id} is already monitored under another id.");
-        }
-        if ($current !== \yii\db\Command::class) {
-            throw new InvalidConfigException("Connection {$id} sets its own commandMap for {$driver}.");
-        }
-        $connection->commandMap[$driver] = [
-            'class' => Command::class,
-            'recorder' => new Recorder($id, $driver, $normalizer, $collector, $guard, $callers),
-        ];
+
+        throw new InvalidConfigException("Connection {$id} is not a connection the package measures.");
     }
 
     /**
      * `db` from the application, `admin/db` from module `admin` (loading the module).
      */
-    private function connection(Application $app, string $id): Connection
+    private function component(Application $app, string $id): object
     {
         $position = strrpos($id, '/');
         $owner = $position === false ? $app : $app->getModule(substr($id, 0, $position));
         if ($owner === null) {
             throw new InvalidConfigException("Module of connection {$id} does not exist.");
         }
-        $connection = $owner->get($position === false ? $id : substr($id, $position + 1), false);
-        if (!$connection instanceof Connection) {
+        $component = $owner->get($position === false ? $id : substr($id, $position + 1), false);
+        if (!is_object($component)) {
             throw new InvalidConfigException("Connection {$id} does not exist.");
         }
 
-        return $connection;
+        return $component;
     }
 
     private function resolveAdapter(): BatchAdapterInterface
