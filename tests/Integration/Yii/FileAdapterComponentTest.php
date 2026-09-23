@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace mrstroz\querymonitoring\tests\Integration\Yii;
 
 use mrstroz\querymonitoring\adapter\FileAdapter;
+use mrstroz\querymonitoring\tests\Integration\support\JsonLines;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
@@ -118,12 +119,9 @@ final class FileAdapterComponentTest extends IntegrationTestCase
      */
     private function singleLine(string $content): array
     {
-        self::assertStringEndsWith("\n", $content);
-        $lines = explode("\n", rtrim($content, "\n"));
-        self::assertCount(1, $lines);
-        $batch = json_decode($lines[0], true, 512, JSON_THROW_ON_ERROR);
-        self::assertIsArray($batch);
+        $batches = JsonLines::decode($content);
+        self::assertCount(1, $batches, 'the component writes exactly one line');
 
-        return $batch;
+        return $batches[0];
     }
 }

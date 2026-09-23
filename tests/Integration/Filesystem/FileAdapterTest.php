@@ -9,8 +9,8 @@ use mrstroz\querymonitoring\adapter\FileAdapterException;
 use mrstroz\querymonitoring\batch\BatchType;
 use mrstroz\querymonitoring\batch\QueryBatch;
 use mrstroz\querymonitoring\batch\QueryEntry;
+use mrstroz\querymonitoring\tests\Integration\support\TemporaryDirectory;
 use PHPUnit\Framework\TestCase;
-use yii\helpers\FileHelper;
 
 /**
  * YQM-13 and YQM-14: the file adapter of spec 03 §3 and ADR-0005, one process.
@@ -20,6 +20,8 @@ use yii\helpers\FileHelper;
  */
 final class FileAdapterTest extends TestCase
 {
+    use TemporaryDirectory;
+
     /** Text in every batch's query; an exception message must never contain it. */
     public const MARKER = 'QM_MARKER_7f3a';
 
@@ -28,14 +30,12 @@ final class FileAdapterTest extends TestCase
     /** What `@` leaves in error_reporting() (PHP 8). */
     private const FATAL_LEVELS = E_ERROR | E_PARSE | E_CORE_ERROR | E_COMPILE_ERROR | E_USER_ERROR | E_RECOVERABLE_ERROR;
 
-    private string $dir;
-
     /** @var list<string> */
     private array $warnings = [];
 
     protected function setUp(): void
     {
-        $this->dir = sys_get_temp_dir() . '/qm-file-' . bin2hex(random_bytes(6));
+        $this->dir = self::temporaryPath('file');
         mkdir($this->dir);
         // An error masked by `@` goes on to PHP's own handler, which fills error_get_last() as it does
         // under Yii's ErrorHandler in an application; any other one is recorded as a failure. PHPUnit lowers
@@ -53,7 +53,7 @@ final class FileAdapterTest extends TestCase
     protected function tearDown(): void
     {
         restore_error_handler();
-        FileHelper::removeDirectory($this->dir);
+        $this->removeTemporaryDirectory();
     }
 
     public function testWriteAppendsEachBatchAsOneJsonLineAndCreatesTheDirectory(): void
@@ -112,8 +112,9 @@ final class FileAdapterTest extends TestCase
 
         $message = $this->sendFailure(new FileAdapter($path));
 
-        self::assertStringContainsString('could not write to ' . $path . ': fwrite(): Write of ', $message);
-        self::assertStringContainsString('No space left on device', $message);
+        // spec 03 §2 promises the kind of operation and the path; the rest of the message comes from PHP
+        // and depends on its version and locale, so it is not part of the contract
+        self::assertStringContainsString('could not write to ' . $path . ': ', $message);
         self::assertFileExists($path . '.lock');
         $this->assertNoWarning();
     }

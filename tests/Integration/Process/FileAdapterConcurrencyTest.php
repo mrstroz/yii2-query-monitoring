@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace mrstroz\querymonitoring\tests\Integration\Process;
 
 use mrstroz\querymonitoring\tests\app\ProcessGroup;
+use mrstroz\querymonitoring\tests\Integration\support\JsonLines;
+use mrstroz\querymonitoring\tests\Integration\support\ProcessAssertions;
+use mrstroz\querymonitoring\tests\Integration\support\TemporaryDirectory;
 use PHPUnit\Framework\TestCase;
-use yii\helpers\FileHelper;
 
 /**
  * YQM-18, probe of ADR-0005: eight processes write through one FileAdapter file while it rotates, and
@@ -18,21 +20,22 @@ use yii\helpers\FileHelper;
  */
 final class FileAdapterConcurrencyTest extends TestCase
 {
+    use ProcessAssertions;
+    use TemporaryDirectory;
+
     private const PROCESSES = 8;
     private const BATCHES_PER_PROCESS = 60;
     private const MAX_FILES = self::PROCESSES * self::BATCHES_PER_PROCESS + 1;
     private const MAX_SIZE = 4096;
 
-    private string $dir;
-
     protected function setUp(): void
     {
-        $this->dir = sys_get_temp_dir() . '/qm-concurrency-' . bin2hex(random_bytes(6));
+        $this->dir = self::temporaryPath('concurrency');
     }
 
     protected function tearDown(): void
     {
-        FileHelper::removeDirectory($this->dir);
+        $this->removeTemporaryDirectory();
     }
 
     public function testParallelWritersWithRotationLoseNoLineOutsideABusyLock(): void
@@ -50,9 +53,7 @@ final class FileAdapterConcurrencyTest extends TestCase
         $written = [];
         $lost = [];
         foreach ($results as $result) {
-            self::assertFalse($result->timedOut, "process {$result->index} timed out");
-            self::assertSame(0, $result->exitCode, "process {$result->index}\nstdout: {$result->stdout}\nstderr: {$result->stderr}");
-            self::assertSame('', $result->stderr);
+            $this->assertFinished($result, $result->index);
             $ids = json_decode($result->stdout, true, 512, JSON_THROW_ON_ERROR);
             self::assertIsArray($ids);
             array_push($written, ...$ids['true']);
@@ -73,9 +74,7 @@ final class FileAdapterConcurrencyTest extends TestCase
             }
             $content = (string) file_get_contents($this->dir . '/logs/' . $name);
             self::assertStringEndsWith("\n", $content, "{$name} ends with a whole line");
-            foreach (explode("\n", rtrim($content, "\n")) as $line) {
-                $batch = json_decode($line, true, 512, JSON_THROW_ON_ERROR);
-                self::assertIsArray($batch);
+            foreach (JsonLines::decode($content) as $batch) {
                 $inFiles[] = $batch['id'];
             }
         }

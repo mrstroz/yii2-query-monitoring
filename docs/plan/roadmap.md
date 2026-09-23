@@ -4,9 +4,9 @@
 
 | Pole | Wartość |
 |---|---|
-| **Etap** | E2. Architektura i konwencje testów, 4 z 8. E1 zakończony, 6 z 6 |
-| **Ostatnio ukończone** | [YQM-22](03-testy.md): czternaście providerów na `provide…Cases`, wraz z `databases()` z `IntegrationTestCase` i wywołaniami po `self::`; pięć pętli `foreach (['mysql','pgsql'])` zamienionych na wspólny mechanizm; dwa providery w `SqlNormalizerTest` dostały nazwane zestawy. Osiem wierszy listy zmieniło etykietę z `#N` na nazwę — jedyna różnica wobec baseline w całym etapie; liczba przypadków (349) i metod (143) bez zmian. Nazwane zestawy wymusiły `iterable<string, …>` w docblokach, więc od teraz pilnuje ich `composer stan` |
-| **Następne** | [YQM-23](03-testy.md): asercja na kontrakt zamiast natywnego komunikatu systemu (`could not write to <path>` zamiast `No space left on device`) plus trzy powtórzenia do scalenia. Zadania MongoDB spisuje się po E2, od YQM-27. Komendy przez Docker: `docker compose run --rm php composer test` (bazy startują same), a bieg bez baz wymaga `--no-deps` i pustych DSN |
+| **Etap** | E2. Architektura i konwencje testów, 5 z 8. E1 zakończony, 6 z 6 |
+| **Ostatnio ukończone** | [YQM-23](03-testy.md): asercja o nieudanym zapisie sprawdza kontrakt ze [spec 03 §2](../spec/03-adaptery-wyjsciowe.md#2-błąd-adaptera) (`could not write to <path>: `) zamiast natywnego komunikatu PHP zależnego od wersji i locale. Trzy powtórzenia scalone w `tests/Integration/support/`: traity `TemporaryDirectory` i `ProcessAssertions` oraz `JsonLines::decode()`. Tworzenie katalogu i asercja „plik ma jedną linię" zostały jawne w klasach — wspólne jest to, co naprawdę wspólne |
+| **Następne** | [YQM-24](03-testy.md): parametryzacja bazą tylko tam, gdzie zachowanie idzie przez sterownik; tabelę „Redukcja parametryzacji bazą" w planie wypełnia się **przed** redukcją. Zadania MongoDB spisuje się po E2, od YQM-27. Komendy przez Docker: `docker compose run --rm php composer test` (bazy startują same), a bieg bez baz wymaga `--no-deps` i pustych DSN |
 
 Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trzeba zajrzeć na początku sesji.
 
@@ -16,7 +16,7 @@ Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trze
 |---|---|---|---|---|
 | **E0** | [01-fundament-i-sql](01-fundament-i-sql.md) | Pakiet, kolektor, `Command`, cykl życia HTTP | Aplikacja z MySQL i PostgreSQL daje paczkę do jawnego adaptera, wyjątek nie gubi paczki | 12/12 |
 | **E1** | [02-adapter-plikowy](02-adapter-plikowy.md) | Adapter plikowy z rotacją | Paczki w `runtime/logs`, bezpieczne przy 8 procesach | 6/6 |
-| **E2** | [03-testy](03-testy.md) | Architektura i konwencje testów | Cztery testsuite'y, konwencje spisane i zastosowane, żaden scenariusz nie zniknął | 4/8 |
+| **E2** | [03-testy](03-testy.md) | Architektura i konwencje testów | Cztery testsuite'y, konwencje spisane i zastosowane, żaden scenariusz nie zniknął | 5/8 |
 | **E3** | [04-mongodb](04-mongodb.md) | Źródło MongoDB | Jedna paczka z wpisami SQL i MongoDB | – |
 | **E4** | [05-konsola](05-konsola.md) | Zadania konsolowe | Wiele paczek z `seq` w jednym procesie | – |
 | **E5** | [06-wydajnosc-i-odbior](06-wydajnosc-i-odbior.md) | Test wydajności, dokumentacja | Narzut w progu, limity potwierdzone, README pakietu | – |

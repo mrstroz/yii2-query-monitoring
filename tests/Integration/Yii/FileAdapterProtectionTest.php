@@ -6,8 +6,8 @@ namespace mrstroz\querymonitoring\tests\Integration\Yii;
 
 use mrstroz\querymonitoring\adapter\FileAdapterException;
 use mrstroz\querymonitoring\tests\app\RunResult;
+use mrstroz\querymonitoring\tests\Integration\support\TemporaryDirectory;
 use PHPUnit\Framework\Attributes\DataProvider;
-use yii\helpers\FileHelper;
 
 /**
  * YQM-17, spec 03 §2–§3 and 01 §6: a busy or unwritable file never changes what the application gets. A
@@ -16,20 +16,17 @@ use yii\helpers\FileHelper;
  */
 final class FileAdapterProtectionTest extends IntegrationTestCase
 {
-    private string $dir;
+    use TemporaryDirectory;
 
     protected function setUp(): void
     {
-        $this->dir = sys_get_temp_dir() . '/qm-protection-' . bin2hex(random_bytes(6));
+        $this->dir = self::temporaryPath('protection');
         mkdir($this->dir);
     }
 
     protected function tearDown(): void
     {
-        foreach (FileHelper::findDirectories($this->dir) as $directory) {
-            chmod($directory, 0o755);
-        }
-        FileHelper::removeDirectory($this->dir);
+        $this->removeTemporaryDirectory();
     }
 
     #[DataProvider('provideDatabaseCases')]

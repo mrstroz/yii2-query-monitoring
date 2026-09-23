@@ -24,6 +24,7 @@ Test sięgający po `/dev/full`, `flock`, `open_basedir`, `sh`, `ulimit`, `proc_
 - Ciało testu dzieli się pustymi liniami na przygotowanie, wykonanie i asercje. Nie piszemy komentarzy `Arrange`, `Act`, `Assert` — puste linie mówią to samo.
 - Jeden test opisuje jedno zachowanie. Asercji może być kilka, jeśli wszystkie opisują to jedno zachowanie.
 - Helpery, fabryki danych i metody techniczne idą na koniec klasy, pod testami.
+- Deklaracja traitu (`use TemporaryDirectory;`) stoi jako pierwsza rzecz w ciele klasy, przed stałymi i polami — `@PER-CS2.0` w `composer cs` odrzuca inne miejsce.
 - W `Integration/Yii/` klasa `Yii` jest przesłonięta segmentem namespace'u: pisz `\Yii::…` albo dodaj `use Yii;`. Bez tego `Yii::$app` szuka `…\tests\Integration\Yii\Yii` i wywraca się dopiero w czasie wykonania.
 
 ## Asercje

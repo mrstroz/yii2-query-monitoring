@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace mrstroz\querymonitoring\tests\Integration\Process;
 
 use mrstroz\querymonitoring\tests\app\ProcessGroup;
-use mrstroz\querymonitoring\tests\app\ProcessResult;
+use mrstroz\querymonitoring\tests\Integration\support\ProcessAssertions;
+use mrstroz\querymonitoring\tests\Integration\support\TemporaryDirectory;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -13,6 +14,9 @@ use PHPUnit\Framework\TestCase;
  */
 final class ProcessGroupTest extends TestCase
 {
+    use ProcessAssertions;
+    use TemporaryDirectory;
+
     private const PROBE = __DIR__ . '/../workers/process-probe.php';
 
     public function testEightProcessesWorkAtTheSameTime(): void
@@ -48,7 +52,7 @@ final class ProcessGroupTest extends TestCase
 
     public function testDeadlineKillsProcessesThatAreStillWorking(): void
     {
-        $marker = sys_get_temp_dir() . '/qm-group-' . bin2hex(random_bytes(6));
+        $marker = self::temporaryPath('group');
 
         $started = microtime(true);
         $results = ProcessGroup::run(self::PROBE, 3, 0.5, ['QM_PROBE' => 'sleep', 'QM_SLEEP' => '1.5', 'QM_MARKER' => $marker]);
@@ -91,11 +95,4 @@ final class ProcessGroupTest extends TestCase
         }
     }
 
-    private function assertFinished(ProcessResult $result, int $index): void
-    {
-        self::assertSame($index, $result->index);
-        self::assertFalse($result->timedOut, "process {$index} timed out");
-        self::assertSame(0, $result->exitCode, "process {$index}\nstdout: {$result->stdout}\nstderr: {$result->stderr}");
-        self::assertSame('', $result->stderr);
-    }
 }
