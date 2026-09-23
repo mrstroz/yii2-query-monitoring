@@ -14,7 +14,7 @@ Kolejny etap potoku MongoDB, `$match` z dokumentem, ma wartości w zagnieżdżon
 
 ## Decyzja
 
-SQL: symbole parametrów zostają, każdy literał tekstowy i liczbowy jest zamieniany na `?`, komentarze są usuwane. Reguły cudzysłowu i komentarzy zależą od dialektu, bo `"..."` jest literałem w MySQL i identyfikatorem w PostgreSQL. Gdy skaner napotka niedomknięty literał lub nieznaną konstrukcję, `query` ma `null`. MongoDB: nazwy pól, operatory i etapy zostają, każda wartość jest zamieniana na `?`, zagnieżdżenie ponad trzy poziomy lub przekroczenie długości daje `null`.
+SQL: symbole parametrów zostają, każdy literał tekstowy i liczbowy jest zamieniany na `?`, komentarze są usuwane. Reguły cudzysłowu i komentarzy zależą od dialektu, bo `"..."` jest literałem w MySQL i identyfikatorem w PostgreSQL. Gdy skaner napotka niedomknięty literał lub nieznaną konstrukcję, `query` ma `null`. MongoDB: nazwy pól, operatory i etapy zostają, każda wartość jest zamieniana na `?`, klucz głębiej niż pięć poziomów lub przekroczenie długości daje `null`. Tablica nie jest poziomem, więc trzy `andWhere()` w Yii (`$and` w `$and` z `$in`) mieszczą się z zapasem. Głębokość nie chroni przed wyciekiem, bo wartość na każdym poziomie jest `?`. Ogranicza tylko strukturę, której nikt nie odczyta.
 
 ## Konsekwencje
 

@@ -89,14 +89,30 @@ Założenie: nazwy pól, tabel, kolekcji i parametrów są kodem aplikacji, nie 
 | Zagnieżdżony komentarz `/* /* */ */` | Nie występuje | `query: null`, `op` pusty |
 | `E'...'`, `$$...$$`, `$tag$...$tag$` | Nie występuje | Literał, zamiana na `?`. W `E'...'` backslash jest znakiem ucieczki. Niedomknięty daje `null`. Inny `$` niż `$cyfry` i otwarcie literału daje `null` |
 
-**MongoDB.** Postać tekstowa: kolekcja, potem sekcje polecenia w kolejności `filter`, `update`, `pipeline`, `sort`, `limit`, `skip`, każda jako `nazwa{...}` lub `nazwa:?`. Klucze w sekcji w kolejności z polecenia, bez spacji, np. `contacts filter{externalId:?,tenantId:?} sort{updatedAt:?} limit:?`.
+**MongoDB.** Postać tekstowa to nazwa kolekcji, a po niej sekcje polecenia w kolejności `filter`, `update`, `pipeline`, `sort`, `limit`, `skip`. Każda sekcja ma postać `nazwa{...}`, `nazwa[...]` albo `nazwa:?`. Klucze w sekcji stoją w kolejności z polecenia, bez spacji, np. `contacts filter{externalId:?,tenantId:?} sort{updatedAt:?} limit:?`. Normalizator czyta dokument polecenia z `CommandStartedEvent::getCommand()` i bierze z niego tylko pola z tabeli poleceń. Pola `lsid`, `$clusterTime`, `txnNumber`, `$db`, `$readPreference`, `batchSize`, `projection` i każde inne nigdy nie trafiają do `query`.
+
+| Polecenie | Kolekcja | Sekcje |
+|---|---|---|
+| `find` | wartość `find` | `filter` z `filter`, `sort`, `limit`, `skip` |
+| `count` | wartość `count` | `filter` z `query`, `limit`, `skip` |
+| `findAndModify` | wartość `findAndModify` | `filter` z `query`, `update` z `update`, `sort` |
+| `update` | wartość `update` | `filter` z `updates[0].q`, `update` z `updates[0].u`. Więcej niż jedna instrukcja w `updates` daje `null` |
+| `delete` | wartość `delete` | `filter` z `deletes[0].q`. Więcej niż jedna instrukcja w `deletes` daje `null` |
+| `aggregate` | wartość `aggregate` | `pipeline` z `pipeline`, np. `orders pipeline[{$match:{status:?}},{$group:{_id:?,n:{$sum:?}}}]` |
+| `insert` | wartość `insert` | Tylko liczba dokumentów w `documents`, np. `contacts n:3` |
+| `getMore` | wartość `collection` | Brak, np. `contacts` |
+| Każde inne, np. `createIndexes`, `killCursors`, `distinct` | | `query: null` |
 
 | Element | Reguła |
 |---|---|
-| Nazwy pól, operatory `$set`, `$match`, etapy potoku | Zostają |
-| Każda wartość, także liczba w `sort` i `limit` | Zamiana na `?` |
-| `insert` | Tylko kolekcja i liczba dokumentów, np. `contacts n:3` |
-| Zagnieżdżenie ponad trzy poziomy | `query: null` |
+| Nazwy pól, operatory `$set`, `$in`, `$match`, etapy potoku | Zostają |
+| Każda wartość, także liczba w `sort` i `limit`, wartość logiczna i `null` | Zamiana na `?` |
+| Obiekt BSON (`ObjectId`, `UTCDateTime`, `Regex`, `Binary`, `Decimal128` i inne) | Jedna wartość, zamiana na `?`, bez zaglądania do środka |
+| Tablica | `[...]` z elementami po przecinku, każdy według tych reguł. Tablice nie są scalane: `$in:[?,?]` i `$in:[?,?,?]` to różne `query` |
+| Brak sekcji w poleceniu | Sekcja pominięta. Pusty filtr daje `filter{}` |
+| Zagnieżdżenie | Poziomy liczy się po kluczach: klucze sekcji i klucze etapu `pipeline` to poziom pierwszy, klucze dokumentu pod kluczem to kolejny, tablica nie jest poziomem. Klucz ponad pięć poziomów daje `query: null`. `filter{$and:[{$and:[{tenantId:?},{status:{$in:[?,?]}}]},{k:?}]}`, czyli trzy `andWhere()` w Yii, ma cztery poziomy, a `filter{a:{b:{c:{d:{e:{f:?}}}}}}` sześć |
+| Pusta kolekcja albo nazwa pola, nazwa ze znakiem `{`, `}`, `[`, `]`, `,`, `:`, białym (także Unicode, np. NBSP), sterującym albo nie w UTF-8 | `query: null` |
+| Kolekcja, która nie jest tekstem (np. `aggregate: 1` na bazie) | `query: null` |
 | Długość ponad `maxQueryLength` | `query: null`, bez obcinania |
 
 Wartości parametrów, dokumenty, adresy URL z parametrami, dane uwierzytelniające i ścieżki bezwzględne nigdy nie trafiają do paczki.

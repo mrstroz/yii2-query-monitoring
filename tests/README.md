@@ -70,6 +70,8 @@ Komentarz wyjaśnia powód, ograniczenie platformy albo nietypowy kontrakt. Nie 
 
 ## Testy wymagające środowiska
 
+Testy MongoDB w `Unit/` budują dokumenty poleceń z canonical Extended JSON przez `MongoDB\BSON\Document`, więc wymagają `ext-mongodb` z obrazu. Serwera nie potrzebują i przechodzą w poleceniu bez baz.
+
 Test sięgający po urządzenie, limit systemowy albo uprawnienia dokumentuje u siebie, czego wymaga: Linux, proces bez uprawnień roota, dostępne `/dev/full`, `ulimit -f`. Jedno zdanie w komentarzu nad metodą wystarczy, ale musi być — bez niego czerwony wynik na innej maszynie wygląda jak błąd pakietu.
 
 ## Uruchamianie
