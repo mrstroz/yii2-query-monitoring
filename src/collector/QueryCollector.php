@@ -76,13 +76,7 @@ final class QueryCollector
      */
     public function add(QueryEntry $entry): void
     {
-        if (!$this->isAccepting()) {
-            return;
-        }
-        if ($this->full || count($this->entries) >= $this->maxEntries) {
-            $this->full = true;
-            $this->drop();
-
+        if (!$this->isAccepting() || $this->dropIfFull()) {
             return;
         }
         $bytes = strlen(json_encode($entry->toArray(), QueryBatch::JSON_FLAGS));
@@ -95,6 +89,27 @@ final class QueryCollector
         $this->entries[] = $entry;
         $this->entryLengths[] = $bytes;
         $this->entryBytes += $bytes;
+    }
+
+    /**
+     * Counts one entry in `dropped` when the collector would not store any further entry, so the
+     * caller can skip building it. True means the entry would not be stored and `dropped` already
+     * counts it; false means {@see self::add()} decides, the byte limit included, because that
+     * depends on the entry's length. False without counting while {@see self::isAccepting()} is false.
+     */
+    public function dropIfFull(): bool
+    {
+        if (!$this->isAccepting()) {
+            return false;
+        }
+        if ($this->full || count($this->entries) >= $this->maxEntries) {
+            $this->full = true;
+            $this->drop();
+
+            return true;
+        }
+
+        return false;
     }
 
     /**

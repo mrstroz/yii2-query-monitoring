@@ -5,16 +5,18 @@ declare(strict_types=1);
 namespace mrstroz\querymonitoring\tests\Unit\sql;
 
 use mrstroz\querymonitoring\batch\BatchType;
+use mrstroz\querymonitoring\batch\QueryEntry;
 use mrstroz\querymonitoring\collector\QueryCollector;
 use mrstroz\querymonitoring\sql\Recorder;
 use mrstroz\querymonitoring\sql\SqlNormalizer;
 use mrstroz\querymonitoring\support\CallerFrames;
 use mrstroz\querymonitoring\support\Guard;
 use mrstroz\querymonitoring\tests\Unit\LoggedTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * YQM-9, spec 01 §6: a recorder whose collector does not accept does nothing, not even normalise;
- * a failure inside it is swallowed with one package error.
+ * a full collector only counts the query (spec 01 §2); a failure inside it is swallowed with one package error.
  */
 final class RecorderTest extends LoggedTestCase
 {
@@ -48,6 +50,37 @@ final class RecorderTest extends LoggedTestCase
         $this->recorder($this->brokenNormalizer(), $collector)->record('SELECT 1', 1.0, null);
 
         self::assertSame([], $this->errors());
+    }
+
+    /**
+     * spec 01 §2: after a limit stops intake, a query only increases `dropped`.
+     *
+     * @return iterable<string, array{QueryCollector}>
+     */
+    public static function provideFullCollectorCases(): iterable
+    {
+        $byEntries = new QueryCollector('app', BatchType::Http, 'req_1', 'host', maxEntries: 1);
+        $byEntries->add(QueryEntry::success('mysql', 'db', 'select', 'SELECT ?', 1.0, []));
+        yield 'entry limit' => [$byEntries];
+
+        $byBytes = new QueryCollector('app', BatchType::Http, 'req_1', 'host', maxBatchBytes: 600);
+        $byBytes->add(QueryEntry::success('mysql', 'db', 'select', str_repeat('x', 1000), 1.0, []));
+        yield 'byte limit' => [$byBytes];
+    }
+
+    #[DataProvider('provideFullCollectorCases')]
+    public function testFullCollectorStopsRecorderBeforeNormalising(QueryCollector $collector): void
+    {
+        $count = $collector->count();
+        $dropped = $collector->dropped();
+
+        $recorder = $this->recorder($this->brokenNormalizer(), $collector);
+        $recorder->record('SELECT 1', 1.0, null);
+        $recorder->record('SELECT 2', 1.0, '42000');
+
+        self::assertSame([], $this->errors(), 'the broken normaliser was not reached');
+        self::assertSame($dropped + 2, $collector->dropped(), 'each query is counted as dropped');
+        self::assertSame($count, $collector->count());
     }
 
     public function testFailureIsSwallowedWithOnePackageError(): void

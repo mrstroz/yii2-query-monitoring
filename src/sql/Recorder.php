@@ -42,7 +42,8 @@ final class Recorder
     {
         $this->guard->run(function () use ($sql, $timeMs, $sqlState): void {
             // After finalisation and while the adapter sends, a query is not an entry: skip the normaliser too.
-            if (!$this->collector->isAccepting()) {
+            // Once the batch is full the query only counts in `dropped`: no trace, no normaliser.
+            if (!$this->collector->isAccepting() || $this->collector->dropIfFull()) {
                 return;
             }
             // Called right here, in the closure: frame 0 of the limit is this closure (spec 01 §2).
