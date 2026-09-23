@@ -16,7 +16,7 @@ an adapter you write. MongoDB and console commands are planned and not available
 
 - PHP 8.1 or newer
 - Yii 2.0.55 or newer
-- Composer 2 (`caller` paths are relative to the root package Composer reports)
+- Composer 2.1 or newer (`caller` paths are relative to the root package Composer reports)
 - PHP-FPM request model (no RoadRunner or Swoole)
 
 ## Installation

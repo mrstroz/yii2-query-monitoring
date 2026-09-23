@@ -82,7 +82,7 @@ Z tego wynika reszta: wyjątek w kolektorze lub adapterze jest przechwytywany i 
 | CI | GitHub Actions | Matryca PHP 8.1 do 8.4 |
 | Produkcja | Aplikacje Yii 2 na PHP-FPM | Każda aplikacja podaje własne `app` w konfiguracji |
 
-Wymagania: PHP 8.1 lub nowszy, Yii 2.0.55 lub nowszy, Composer 2 (korzeń projektu dla `caller`, [ADR 0009](../adr/0009-caller-i-route-w-formacie-v2.md)). Starsze wydania 2.0.x mają security advisories, przez które domyślna polityka Composera 2.10 ich nie instaluje. `yiisoft/yii2-mongodb` i `ext-mongodb` są zależnościami opcjonalnymi w `suggest`. Aplikacja tylko z SQL instaluje pakiet bez MongoDB.
+Wymagania: PHP 8.1 lub nowszy, Yii 2.0.55 lub nowszy, Composer 2.1 lub nowszy (korzeń projektu dla `caller`, [ADR 0009](../adr/0009-caller-i-route-w-formacie-v2.md)). Starsze wydania 2.0.x mają security advisories, przez które domyślna polityka Composera 2.10 ich nie instaluje. `yiisoft/yii2-mongodb` i `ext-mongodb` są zależnościami opcjonalnymi w `suggest`. Aplikacja tylko z SQL instaluje pakiet bez MongoDB.
 
 ## 8. Słownik
 

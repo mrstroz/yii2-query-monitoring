@@ -48,4 +48,4 @@ These come from the ADRs and are easy to violate by accident:
 - Normalisation replaces literals with `?` and returns `query: null` when unsure (ADR-0004). Rules differ per dialect: `"..."` is a string in MySQL and an identifier in PostgreSQL. Only MySQL's default `sql_mode` is supported.
 - Parameter values, MongoDB documents, credentials and absolute paths never enter a batch. Field, table and collection names, and paths relative to the project root in `caller`, are treated as code, not data.
 - `yiisoft/yii2-mongodb` and `ext-mongodb` are optional (`suggest`). SQL-only applications must install without them.
-- Target: PHP 8.1+, Yii 2.0.55+, Composer 2, PHP-FPM request model. No RoadRunner/Swoole, no NFS.
+- Target: PHP 8.1+, Yii 2.0.55+, Composer 2.1+, PHP-FPM request model. No RoadRunner/Swoole, no NFS.

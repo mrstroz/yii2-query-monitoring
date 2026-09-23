@@ -32,7 +32,7 @@ Wpis dostaje pole `caller`: najwyżej trzy ramki aplikacji z pierwszych 30 ramek
 - `[]` nie odróżnia „brak ramki aplikacji w granicach 30” od „zapytanie wystawił framework”. Głębsze ścieżki (`findWith`, zachowania, domknięcia w `Connection::cache()`) mogą dać `[]`, choć kod aplikacji je wywołał.
 - Zapytanie wystawione w kodzie najwyższego poziomu samego skryptu wejściowego dostaje `[]`, bo ta ramka jest wykluczona.
 - Adapter czytający `$batch->module`, `->controller` albo `->action` przestaje działać. Przed wydaniem to koszt zerowy, po wydaniu byłby zmianą łamiącą.
-- Pakiet wymaga Composera 2 (`composer-runtime-api` `^2.0`), bo korzeń projektu bierze z `Composer\InstalledVersions`.
+- Pakiet wymaga Composera 2.1 (`composer-runtime-api` `^2.1`), bo korzeń projektu bierze z `Composer\InstalledVersions::getRootPackage()`, a klucz `install_path` pakiet główny ma dopiero od Composera 2.1.
 
 **Wymagania:** katalog vendor, korzeń projektu, `src/` pakietu i skrypt wejściowy liczone raz na proces; ramki porównywane prefiksami, bez `realpath()` na każdą ramkę. Skrypt wejściowy to pierwszy plik z `get_included_files()`, który nie jest plikiem `auto_prepend_file`: kolejność obu zależy od SAPI, bo CLI wpisuje skrypt główny przed plikiem prepend. Korzeń projektu z `InstalledVersions::getRootPackage()`, nie z katalogu nad vendor, bo `vendor-dir` może leżeć głębiej, np. `lib/vendor`. Ślad brany w `Recorder::record()` wewnątrz strażnika i po sprawdzeniu, że kolektor przyjmuje wpisy.
 
