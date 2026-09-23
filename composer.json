@@ -15,11 +15,11 @@
         "friendsofphp/php-cs-fixer": "^3.64",
         "phpstan/phpstan": "^2.1",
         "phpunit/phpunit": "^10.5",
-        "yiisoft/yii2-mongodb": "^3.0.3"
+        "yiisoft/yii2-mongodb": "^3.0.4"
     },
     "suggest": {
-        "ext-mongodb": "Required to monitor MongoDB connections.",
-        "yiisoft/yii2-mongodb": "Required to monitor MongoDB connections."
+        "ext-mongodb": "Required to monitor MongoDB connections, 1.20.1 or newer.",
+        "yiisoft/yii2-mongodb": "Required to monitor MongoDB connections, 3.0.4 or newer."
     },
     "autoload": {
         "psr-4": {

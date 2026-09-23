@@ -1,0 +1,676 @@
+{
+    "delete-all": {
+        "probe": "documents",
+        "command": {
+            "delete": "qm_probe_docs",
+            "ordered": true,
+            "$db": "qm",
+            "deletes": [
+                {
+                    "q": {},
+                    "limit": {
+                        "$numberInt": "0"
+                    }
+                }
+            ]
+        },
+        "reply": {
+            "n": {
+                "$numberInt": "0"
+            },
+            "ok": {
+                "$numberDouble": "1.0"
+            }
+        },
+        "event": "succeeded"
+    },
+    "insert": {
+        "probe": "documents",
+        "command": {
+            "insert": "qm_probe_docs",
+            "ordered": true,
+            "$db": "qm",
+            "documents": [
+                {
+                    "k": {
+                        "$numberInt": "1"
+                    },
+                    "tags": [
+                        "a",
+                        "b"
+                    ],
+                    "_id": {
+                        "$oid": "6ab408ba951fc129f40b9eb2"
+                    }
+                },
+                {
+                    "k": {
+                        "$numberInt": "2"
+                    },
+                    "tags": [
+                        "c"
+                    ],
+                    "_id": {
+                        "$oid": "6ab408ba951fc129f40b9eb3"
+                    }
+                },
+                {
+                    "k": {
+                        "$numberInt": "3"
+                    },
+                    "_id": {
+                        "$oid": "6ab408ba951fc129f40b9eb4"
+                    }
+                }
+            ]
+        },
+        "reply": {
+            "n": {
+                "$numberInt": "3"
+            },
+            "ok": {
+                "$numberDouble": "1.0"
+            }
+        },
+        "event": "succeeded"
+    },
+    "find": {
+        "probe": "documents",
+        "command": {
+            "find": "qm_probe_docs",
+            "filter": {
+                "k": {
+                    "$in": [
+                        {
+                            "$numberInt": "1"
+                        },
+                        {
+                            "$numberInt": "2"
+                        }
+                    ]
+                },
+                "tags": "a"
+            },
+            "limit": {
+                "$numberInt": "5"
+            },
+            "skip": {
+                "$numberInt": "1"
+            },
+            "sort": {
+                "k": {
+                    "$numberInt": "-1"
+                }
+            },
+            "$db": "qm"
+        },
+        "reply": {
+            "cursor": {
+                "firstBatch": [],
+                "id": {
+                    "$numberInt": "0"
+                },
+                "ns": "qm.qm_probe_docs"
+            },
+            "ok": {
+                "$numberDouble": "1.0"
+            }
+        },
+        "event": "succeeded"
+    },
+    "update": {
+        "probe": "documents",
+        "command": {
+            "update": "qm_probe_docs",
+            "ordered": true,
+            "$db": "qm",
+            "updates": [
+                {
+                    "q": {
+                        "k": {
+                            "$numberInt": "1"
+                        }
+                    },
+                    "u": {
+                        "$set": {
+                            "v": "x"
+                        }
+                    },
+                    "upsert": false,
+                    "multi": true
+                }
+            ]
+        },
+        "reply": {
+            "n": {
+                "$numberInt": "1"
+            },
+            "nModified": {
+                "$numberInt": "1"
+            },
+            "ok": {
+                "$numberDouble": "1.0"
+            }
+        },
+        "event": "succeeded"
+    },
+    "delete": {
+        "probe": "documents",
+        "command": {
+            "delete": "qm_probe_docs",
+            "ordered": true,
+            "$db": "qm",
+            "deletes": [
+                {
+                    "q": {
+                        "k": {
+                            "$numberInt": "3"
+                        }
+                    },
+                    "limit": {
+                        "$numberInt": "0"
+                    }
+                }
+            ]
+        },
+        "reply": {
+            "n": {
+                "$numberInt": "1"
+            },
+            "ok": {
+                "$numberDouble": "1.0"
+            }
+        },
+        "event": "succeeded"
+    },
+    "aggregate": {
+        "probe": "documents",
+        "command": {
+            "aggregate": "qm_probe_docs",
+            "pipeline": [
+                {
+                    "$match": {
+                        "k": {
+                            "$gt": {
+                                "$numberInt": "0"
+                            }
+                        }
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$k",
+                        "n": {
+                            "$sum": {
+                                "$numberInt": "1"
+                            }
+                        }
+                    }
+                }
+            ],
+            "allowDiskUse": false,
+            "cursor": {},
+            "$db": "qm"
+        },
+        "reply": {
+            "cursor": {
+                "firstBatch": [
+                    {
+                        "_id": {
+                            "$numberInt": "2"
+                        },
+                        "n": {
+                            "$numberInt": "1"
+                        }
+                    },
+                    {
+                        "_id": {
+                            "$numberInt": "1"
+                        },
+                        "n": {
+                            "$numberInt": "1"
+                        }
+                    }
+                ],
+                "id": {
+                    "$numberInt": "0"
+                },
+                "ns": "qm.qm_probe_docs"
+            },
+            "ok": {
+                "$numberDouble": "1.0"
+            }
+        },
+        "event": "succeeded"
+    },
+    "count": {
+        "probe": "documents",
+        "command": {
+            "count": "qm_probe_docs",
+            "query": {
+                "k": {
+                    "$gte": {
+                        "$numberInt": "1"
+                    }
+                }
+            },
+            "$db": "qm"
+        },
+        "reply": {
+            "n": {
+                "$numberInt": "2"
+            },
+            "ok": {
+                "$numberDouble": "1.0"
+            }
+        },
+        "event": "succeeded"
+    },
+    "find-batch": {
+        "probe": "documents",
+        "command": {
+            "find": "qm_probe_docs",
+            "filter": {},
+            "batchSize": {
+                "$numberInt": "1"
+            },
+            "$db": "qm"
+        },
+        "reply": {
+            "cursor": {
+                "firstBatch": [
+                    {
+                        "_id": {
+                            "$oid": "6ab408ba951fc129f40b9eb2"
+                        },
+                        "k": {
+                            "$numberInt": "1"
+                        },
+                        "tags": [
+                            "a",
+                            "b"
+                        ],
+                        "v": "x"
+                    }
+                ],
+                "id": {
+                    "$numberLong": "3617396931430429707"
+                },
+                "ns": "qm.qm_probe_docs"
+            },
+            "ok": {
+                "$numberDouble": "1.0"
+            }
+        },
+        "event": "succeeded"
+    },
+    "getMore": {
+        "probe": "documents",
+        "command": {
+            "getMore": {
+                "$numberLong": "3617396931430429707"
+            },
+            "collection": "qm_probe_docs",
+            "batchSize": {
+                "$numberInt": "1"
+            },
+            "$db": "qm"
+        },
+        "reply": {
+            "cursor": {
+                "nextBatch": [
+                    {
+                        "_id": {
+                            "$oid": "6ab408ba951fc129f40b9eb3"
+                        },
+                        "k": {
+                            "$numberInt": "2"
+                        },
+                        "tags": [
+                            "c"
+                        ]
+                    }
+                ],
+                "id": {
+                    "$numberLong": "3617396931430429707"
+                },
+                "ns": "qm.qm_probe_docs"
+            },
+            "ok": {
+                "$numberDouble": "1.0"
+            }
+        },
+        "event": "succeeded"
+    },
+    "getMore-last": {
+        "probe": "documents",
+        "command": {
+            "getMore": {
+                "$numberLong": "3617396931430429707"
+            },
+            "collection": "qm_probe_docs",
+            "batchSize": {
+                "$numberInt": "1"
+            },
+            "$db": "qm"
+        },
+        "reply": {
+            "cursor": {
+                "nextBatch": [],
+                "id": {
+                    "$numberInt": "0"
+                },
+                "ns": "qm.qm_probe_docs"
+            },
+            "ok": {
+                "$numberDouble": "1.0"
+            }
+        },
+        "event": "succeeded"
+    },
+    "findAndModify": {
+        "probe": "documents",
+        "command": {
+            "findAndModify": "qm_probe_docs",
+            "query": {
+                "k": {
+                    "$numberInt": "2"
+                }
+            },
+            "update": {
+                "$set": {
+                    "v": "y"
+                }
+            },
+            "$db": "qm"
+        },
+        "reply": {
+            "lastErrorObject": {
+                "n": {
+                    "$numberInt": "1"
+                },
+                "updatedExisting": true
+            },
+            "value": {
+                "_id": {
+                    "$oid": "6ab408ba951fc129f40b9eb3"
+                },
+                "k": {
+                    "$numberInt": "2"
+                },
+                "tags": [
+                    "c"
+                ]
+            },
+            "ok": {
+                "$numberDouble": "1.0"
+            }
+        },
+        "event": "succeeded"
+    },
+    "find-unfinished": {
+        "probe": "documents",
+        "command": {
+            "find": "qm_probe_docs",
+            "filter": {},
+            "batchSize": {
+                "$numberInt": "1"
+            },
+            "$db": "qm"
+        },
+        "reply": {
+            "cursor": {
+                "firstBatch": [
+                    {
+                        "_id": {
+                            "$oid": "6ab408ba951fc129f40b9eb2"
+                        },
+                        "k": {
+                            "$numberInt": "1"
+                        },
+                        "tags": [
+                            "a",
+                            "b"
+                        ],
+                        "v": "x"
+                    }
+                ],
+                "id": {
+                    "$numberLong": "2104370993249471033"
+                },
+                "ns": "qm.qm_probe_docs"
+            },
+            "ok": {
+                "$numberDouble": "1.0"
+            }
+        },
+        "event": "succeeded"
+    },
+    "killCursors": {
+        "probe": "documents",
+        "command": {
+            "killCursors": "qm_probe_docs",
+            "cursors": [
+                {
+                    "$numberLong": "2104370993249471033"
+                }
+            ],
+            "$db": "qm"
+        },
+        "reply": {
+            "cursorsKilled": [
+                {
+                    "$numberLong": "2104370993249471033"
+                }
+            ],
+            "cursorsNotFound": [],
+            "cursorsAlive": [],
+            "cursorsUnknown": [],
+            "ok": {
+                "$numberDouble": "1.0"
+            }
+        },
+        "event": "succeeded"
+    },
+    "find-objectid": {
+        "probe": "documents",
+        "command": {
+            "find": "qm_contact",
+            "filter": {
+                "_id": {
+                    "$oid": "6ab408ba951fc129f40b9eb5"
+                }
+            },
+            "$db": "qm"
+        },
+        "reply": {
+            "cursor": {
+                "id": {
+                    "$numberInt": "0"
+                },
+                "ns": "qm.qm_contact",
+                "firstBatch": []
+            },
+            "ok": {
+                "$numberDouble": "1.0"
+            }
+        },
+        "event": "succeeded"
+    },
+    "insert-writeErrors": {
+        "probe": "errors",
+        "command": {
+            "insert": "qm_probe_errors",
+            "ordered": true,
+            "$db": "qm",
+            "documents": [
+                {
+                    "_id": "qm-dup"
+                }
+            ]
+        },
+        "reply": {
+            "n": {
+                "$numberInt": "0"
+            },
+            "writeErrors": [
+                {
+                    "index": {
+                        "$numberInt": "0"
+                    },
+                    "code": {
+                        "$numberInt": "11000"
+                    },
+                    "errmsg": "E11000 duplicate key error collection: qm.qm_probe_errors index: _id_ dup key: { _id: \"qm-dup\" }",
+                    "keyPattern": {
+                        "_id": {
+                            "$numberInt": "1"
+                        }
+                    },
+                    "keyValue": {
+                        "_id": "qm-dup"
+                    }
+                }
+            ],
+            "ok": {
+                "$numberDouble": "1.0"
+            }
+        },
+        "event": "succeeded"
+    },
+    "insert-standalone-w2": {
+        "probe": "errors",
+        "command": {
+            "insert": "qm_probe_errors",
+            "ordered": true,
+            "$db": "qm",
+            "writeConcern": {
+                "w": {
+                    "$numberInt": "2"
+                }
+            },
+            "documents": [
+                {
+                    "k": "w2",
+                    "_id": {
+                        "$oid": "6ab408ea913db15f0201f212"
+                    }
+                }
+            ]
+        },
+        "reply": {
+            "ok": {
+                "$numberDouble": "0.0"
+            },
+            "errmsg": "cannot use 'w' > 1 when a host is not replicated",
+            "code": {
+                "$numberInt": "2"
+            },
+            "codeName": "BadValue"
+        },
+        "code": 2,
+        "event": "failed"
+    },
+    "insert-writeConcernError": {
+        "probe": "errors",
+        "command": {
+            "insert": "qm_probe_errors",
+            "ordered": true,
+            "$db": "qm",
+            "documents": [
+                {
+                    "k": "wce",
+                    "_id": {
+                        "$oid": "6ab408ea913db15f0201f214"
+                    }
+                }
+            ]
+        },
+        "reply": {
+            "n": {
+                "$numberInt": "1"
+            },
+            "writeConcernError": {
+                "code": {
+                    "$numberInt": "64"
+                },
+                "errmsg": "qm-probe"
+            },
+            "ok": {
+                "$numberDouble": "1.0"
+            }
+        },
+        "event": "succeeded"
+    },
+    "insert-both": {
+        "probe": "errors",
+        "command": {
+            "insert": "qm_probe_errors",
+            "ordered": true,
+            "$db": "qm",
+            "documents": [
+                {
+                    "_id": "qm-dup"
+                }
+            ]
+        },
+        "reply": {
+            "n": {
+                "$numberInt": "0"
+            },
+            "writeErrors": [
+                {
+                    "index": {
+                        "$numberInt": "0"
+                    },
+                    "code": {
+                        "$numberInt": "11000"
+                    },
+                    "errmsg": "E11000 duplicate key error collection: qm.qm_probe_errors index: _id_ dup key: { _id: \"qm-dup\" }",
+                    "keyPattern": {
+                        "_id": {
+                            "$numberInt": "1"
+                        }
+                    },
+                    "keyValue": {
+                        "_id": "qm-dup"
+                    }
+                }
+            ],
+            "writeConcernError": {
+                "code": {
+                    "$numberInt": "64"
+                },
+                "errmsg": "qm-probe"
+            },
+            "ok": {
+                "$numberDouble": "1.0"
+            }
+        },
+        "event": "succeeded"
+    },
+    "find-failed": {
+        "probe": "errors",
+        "command": {
+            "find": "qm_probe_errors",
+            "filter": {
+                "$qmInvalid": {
+                    "$numberInt": "1"
+                }
+            },
+            "$db": "qm"
+        },
+        "reply": {
+            "ok": {
+                "$numberDouble": "0.0"
+            },
+            "errmsg": "unknown top level operator: $qmInvalid. If you have a field name that starts with a '$' symbol, consider using $getField or $setField.",
+            "code": {
+                "$numberInt": "2"
+            },
+            "codeName": "BadValue"
+        },
+        "code": 2,
+        "event": "failed"
+    }
+}

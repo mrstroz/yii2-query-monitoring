@@ -57,6 +57,8 @@ services:
 
   mongodb:
     image: mongo:7
+    # failCommand fail points for writeConcernError and CommandFailed in tests; a standalone server has no other way (YQM-32).
+    command: ["--setParameter", "enableTestCommands=1"]
     tmpfs:
       - /data/db
     healthcheck:

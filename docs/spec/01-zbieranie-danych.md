@@ -9,7 +9,7 @@ Zdanie, którego kod jeszcze nie realizuje, opisuje zachowanie docelowe. Odwoła
 Pakiet dostarcza komponent aplikacji Yii rejestrowany w `bootstrap`. Przy starcie komponent:
 
 1. Ustawia `commandMap` dla drivera każdego połączenia SQL z listy `connections` na klasę `Command` pakietu. Połączenie z modułu (`admin/db`) jest pobierane przez `getModule()`, więc moduł ładuje się już w bootstrapie.
-2. Rejestruje subskrybenta zdarzeń sterownika w każdym połączeniu MongoDB z listy.
+2. Rejestruje subskrybenta zdarzeń sterownika w każdym połączeniu MongoDB z listy ([§3](#3-źródło-mongodb)).
 3. Podpina się pod `EVENT_BEFORE_ACTION` i `EVENT_AFTER_REQUEST` aplikacji.
 4. Rejestruje callback przez `register_shutdown_function`.
 
@@ -25,9 +25,9 @@ Pakiet dostarcza komponent aplikacji Yii rejestrowany w `bootstrap`. Przy starci
 | `adapter` | Klasa, obiekt lub `callable`. Brak oznacza adapter plikowy | `null` |
 | `file` | Ustawienia adaptera plikowego, [03 §3](03-adaptery-wyjsciowe.md#3-domyślny-adapter-plikowy) | `[]` |
 
-Połączenie spoza listy nie jest mierzone. Połączenie tworzone dynamicznie w kodzie i własna klasa `Command` są poza zakresem.
+Połączenie spoza listy nie jest mierzone, z jednym wyjątkiem w MongoDB. `Manager` o identycznym `dsn` (ten sam napis) i identycznych tablicach `options` i `driverOptions` (te same klucze w tej samej kolejności i te same wartości) dzielą klienta sterownika, a sterownik oddaje zdarzenia klienta subskrybentom każdego z nich. Inna kolejność kluczy albo dodany `disableClientPersistence => false` daje osobnego klienta. Połączenia z listy o wspólnym kliencie mają jednego subskrybenta, a ich wpisy dostają `conn` pierwszego z nich na liście. Polecenie połączenia spoza listy, które dzieli klienta z połączeniem z listy, jest wpisem z tym `conn`, gdy w procesie istnieje już `Manager` któregoś z tych połączeń z listy. Połączenie z `driverOptions['disableClientPersistence'] => true` ma własnego klienta. Klucz klienta liczony jest przy każdym otwarciu z wartości, z którymi `yii2-mongodb` tworzy `Manager`, a `conn` to pierwsze id z listy, którego połączenie ma w tej chwili ten sam klucz. Połączenie tworzone dynamicznie w kodzie i własna klasa `Command` są poza zakresem.
 
-Pakiet nie łączy się z bazą w bootstrapie: driver odczytuje z prefiksu `dsn`. Z jednym `Yii::error` pomijane są, a reszta listy działa: nieznane id połączenia lub modułu, połączenie bez `dsn` (np. tylko `masters`/`slaves`), driver inny niż `mysql` i `pgsql`, połączenie z własnym `commandClass` albo własnym `commandMap` dla swojego drivera oraz ten sam obiekt połączenia pod drugim id z listy (liczy się pierwsze id). Błędna konfiguracja pakietu (np. brak `app`, `maxQueryLength` poniżej `3`, przy `adapter: null` także nieznany klucz `file`, pusty `file.path` lub nieznany alias w nim albo `file.maxSize` lub `file.maxFiles` poniżej `1`) wyłącza pakiet w tym procesie: bez podmiany `Command`, bez subskrybenta MongoDB i bez wysyłki, z jednym `Yii::error`. Wersja Yii, w której `yii\db\Command` nie ma prywatnych pól `_isolationLevel` i `_retryHandler` używanych przez pomiar ([ADR-0001](../adr/0001-podmiana-klasy-command-zamiast-profilera.md)), wyłącza tylko źródło SQL: połączenia SQL z listy są pomijane z jednym `Yii::error`, a połączenia MongoDB są mierzone. Aplikacja odpowiada normalnie.
+Pakiet nie łączy się z bazą w bootstrapie: driver odczytuje z prefiksu `dsn`. Z jednym `Yii::error` pomijane są, a reszta listy działa: nieznane id połączenia lub modułu, połączenie bez `dsn` (np. tylko `masters`/`slaves`), driver inny niż `mysql` i `pgsql`, połączenie z własnym `commandClass` albo własnym `commandMap` dla swojego drivera oraz ten sam obiekt połączenia pod drugim id z listy (liczy się pierwsze id). W MongoDB pomijane jest połączenie, gdy nie ma `ext-mongodb`. Połączenie z listy, które ma ten sam klucz klienta co wcześniejsze id, jest mierzone pod `conn` tego id. Błędna konfiguracja pakietu (np. brak `app`, `maxQueryLength` poniżej `3`, przy `adapter: null` także nieznany klucz `file`, pusty `file.path` lub nieznany alias w nim albo `file.maxSize` lub `file.maxFiles` poniżej `1`) wyłącza pakiet w tym procesie: bez podmiany `Command`, bez subskrybenta MongoDB i bez wysyłki, z jednym `Yii::error`. Wersja Yii, w której `yii\db\Command` nie ma prywatnych pól `_isolationLevel` i `_retryHandler` używanych przez pomiar ([ADR-0001](../adr/0001-podmiana-klasy-command-zamiast-profilera.md)), wyłącza tylko źródło SQL: połączenia SQL z listy są pomijane z jednym `Yii::error`, a połączenia MongoDB są mierzone. Aplikacja odpowiada normalnie.
 
 ## 2. Źródło SQL
 
@@ -48,7 +48,7 @@ Pakiet dostarcza klasę rozszerzającą `yii\db\Command`. Podmiana przez `comman
 
 ## 3. Źródło MongoDB
 
-Pakiet rejestruje `MongoDB\Driver\Monitoring\CommandSubscriber` dla `Manager` połączenia z listy. Każda para zdarzeń `CommandStarted` i `CommandSucceeded` lub `CommandFailed` daje jeden wpis, niezależnie od nazwy polecenia: `find` z Active Record, `createIndexes` z migracji, `killCursors` wysłane przez sterownik i dowolne polecenie z `Connection::createCommand()`. Połączenie otwarte przed bootstrapem pakietu jest mierzone od bootstrapu, a po `close()` i ponownym otwarciu dalej. Jeden `Manager` ma najwyżej jednego subskrybenta pakietu.
+Pakiet rejestruje `MongoDB\Driver\Monitoring\CommandSubscriber` przez `addSubscriber()` na `Manager` z publicznego `Connection::$manager`: od razu, gdy połączenie jest otwarte, i w każdym `EVENT_AFTER_OPEN`, bo `open()` po `close()` tworzy nowy `Manager`. Każda para zdarzeń `CommandStarted` i `CommandSucceeded` lub `CommandFailed` daje jeden wpis, niezależnie od nazwy polecenia: `find` z Active Record, `createIndexes` z migracji, `killCursors` wysłane przez sterownik przy porzuconym kursorze i dowolne polecenie z `Connection::createCommand()`. Uzgadniania połączenia (`hello`) sterownik nie zgłasza. Połączenie otwarte przed bootstrapem pakietu jest mierzone od bootstrapu, a po `close()` i ponownym otwarciu dalej. Jeden `Manager` ma najwyżej jednego subskrybenta pakietu.
 
 | Co | Zachowanie |
 |---|---|
@@ -63,8 +63,6 @@ Pakiet rejestruje `MongoDB\Driver\Monitoring\CommandSubscriber` dla `Manager` po
 Zdarzenia początku i końca łączy `requestId`. Przy `CommandStarted` pakiet wylicza `op` i `query` i do zdarzenia końca trzyma tylko te dwie wartości. Dokument polecenia i odpowiedź nie żyją w pakiecie dłużej niż wywołanie subskrybenta. Gdy kolektor nie przyjmuje wpisów (po finalizacji, podczas `send()` adaptera), `CommandStarted` nie zapisuje stanu. Gdy paczka jest pełna ([02 §5](02-format-paczki.md#5-limity)), `CommandStarted` od razu zwiększa `dropped`, bez normalizacji i bez zapisu stanu.
 
 Zdarzenie końca najpierw usuwa zapisany stan, potem buduje wpis tak jak źródło SQL: po finalizacji go pomija, przy pełnej paczce zwiększa `dropped`. Zdarzenie końca bez zapisanego stanu nie daje wpisu i nie zmienia `dropped`. Tak kończy się polecenie rozpoczęte przed instalacją subskrybenta albo takie, którego normalizacja rzuciła wyjątek. `caller` powstaje przy zdarzeniu końca, z granicą 64 ramek jak w [§2](#2-źródło-sql). Wyjątek w subskrybencie jest obsłużony jak w [§6](#6-ochrona-aplikacji) i nie wraca do sterownika.
-
-Sposób dostępu do `Manager` z `yii\mongodb\Connection` jest otwartą kwestią 2 w [00 §9](00-przeglad-i-zakres.md#9-otwarte-kwestie).
 
 ## 4. Żądanie HTTP
 

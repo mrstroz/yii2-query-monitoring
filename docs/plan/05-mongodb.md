@@ -13,7 +13,7 @@
       Gotowe, gdy: test w `Integration/Yii` wykonuje `find` przez `yii\mongodb\Connection` aplikacji testowej lokalnie i w CI na PHP 8.1 i 8.4, `QM_MONGODB_DSN` jest ustawione w compose i w CI tak jak DSN SQL, więc przy `failOnSkipped` pełny bieg niczego nie pomija, a polecenie bez baz z [`tests/README.md`](../../tests/README.md) dostaje `-e QM_MONGODB_DSN=` i nadal przechodzi.
       Obraz ma dziś tylko `pdo_mysql` i `pdo_pgsql` (`docker/php/Dockerfile`), a w `vendor/` nie ma `yii2-mongodb`, więc sonda nie miałaby na czym działać.
 
-- [ ] (^) **YQM-32** Sonda: dostęp do `Manager`, zasięg subskrybenta, kształt poleceń i głębokość stosu
+- [x] (^) **YQM-32** Sonda: dostęp do `Manager`, zasięg subskrybenta, kształt poleceń i głębokość stosu
       Spec: [00 §9](../spec/00-przeglad-i-zakres.md#9-otwarte-kwestie) · ADR: 0010, powstaje w tym zadaniu ([rejestr](../adr/README.md)) · Zależy od: YQM-31
       Gotowe, gdy: pozycja 2 w spec 00 §9 jest rozstrzygnięta, ADR-0010 zapisuje sposób podpięcia i [podział klas](#podział-klas), spec 01 §3 i 00 §7 mówią, jak pakiet dochodzi do `Manager` i od jakich wersji `ext-mongodb` i `yii2-mongodb`, a odpowiedzi na sześć pytań z [ustaleń](#ustalenia-do-yqm-32) stoją w tabeli ryzyk w [`roadmap.md`](roadmap.md). Zakres poleceń, czas, pierwszeństwo kodów błędu i parowanie zdarzeń są już w spec 01 §3; sonda je poprawia tylko wtedy, gdy sterownik na to nie pozwala.
       Sonda nie dodaje kodu w `src/`. Pomiar stosu żyje w `Integration/Yii` jak `CallerProbeTest` z YQM-27.

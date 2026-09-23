@@ -38,6 +38,8 @@ Zmieniasz zachowanie? Najpierw poprawiasz specyfikację, potem kod, i edytujesz 
 | [0006](adr/0006-blad-adaptera-gubi-paczke.md) | Błąd adaptera gubi paczkę, bez ponowień | Zaakceptowany |
 | [0007](adr/0007-zadanie-konsolowe-to-jeden-proces.md) | Zadanie konsolowe to jedno uruchomienie procesu | Zaakceptowany |
 | [0008](adr/0008-architektura-i-konwencje-testow.md) | Architektura testów i wersja PHPUnit | Zaakceptowany |
+| [0009](adr/0009-caller-i-route-w-formacie-v2.md) | `caller` we wpisie i `route` w nagłówku, format `v: 2` | Zaakceptowany |
+| [0010](adr/0010-subskrybent-na-manager-polaczenia-mongodb.md) | Subskrybent sterownika na `Manager` połączenia MongoDB | Zaakceptowany |
 
 Szablon nowego ADR: [`adr/template.md`](adr/template.md).
 

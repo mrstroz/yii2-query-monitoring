@@ -78,11 +78,11 @@ Z tego wynika reszta: wyjątek w kolektorze lub adapterze jest przechwytywany i 
 
 | Środowisko | Gdzie | Uwagi |
 |---|---|---|
-| Lokalne | Docker: MySQL 8, PostgreSQL 16, MongoDB 7 | Testy integracyjne |
+| Lokalne | Docker: MySQL 8, PostgreSQL 16, MongoDB 7 z `enableTestCommands` | Testy integracyjne. Fail pointy `failCommand` dają `writeConcernError`, którego pojedynczy serwer inaczej nie zwraca |
 | CI | GitHub Actions | Matryca PHP 8.1 do 8.4 |
 | Produkcja | Aplikacje Yii 2 na PHP-FPM | Każda aplikacja podaje własne `app` w konfiguracji |
 
-Wymagania: PHP 8.1 lub nowszy, Yii 2.0.55 lub nowszy, Composer 2.1 lub nowszy (korzeń projektu dla `caller`, [ADR 0009](../adr/0009-caller-i-route-w-formacie-v2.md)). Starsze wydania 2.0.x mają security advisories, przez które domyślna polityka Composera 2.10 ich nie instaluje. `yiisoft/yii2-mongodb` i `ext-mongodb` są zależnościami opcjonalnymi w `suggest`. Aplikacja tylko z SQL instaluje pakiet bez MongoDB.
+Wymagania: PHP 8.1 lub nowszy, Yii 2.0.55 lub nowszy, Composer 2.1 lub nowszy (korzeń projektu dla `caller`, [ADR 0009](../adr/0009-caller-i-route-w-formacie-v2.md)). Starsze wydania 2.0.x mają security advisories, przez które domyślna polityka Composera 2.10 ich nie instaluje. `yiisoft/yii2-mongodb` i `ext-mongodb` są zależnościami opcjonalnymi w `suggest`. Aplikacja tylko z SQL instaluje pakiet bez MongoDB. Źródło MongoDB wymaga `yiisoft/yii2-mongodb` 3.0.4 lub nowszego i `ext-mongodb` 1.20.1 lub nowszego ([ADR 0010](../adr/0010-subskrybent-na-manager-polaczenia-mongodb.md)).
 
 ## 8. Słownik
 
@@ -104,7 +104,7 @@ Wymagania: PHP 8.1 lub nowszy, Yii 2.0.55 lub nowszy, Composer 2.1 lub nowszy (k
 | # | Kwestia | Warianty | Co to rozstrzygnie |
 |---|---|---|---|
 | 1 | Nazwa pakietu i namespace | **Rozstrzygnięte 2026-09-22 w YQM-1:** `mrstroz/yii2-query-monitoring` z `mrstroz\querymonitoring` | Zamknięte |
-| 2 | Czy `yii\mongodb\Connection` udostępnia `Manager` sterownika tak, żeby dało się podpiąć `CommandSubscriber` bez podmiany klasy połączenia | `addSubscriber` na `Manager`, albo podmiana klasy `Connection` | Sonda w pierwszym zadaniu etapu E4 |
+| 2 | Czy `yii\mongodb\Connection` udostępnia `Manager` sterownika tak, żeby dało się podpiąć `CommandSubscriber` bez podmiany klasy połączenia | **Rozstrzygnięte 2026-09-23 w YQM-32:** tak, `addSubscriber()` na publicznym `Connection::$manager` w `EVENT_AFTER_OPEN`. `Manager` o tej samej konfiguracji dzielą klienta sterownika i jego subskrybentów ([ADR 0010](../adr/0010-subskrybent-na-manager-polaczenia-mongodb.md)) | Zamknięte |
 | 3a | Limit `maxQueryLength` | **Rozstrzygnięte 2026-09-23 w YQM-29:** 8192 bajty. 2 KB obcinało zapytania, które w rzeczywistej aplikacji mają kilka kilobajtów, a obcięty `query` nie daje się odtworzyć | Zamknięte |
 | 3b | Limity `maxBatchBytes` 256 KB i `maxEntries` 500 | **Rozstrzygnięte 2026-09-23 w YQM-30:** zostają. Pomiar na aplikacji rulewave, 188 żądań HTTP na 75 trasach: p90 to 150 wpisów i 67 KB. 15 żądań przekroczyło limit, najcięższe miały około 9000 zapytań, czyli około 3,9 MB JSON, więc limit musi przycinać przy każdej wartości mieszczącej się w 2 MB pamięci. Oba limity przycinają w tym samym miejscu: 500 wpisów to 198–255 KB, 13 paczek zatrzymał limit wpisów, 2 limit bajtów. `caller` to średnio 145 B, około jednej trzeciej wpisu. Szczyt pamięci przy pełnej paczce sprawdza E6 | Zamknięte |
 | 3c | Rotacja pliku: 10 MB × 5 plików | Zostaje, albo korekta | Wynik testu wydajności w E6 |
