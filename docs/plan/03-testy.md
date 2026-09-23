@@ -67,13 +67,27 @@ Katalogi `tests/app`, `tests/Integration/scenarios`, `tests/Integration/workers`
 
 ### Redukcja parametryzacji bazą (YQM-24)
 
-Tabelę uzupełnia się przed zmianą, nie po niej. Dwa pierwsze wiersze są sprawdzone w kodzie; reszta dopisuje się w trakcie zadania.
+Tabelę uzupełnia się przed zmianą, nie po niej; każdy wiersz jest sprawdzony w kodzie, zanim zacznie się redukcja.
 
-| Metoda | Zestawy tracące silnik | Powód |
-|---|---|---|
-| `FileAdapterComponentTest::testEachFileKeyOverridesOnlyItself` | provider `overrides`, warianty `pgsql` | ustawienia klucza `file`, baza jest tylko nośnikiem połączenia |
-| `FileAdapterComponentTest::testBadFileSettingDisablesThePackageBeforeTheCommandSwap` | provider `badFileSettings`, warianty `pgsql` | walidacja konfiguracji przed podmianą `Command`, nic nie idzie przez sterownik |
-| … | … | … |
+| Metoda | Zestawy przed | Po | Powód |
+|---|---|---|---|
+| `QueryMonitorComponentTest::testListedConnectionsGetMeasuredCommand` | 2 | 1 | czyta wyłącznie nazwy klas `Command` z kontenera; żadne zapytanie nie jest wykonywane |
+| `QueryMonitorComponentTest::testDisabledChangesNothingAndSendsNothing` | 2 | 1 | nazwy klas przy `enabled: false` i brak paczki; pakiet jest wyłączony |
+| `QueryMonitorComponentTest::testRequestWithoutQueriesSendsNothing` | 2 | 1 | trasa `no-queries` z definicji nie wykonuje zapytań |
+| `QueryMonitorComponentTest::testBadConfigurationDisablesPackageWithOneError` | 4 | 2 | walidacja konfiguracji komponentu; odpowiedź aplikacji i brak podmiany `Command` |
+| `ConnectionListTest::testListedConnectionIsNotOpenedByBootstrap` | 2 | 1 | sprawdza, że połączenie **nie** zostało otwarte; brak otwarcia to brak sterownika |
+| `FileAdapterComponentTest::testEachFileKeyOverridesOnlyItself` | 6 | 3 | ustawienia klucza `file`, baza jest tylko nośnikiem połączenia |
+| `FileAdapterComponentTest::testBadFileSettingDisablesThePackageBeforeTheCommandSwap` | 12 | 6 | walidacja ustawień `file` przed podmianą `Command` |
+| `TestApplicationTest::testApplicationRunsInAnotherProcess` | 2 | 1 | scenariusz `process` zwraca `pid` i `sapi`; nie wykonuje zapytań |
+| **Razem** | **32** | **16** | ubytek **16 zestawów** |
+
+Redukcja usuwa provider tam, gdzie baza była jedynym wymiarem, i podstawia `IntegrationTestCase::ANY_DB`; stała nazywa decyzję w miejscu użycia zamiast zostawiać providera z jednym elementem. Na liście przypadków daje to trzy rodzaje zmian, które przy odbiorze trzeba rozróżnić: wiersze **usunięte** (warianty `pgsql`), wiersze ze **zmienioną etykietą** (`"mysql: unknown key"` → `"unknown key"` tam, gdzie provider miał więcej wymiarów niż baza) i wiersze **bez etykiety** (metody, w których provider zniknął w całości).
+
+Metoda audytu, żeby YQM-26 mogło go powtórzyć: z 58 metod parametryzowanych bazą filtr maszynowy po `entriesWith`, `singleBatch`, `->queries` i `batches[0]` odsiewa 38, które czytają wpisy z paczki, czyli na pewno przeszły przez sterownik; pozostałe 20 czyta się ręcznie. Osiem z nich nie dotyka sterownika — siedem znalazł ten audyt, ósme (`testApplicationRunsInAnotherProcess`) wyszło dopiero przy przeglądzie tabeli, bo chronił je zakaz oparty na nieprawdziwej przesłance, że wszystkie metody `TestApplicationTest` tworzą schemat albo wykonują zapytania.
+
+Warunek sprawdza się czterema liczbami, nie trzema: wierszy przed, wierszy po, suma ubytków z tabeli oraz `diff` listy ograniczony do wierszy spoza tabeli — **pusty w obie strony**, bo wariant ze stałą dodaje wiersze bez etykiety, a nie tylko usuwa. Trzy pierwsze liczby mogą się domknąć przypadkiem, gdy coś zniknie i coś przybędzie; czwarta tego nie przepuści. Końcowej liczby wierszy plan nie przewiduje — wynika ona z tego, ile metod traci providera w całości (dochodzi im wiersz bez etykiety), a ile zachowuje go z innym wymiarem, i mierzy się ją przy odbiorze.
+
+Bieg z ustawionym wyłącznie `QM_PGSQL_DSN` pominąłby metody z `ANY_DB` i przy `failOnSkipped` byłby czerwony; compose i CI ustawiają oba DSN, więc dziś takiego biegu nie ma. To znane ograniczenie mechanizmu, nie jego wada.
 
 Osiem wierszy zmieniło etykietę w YQM-22, bez utraty silnika i bez zmiany liczby zestawów — to jedyna różnica wobec baseline w całym etapie poza tabelą wyżej:
 
@@ -82,7 +96,7 @@ Osiem wierszy zmieniło etykietę w YQM-22, bez utraty silnika i bez zmiany licz
 | `SqlNormalizerTest::testLimitSmallerThanEllipsisIsRejected` | `#0`, `#1`, `#2` | `zero`, `shorter than the ellipsis`, `negative` |
 | `SqlNormalizerTest::testUnsupportedDbGivesNull` | `#0`..`#4` | `sqlite`, `mongodb`, `oci`, `empty name`, `mysql in upper case` |
 
-Poza tabelą nic nie traci drugiego silnika. `ReadmeExampleTest::testConfigurationExampleRunsInTheTestApplication` i wszystkie metody `TestApplicationTest` zostają na obu bazach, bo tworzą schemat i wykonują żądania z zapytaniami.
+Poza tabelą nic nie traci drugiego silnika. `ReadmeExampleTest::testConfigurationExampleRunsInTheTestApplication` zostaje na obu bazach, bo tworzy schemat i wykonuje żądanie `order/index`. `TestApplicationTest` zostaje na obu bazach w czterech z pięciu metod: trzy tworzą schemat albo wykonują zapytania, a `testRouteWithoutQueriesGivesNoBatch` jest świadomym potwierdzeniem obu silników w rozumieniu reguły 10 ADR 0008 — pusta paczka to dowód, że przez sterownik nic nie przeszło. Piąta, `testApplicationRunsInAnotherProcess`, jest w tabeli: sprawdza tożsamość procesu, nie zachowanie bazy.
 
 Ścieżki, które trzeba poprawić przy przenoszeniu, i te, których nie wolno „poprawić":
 

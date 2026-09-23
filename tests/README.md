@@ -44,6 +44,7 @@ Test sięgający po `/dev/full`, `flock`, `open_basedir`, `sh`, `ulimit`, `proc_
 - Provider stoi bezpośrednio nad pierwszym testem, który go używa, a gdy używa go kilka testów — nad pierwszym z nich.
 - Rodzaj bazy parametryzujemy tylko wtedy, gdy zachowanie przechodzi przez sterownik albo przez implementację zależną od bazy, albo gdy świadomie potwierdzamy wsparcie obu silników. Scenariusz niezależny od bazy nie jest mnożony przez dwa silniki „na wszelki wypadek".
 - Przypadki na MySQL i PostgreSQL idą przez wspólny mechanizm `IntegrationTestCase`, nie przez własną listę DSN w teście.
+- Scenariusz, którego wynik nie idzie przez sterownik, dostaje `IntegrationTestCase::ANY_DB` zamiast providera baz — stała nazywa decyzję w miejscu użycia.
 
 ## Komentarze
 
