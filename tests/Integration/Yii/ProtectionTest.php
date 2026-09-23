@@ -106,7 +106,7 @@ final class ProtectionTest extends IntegrationTestCase
             'adapter throws' => [[], ['QM_ADAPTER' => 'throw'], '/ failed in send with /', 1],
             'serialisation fails' => [[], ['QM_ADAPTER' => 'json-fail'], '/ failed in send with JsonException$/', 1],
             'normaliser fails' => [$faulty, ['QM_FAULT' => 'normalizer'], '/ failed in record with Error$/', 0],
-            // the uninitialised collector throws first in setAction() on EVENT_BEFORE_ACTION; its later
+            // the uninitialised collector throws first in setRoute() on EVENT_BEFORE_ACTION; its later
             // calls in record and send are silenced by the guard
             'collector fails' => [$faulty, ['QM_FAULT' => 'collector'], '/ failed in action with Error$/', 0],
             'log target queries while logging the normaliser failure' => [$faulty, ['QM_FAULT' => 'normalizer', 'QM_LOG_QUERY' => '1'], '/ failed in record with Error$/', 0],

@@ -14,6 +14,7 @@ use mrstroz\querymonitoring\sql\Command;
 use mrstroz\querymonitoring\sql\Dialect;
 use mrstroz\querymonitoring\sql\Recorder;
 use mrstroz\querymonitoring\sql\SqlNormalizer;
+use mrstroz\querymonitoring\support\CallerFrames;
 use mrstroz\querymonitoring\support\Guard;
 use yii\base\ActionEvent;
 use yii\base\Application;
@@ -164,8 +165,9 @@ class QueryMonitor extends Component implements BootstrapInterface
         $normalizer = $this->createNormalizer();
         $adapter = $this->resolveAdapter();
         $collector = $this->createCollector($app);
+        $callers = CallerFrames::forProcess();
         foreach ($this->connections as $id) {
-            $guard->run(fn() => $this->installOn($app, $id, $normalizer, $collector, $guard), "connection {$id}");
+            $guard->run(fn() => $this->installOn($app, $id, $normalizer, $collector, $guard, $callers), "connection {$id}");
         }
         $this->collector = $collector;
         $this->batchAdapter = $adapter;
@@ -176,9 +178,9 @@ class QueryMonitor extends Component implements BootstrapInterface
     }
 
     /**
-     * Stores the first action of the request in the header (spec 01 §4). The handler detaches itself
-     * after the first action; an action run by the error handler (`errorAction`) is skipped and leaves
-     * it attached, so a 404 before routing keeps three `null`s.
+     * Stores the unique id of the first action of the request as `route` (spec 01 §4). The handler detaches
+     * itself after the first action; an action run by the error handler (`errorAction`) is skipped and leaves
+     * it attached, so a 404 before routing keeps `route` null.
      */
     private function captureEntryAction(Application $app, QueryCollector $collector, Guard $guard): void
     {
@@ -191,16 +193,14 @@ class QueryMonitor extends Component implements BootstrapInterface
                 if ($app->has('errorHandler') && $app->getErrorHandler()->exception !== null) {
                     return;
                 }
-                $controller = $event->action->controller;
-                $module = $controller->module;
-                $collector->setAction($module instanceof Application ? null : $module->getUniqueId(), $controller->id, $event->action->id);
+                $collector->setRoute($event->action->getUniqueId());
                 $app->off(Application::EVENT_BEFORE_ACTION, $handler);
             }, 'action');
         };
         $app->on(Application::EVENT_BEFORE_ACTION, $handler);
     }
 
-    private function installOn(Application $app, string $id, SqlNormalizer $normalizer, QueryCollector $collector, Guard $guard): void
+    private function installOn(Application $app, string $id, SqlNormalizer $normalizer, QueryCollector $collector, Guard $guard, CallerFrames $callers): void
     {
         $connection = $this->connection($app, $id);
         // Without a DSN prefix getDriverName() would open a connection; with one it only reads the DSN
@@ -224,7 +224,7 @@ class QueryMonitor extends Component implements BootstrapInterface
         }
         $connection->commandMap[$driver] = [
             'class' => Command::class,
-            'recorder' => new Recorder($id, $driver, $normalizer, $collector, $guard),
+            'recorder' => new Recorder($id, $driver, $normalizer, $collector, $guard, $callers),
         ];
     }
 

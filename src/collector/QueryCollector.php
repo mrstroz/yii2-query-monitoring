@@ -17,7 +17,7 @@ use mrstroz\querymonitoring\batch\QueryEntry;
  * plus each entry serialised with {@see QueryBatch::JSON_FLAGS} and its separating comma.
  * The first entry that does not fit in `maxBatchBytes` or `maxEntries` stops intake: it and every
  * later entry, shorter ones included, are not stored and increase `dropped`.
- * When {@see self::setAction()} makes the header too long for the entries already stored,
+ * When {@see self::setRoute()} makes the header too long for the entries already stored,
  * {@see self::close()} removes entries from the end and counts them in `dropped`.
  */
 final class QueryCollector
@@ -44,9 +44,7 @@ final class QueryCollector
     private bool $full = false;
     private ?QueryBatch $batch = null;
     private bool $paused = false;
-    private ?string $module = null;
-    private ?string $controller = null;
-    private ?string $action = null;
+    private ?string $route = null;
 
     public function __construct(
         private readonly string $app,
@@ -60,17 +58,15 @@ final class QueryCollector
     }
 
     /**
-     * Sets the entry action for the header. May be called before or after entries are added.
+     * Sets `route`, the unique id of the entry action. May be called before or after entries are added.
      * Ignored after {@see self::close()}.
      */
-    public function setAction(?string $module, ?string $controller, ?string $action): void
+    public function setRoute(?string $route): void
     {
         if ($this->batch !== null) {
             return;
         }
-        $this->module = $module;
-        $this->controller = $controller;
-        $this->action = $action;
+        $this->route = $route;
         $this->headerBytes = $this->measureHeader();
     }
 
@@ -120,9 +116,7 @@ final class QueryCollector
             type: $this->type,
             id: $this->id,
             seq: $seq,
-            module: $this->module,
-            controller: $this->controller,
-            action: $this->action,
+            route: $this->route,
             ts: $ts,
             host: $this->host,
             dropped: $this->dropped,
@@ -189,9 +183,7 @@ final class QueryCollector
             type: $this->type,
             id: $this->id,
             seq: self::RESERVED_NUMBER,
-            module: $this->module,
-            controller: $this->controller,
-            action: $this->action,
+            route: $this->route,
             ts: new \DateTimeImmutable('@0'),
             host: $this->host,
             dropped: self::RESERVED_NUMBER,

@@ -6,20 +6,18 @@ Kontrakt między kolektorem a każdym adapterem. Zmiana pola oznacza nowe `v`.
 
 | Pole | Typ | Znaczenie |
 |---|---|---|
-| `v` | int | Wersja formatu. Pierwsza wersja to `1` |
+| `v` | int | Wersja formatu, dziś `2`. Wersja `1` miała zamiast `route` pola `module`, `controller` i `action`, a wpis nie miał `caller` |
 | `app` | string | Wartość `app` z konfiguracji |
 | `type` | `http` \| `console` | Kontekst |
 | `id` | string | Losowy identyfikator generowany przez bibliotekę, wspólny dla wszystkich paczek zadania: 16 znaków `[0-9a-f]` z `random_bytes(8)` |
 | `seq` | int | Numer paczki w zadaniu konsolowym, od 1. Dla HTTP zawsze `1` |
-| `module` | string \| null | `uniqueId` modułu akcji wejściowej. `null` dla głównej aplikacji |
-| `controller` | string \| null | Lokalne id kontrolera akcji wejściowej |
-| `action` | string \| null | Lokalne id akcji wejściowej |
+| `route` | string \| null | `uniqueId` akcji wejściowej, np. `admin/orders/order/view` albo `site/index` |
 | `ts` | string | Moment wysyłki, ISO 8601 w UTC |
 | `host` | string | Wynik `gethostname()`, pusty tekst, gdy funkcja zwróci `false` |
 | `dropped` | int | Wpisy pominięte po przekroczeniu limitu |
 | `queries` | array | Lista wpisów w kolejności zakończenia |
 
-`module`, `controller` i `action` mają `null`, gdy żądanie skończyło się przed routingiem, np. błędem 404 w `UrlManager`.
+`route` ma `null`, gdy żądanie skończyło się przed routingiem, np. błędem 404 w `UrlManager`.
 
 ## 2. Wpis
 
@@ -32,20 +30,23 @@ Kontrakt między kolektorem a każdym adapterem. Zmiana pola oznacza nowe `v`.
 | `time_ms` | float | Czas według [01 §2](01-zbieranie-danych.md#2-źródło-sql) i [01 §3](01-zbieranie-danych.md#3-źródło-mongodb) |
 | `result` | `success` \| `error` | |
 | `error` | string | Tylko przy `result: error`. SQLSTATE dla SQL, np. `"23000"`. Kod liczbowy sterownika jako tekst dla MongoDB, np. `"11000"`. Jeden typ dla obu źródeł |
+| `caller` | array of string | Zawsze obecne. Najwyżej trzy ramki aplikacji, od najbliższej zapytaniu, każda jako `ścieżka:linia`, ze ścieżką względną wobec korzenia projektu. Szukane w pierwszych 30 ramkach śladu wywołań ([01 §2](01-zbieranie-danych.md#2-źródło-sql)). `[]` znaczy, że w tych granicach nie ma ramki aplikacji, a nie że zapytania nie wystawił kod aplikacji |
 
 Jeden wpis to jedno polecenie faktycznie wysłane do bazy.
+
+**Ramka aplikacji** to ramka śladu z plikiem pod korzeniem projektu, który nie leży w katalogu vendor Composera ani w `src/` pakietu i nie jest skryptem wejściowym. Korzeń projektu to katalog pakietu głównego Composera (`InstalledVersions::getRootPackage()`), katalog vendor to ten, z którego Composer załadował swój `ClassLoader`, a skrypt wejściowy to pierwszy plik wykonany przez PHP, z pominięciem pliku `auto_prepend_file` (`web/index.php`, `yii`). Ramki spoza korzenia projektu są pomijane. Argumenty funkcji nie są odczytywane.
 
 ## 3. Przykład
 
 ```json
-{"v":1,"app":"shop-api","type":"http","id":"req_9f3a1c2e","seq":1,
- "module":"admin/orders","controller":"order","action":"view",
+{"v":2,"app":"shop-api","type":"http","id":"req_9f3a1c2e","seq":1,
+ "route":"admin/orders/order/view",
  "ts":"2026-09-22T09:41:05.312Z","host":"web-03","dropped":0,
  "queries":[
-  {"db":"mysql","conn":"db","op":"select","query":"SELECT * FROM `order` WHERE `id` = :qp0","time_ms":2.1,"result":"success"},
-  {"db":"mysql","conn":"db","op":"insert","query":"INSERT INTO `audit_log` (`order_id`, `action`) VALUES (:qp0, :qp1)","time_ms":0.9,"result":"error","error":"23000"},
-  {"db":"mongodb","conn":"mongodb","op":"find","query":"contacts filter{externalId:?,tenantId:?} sort{updatedAt:?} limit:?","time_ms":1.3,"result":"success"},
-  {"db":"mysql","conn":"db","op":"select","query":null,"time_ms":0.7,"result":"success"}
+  {"db":"mysql","conn":"db","op":"select","query":"SELECT * FROM `order` WHERE `id` = :qp0","time_ms":2.1,"result":"success","caller":["modules/admin/modules/orders/controllers/OrderController.php:41"]},
+  {"db":"mysql","conn":"db","op":"insert","query":"INSERT INTO `audit_log` (`order_id`, `action`) VALUES (:qp0, :qp1)","time_ms":0.9,"result":"error","error":"23000","caller":["models/AuditLog.php:27","modules/admin/modules/orders/controllers/OrderController.php:44"]},
+  {"db":"mongodb","conn":"mongodb","op":"find","query":"contacts filter{externalId:?,tenantId:?} sort{updatedAt:?} limit:?","time_ms":1.3,"result":"success","caller":["components/ContactRepository.php:88","modules/admin/modules/orders/controllers/OrderController.php:52"]},
+  {"db":"mysql","conn":"db","op":"select","query":null,"time_ms":0.7,"result":"success","caller":[]}
  ]}
 ```
 
@@ -98,7 +99,7 @@ Założenie: nazwy pól, tabel, kolekcji i parametrów są kodem aplikacji, nie 
 | Zagnieżdżenie ponad trzy poziomy | `query: null` |
 | Długość ponad `maxQueryLength` | `query: null`, bez obcinania |
 
-Wartości parametrów, dokumenty, adresy URL z parametrami i dane uwierzytelniające nigdy nie trafiają do paczki.
+Wartości parametrów, dokumenty, adresy URL z parametrami, dane uwierzytelniające i ścieżki bezwzględne nigdy nie trafiają do paczki.
 
 ## 5. Limity
 
@@ -111,8 +112,8 @@ Wartości parametrów, dokumenty, adresy URL z parametrami i dane uwierzytelniaj
 
 Niezmiennik: JSON paczki nigdy nie przekracza `maxBatchBytes`. Kolektor liczy bajty nagłówka z bieżącymi wartościami, z miejscem na `seq` i `dropped` do 10 cyfr, oraz bajty każdego wpisu po serializacji. Gdy akcja wejściowa ustawiona po wpisach wydłuży nagłówek ponad limit, przy zamknięciu kolektor usuwa wpisy od końca i dolicza je do `dropped`. Wpis dodany po zamknięciu kolektora jest pomijany i nie zwiększa `dropped`. W HTTP pierwszy wpis, który nie mieści się w `maxEntries` lub `maxBatchBytes`, kończy przyjmowanie: każdy następny, także krótszy, tylko zwiększa `dropped`, więc lista jest pełna do pierwszego osiągniętego limitu ([00 §6](00-przeglad-i-zakres.md#6-kryteria-sukcesu)).
 
-Wpis z `query` obciętym do `maxQueryLength` mieści się w `maxBatchBytes` przy wartościach początkowych, więc ostatni wiersz tabeli dotyczy tylko konfiguracji z bardzo małym limitem paczki.
+Wpis z `query` obciętym do `maxQueryLength` mieści się w `maxBatchBytes` przy wartościach początkowych, także z `caller`: trzy ścieżki, każda najwyżej 4096 bajtów (`PATH_MAX` w Linuksie), to razem około 12 KB. Ostatni wiersz tabeli dotyczy więc tylko konfiguracji z bardzo małym limitem paczki.
 
 ## 6. Poza zakresem
 
-Sumy, grupy, histogramy i percentyle. Odbiorca liczy je z listy. Miejsce w kodzie, ślad wywołań i treść odpowiedzi z bazy nie są częścią wpisu.
+Sumy, grupy, histogramy i percentyle. Odbiorca liczy je z listy. Pełny ślad wywołań, argumenty funkcji i treść odpowiedzi z bazy nie są częścią wpisu; miejsce w kodzie jest w nim tylko jako `caller` ([ADR 0009](../adr/0009-caller-i-route-w-formacie-v2.md)).

@@ -22,7 +22,7 @@ final class QueryMonitorComponentTest extends IntegrationTestCase
         $batch = $this->singleBatch($result);
         $this->assertNoErrors($result);
 
-        self::assertSame(1, $batch['v']);
+        self::assertSame(2, $batch['v']);
         self::assertSame(self::APP, $batch['app']);
         self::assertSame('http', $batch['type']);
         self::assertMatchesRegularExpression('/^[0-9a-f]{16}$/', $batch['id']);

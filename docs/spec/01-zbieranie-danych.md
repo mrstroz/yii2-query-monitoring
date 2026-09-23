@@ -42,6 +42,8 @@ Pakiet dostarcza klasę rozszerzającą `yii\db\Command`. Podmiana przez `comman
 | Transakcje | `begin`, `commit`, `rollback` idą przez PDO i nie dają wpisów |
 | Ponowienia | Każda próba `PDOStatement::execute()` w pętli ponowień `Command::internalExecute()` to osobny wpis |
 
+`caller` powstaje przy zapisie wpisu, po pomiarze, z `debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 30)` wywołanego bezpośrednio w domknięciu strażnika w `Recorder::record()`, więc nie wchodzi do `time_ms`. Ramka 0 to to domknięcie, ramka 1 `Guard::run()`, ramka 2 `Recorder::record()`; granica 30 obejmuje ramki 0–29. Po finalizacji ślad nie jest brany. Granica 30 ramek pochodzi z pomiaru w YQM-27: najgłębsza zmierzona ramka aplikacji stała na pozycji 29.
+
 `time_ms` to czas wywołań sterownika widziany z PHP, nie czas serwera bazy, w milisekundach zaokrąglonych do trzech miejsc po przecinku. PDO MySQL domyślnie buforuje wynik, więc transfer danych mieści się w `execute()` i duży `SELECT` ma duży pomiar. Błąd przy późniejszym odczycie kursora nie jest raportowany.
 
 ## 3. Źródło MongoDB

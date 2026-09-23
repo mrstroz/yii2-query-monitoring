@@ -74,6 +74,6 @@ final class QueryCollectorPauseTest extends TestCase
 
     private function entry(string $query): QueryEntry
     {
-        return QueryEntry::success('mysql', 'db', 'select', $query, 1.25);
+        return QueryEntry::success('mysql', 'db', 'select', $query, 1.25, []);
     }
 }

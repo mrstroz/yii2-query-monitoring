@@ -82,18 +82,19 @@ Z tego wynika reszta: wyjątek w kolektorze lub adapterze jest przechwytywany i 
 | CI | GitHub Actions | Matryca PHP 8.1 do 8.4 |
 | Produkcja | Aplikacje Yii 2 na PHP-FPM | Każda aplikacja podaje własne `app` w konfiguracji |
 
-Wymagania: PHP 8.1 lub nowszy, Yii 2.0.55 lub nowszy. Starsze wydania 2.0.x mają security advisories, przez które domyślna polityka Composera 2.10 ich nie instaluje. `yiisoft/yii2-mongodb` i `ext-mongodb` są zależnościami opcjonalnymi w `suggest`. Aplikacja tylko z SQL instaluje pakiet bez MongoDB.
+Wymagania: PHP 8.1 lub nowszy, Yii 2.0.55 lub nowszy, Composer 2 (korzeń projektu dla `caller`, [ADR 0009](../adr/0009-caller-i-route-w-formacie-v2.md)). Starsze wydania 2.0.x mają security advisories, przez które domyślna polityka Composera 2.10 ich nie instaluje. `yiisoft/yii2-mongodb` i `ext-mongodb` są zależnościami opcjonalnymi w `suggest`. Aplikacja tylko z SQL instaluje pakiet bez MongoDB.
 
 ## 8. Słownik
 
 | Termin | Znaczenie |
 |---|---|
 | Paczka | Jeden obiekt JSON: nagłówek plus lista wpisów. Jedna na żądanie HTTP, wiele na zadanie konsolowe |
-| Wpis | Jedno polecenie faktycznie wysłane do bazy: `db`, `conn`, `op`, `query`, `time_ms`, `result` |
+| Wpis | Jedno polecenie faktycznie wysłane do bazy: `db`, `conn`, `op`, `query`, `time_ms`, `result`, `caller` |
 | Kolektor | Obiekt w pamięci, który przyjmuje wpisy, pilnuje limitów i buduje paczkę |
 | Finalizacja | Zamknięcie kolektora i przekazanie paczki do adaptera. Po niej kolektor nie przyjmuje wpisów |
 | Adapter | Obiekt lub `callable` z metodą `send(QueryBatch): void`, odbiorca paczki |
-| Akcja wejściowa | Pierwsza akcja kontrolera w żądaniu, zapamiętana z `EVENT_BEFORE_ACTION` aplikacji |
+| Akcja wejściowa | Pierwsza akcja kontrolera w żądaniu, zapamiętana z `EVENT_BEFORE_ACTION` aplikacji; w paczce jako `route` |
+| Ramka aplikacji | Ramka śladu wywołań z kodu aplikacji, nie z vendor, pakietu ani skryptu wejściowego ([02 §2](02-format-paczki.md#2-wpis)) |
 | Normalizacja | Zamiana tekstu zapytania na postać bez wartości |
 | Zadanie konsolowe | Jedno uruchomienie `php yii ...`, od startu do końca procesu |
 | Połączenie monitorowane | Komponent `Connection` z listy w konfiguracji pakietu |

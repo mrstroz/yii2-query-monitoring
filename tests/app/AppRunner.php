@@ -18,7 +18,8 @@ use yii\helpers\FileHelper;
  * - `QM_CAPTURE_FILE`, `QM_LOG_FILE` — per-run files created and removed by the runner
  *   (with `QM_CAPTURE_FILE.calls`, the capturing adapter's call log),
  * - `QM_RUNTIME` — a per-run `@runtime` directory, read into {@see RunResult::$runtimeFiles} and removed,
- * - everything in `$env`, e.g. `QM_SCENARIO` or the {@see TestPdo} switches.
+ * - everything in `$env`, e.g. `QM_SCENARIO` or the {@see TestPdo} switches; `QM_AUTO_PREPEND=1` also starts
+ *   the child with `-d auto_prepend_file=` {@see self::PREPEND_FILE}.
  *
  * Route {@see self::SCENARIO_ROUTE} loads `tests/Integration/scenarios/<QM_SCENARIO>.php`, which returns
  * `callable(\yii\web\Application): mixed`, and prints the returned value as JSON on stdout.
@@ -27,6 +28,7 @@ final class AppRunner
 {
     public const SCENARIO_ROUTE = 'scenario/run';
     public const TIMEOUT_SECONDS = 30;
+    public const PREPEND_FILE = __DIR__ . '/prepend.php';
 
     /**
      * @param array<string, mixed> $componentConfig
@@ -77,8 +79,9 @@ final class AppRunner
      */
     private static function execute(array $env): array
     {
+        $prepend = ($env['QM_AUTO_PREPEND'] ?? '') === '1' ? ['-d', 'auto_prepend_file=' . self::PREPEND_FILE] : [];
         $process = proc_open(
-            [PHP_BINARY, __DIR__ . '/web/index.php'],
+            [PHP_BINARY, ...$prepend, __DIR__ . '/web/index.php'],
             [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
             $pipes,
             null,

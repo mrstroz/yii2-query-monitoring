@@ -17,7 +17,7 @@ final class CallableAdapterTest extends TestCase
 {
     public function testCallbackReceivesTheBatchOnce(): void
     {
-        $batch = new QueryBatch('app', BatchType::Http, 'id', 1, null, null, null, new \DateTimeImmutable('2026-09-22T09:41:05Z'), 'h', 0, []);
+        $batch = new QueryBatch('app', BatchType::Http, 'id', 1, null, new \DateTimeImmutable('2026-09-22T09:41:05Z'), 'h', 0, []);
         $received = [];
         $adapter = new CallableAdapter(static function (QueryBatch $b) use (&$received): string {
             $received[] = $b;
@@ -40,6 +40,6 @@ final class CallableAdapterTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
 
-        $adapter->send(new QueryBatch('app', BatchType::Http, 'id', 1, null, null, null, new \DateTimeImmutable(), 'h', 0, []));
+        $adapter->send(new QueryBatch('app', BatchType::Http, 'id', 1, null, new \DateTimeImmutable(), 'h', 0, []));
     }
 }

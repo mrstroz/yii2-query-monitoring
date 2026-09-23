@@ -8,6 +8,7 @@ use mrstroz\querymonitoring\batch\BatchType;
 use mrstroz\querymonitoring\collector\QueryCollector;
 use mrstroz\querymonitoring\sql\Recorder;
 use mrstroz\querymonitoring\sql\SqlNormalizer;
+use mrstroz\querymonitoring\support\CallerFrames;
 use mrstroz\querymonitoring\support\Guard;
 use mrstroz\querymonitoring\tests\Unit\LoggedTestCase;
 
@@ -66,7 +67,9 @@ final class RecorderTest extends LoggedTestCase
 
     private function recorder(SqlNormalizer $normalizer, QueryCollector $collector): Recorder
     {
-        return new Recorder('db', 'mysql', $normalizer, $collector, new Guard());
+        $root = dirname(__DIR__, 3);
+
+        return new Recorder('db', 'mysql', $normalizer, $collector, new Guard(), new CallerFrames($root, $root . '/vendor', $root . '/src', null));
     }
 
     private function brokenNormalizer(): SqlNormalizer

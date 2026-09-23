@@ -11,7 +11,7 @@ namespace mrstroz\querymonitoring\batch;
  */
 final class QueryBatch
 {
-    public const VERSION = 1;
+    public const VERSION = 2;
 
     /**
      * Flags for every JSON produced by the package; the collector counts bytes with the same flags.
@@ -28,9 +28,7 @@ final class QueryBatch
         public readonly BatchType $type,
         public readonly string $id,
         public readonly int $seq,
-        public readonly ?string $module,
-        public readonly ?string $controller,
-        public readonly ?string $action,
+        public readonly ?string $route,
         public readonly \DateTimeImmutable $ts,
         public readonly string $host,
         public readonly int $dropped,
@@ -50,9 +48,7 @@ final class QueryBatch
             'type' => $this->type->value,
             'id' => $this->id,
             'seq' => $this->seq,
-            'module' => $this->module,
-            'controller' => $this->controller,
-            'action' => $this->action,
+            'route' => $this->route,
             'ts' => self::formatTs($this->ts),
             'host' => $this->host,
             'dropped' => $this->dropped,

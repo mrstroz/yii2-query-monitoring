@@ -50,7 +50,7 @@ final class QueryCollectorTest extends TestCase
         for ($i = 0; $i < 500; $i++) {
             $collector->add($this->entry('SELECT ?'));
         }
-        $collector->add(QueryEntry::error('mysql', 'db', 'insert', 'INSERT INTO t VALUES (?)', 1.0, '23000'));
+        $collector->add(QueryEntry::error('mysql', 'db', 'insert', 'INSERT INTO t VALUES (?)', 1.0, '23000', []));
 
         $batch = $collector->close($this->ts());
 
@@ -68,7 +68,7 @@ final class QueryCollectorTest extends TestCase
             $collector->add($this->entry(str_repeat('x', 100)));
         }
         $droppedBefore = $collector->dropped();
-        $collector->add(QueryEntry::error('mysql', 'db', 'insert', str_repeat('y', 100), 1.0, '23000'));
+        $collector->add(QueryEntry::error('mysql', 'db', 'insert', str_repeat('y', 100), 1.0, '23000', []));
 
         $batch = $collector->close($this->ts());
 
@@ -161,9 +161,9 @@ final class QueryCollectorTest extends TestCase
     {
         $nasty = "a\"b\\c\u{1}d\u{1F}zażółć🙂";
         $collector = new QueryCollector($nasty, BatchType::Http, $nasty, $nasty, 500, 3000);
-        $collector->setAction($nasty, $nasty, $nasty);
+        $collector->setRoute($nasty);
         for ($i = 0; $i < 200; $i++) {
-            $collector->add(QueryEntry::success('mysql', $nasty, 'select', "SELECT `x` FROM \"{$nasty}\"\n", 1.0));
+            $collector->add(QueryEntry::success('mysql', $nasty, 'select', "SELECT `x` FROM \"{$nasty}\"\n", 1.0, ["{$nasty}.php:1"]));
         }
 
         $batch = $collector->close($this->ts());
@@ -212,34 +212,34 @@ final class QueryCollectorTest extends TestCase
         self::assertSame(2, $batch->dropped);
     }
 
-    public function testSetActionAfterCloseIsIgnored(): void
+    public function testSetRouteAfterCloseIsIgnored(): void
     {
         $collector = $this->collector();
-        $collector->setAction('m', 'c', 'a');
+        $collector->setRoute('m/c/a');
         $batch = $collector->close($this->ts());
 
-        $collector->setAction('x', 'y', 'z');
+        $collector->setRoute('x/y/z');
 
         self::assertSame($batch, $collector->close($this->ts()));
-        self::assertSame('m', $batch->module);
+        self::assertSame('m/c/a', $batch->route);
     }
 
-    public function testActionSetBeforeEntriesReducesCapacity(): void
+    public function testRouteSetBeforeEntriesReducesCapacity(): void
     {
-        $long = str_repeat('m', 400);
+        $long = str_repeat('m', 1200);
         $collector = $this->collector(maxBatchBytes: 2000);
-        $collector->setAction($long, $long, $long);
+        $collector->setRoute($long);
         for ($i = 0; $i < 100; $i++) {
             $collector->add($this->entry("SELECT {$i}"));
         }
 
         $batch = $collector->close($this->ts());
 
-        self::assertSame($long, $batch->module);
+        self::assertSame($long, $batch->route);
         self::assertLessThanOrEqual(2000, strlen($batch->toJson()));
     }
 
-    public function testActionSetAfterEntriesRemovesEntriesFromTheEnd(): void
+    public function testRouteSetAfterEntriesRemovesEntriesFromTheEnd(): void
     {
         $collector = $this->collector(maxBatchBytes: 3000);
         $added = [];
@@ -248,15 +248,13 @@ final class QueryCollectorTest extends TestCase
             $added[] = $entry;
             $collector->add($entry);
         }
-        $long = str_repeat('m', 300);
-        $collector->setAction($long, $long, $long);
+        $long = str_repeat('m', 900);
+        $collector->setRoute($long);
 
         $batch = $collector->close($this->ts());
 
         self::assertLessThanOrEqual(3000, strlen($batch->toJson()));
-        self::assertSame($long, $batch->module);
-        self::assertSame($long, $batch->controller);
-        self::assertSame($long, $batch->action);
+        self::assertSame($long, $batch->route);
         self::assertSame(array_slice($added, 0, count($batch->queries)), $batch->queries, 'kept entries are a prefix of the added ones');
         self::assertSame(200, count($batch->queries) + $batch->dropped);
     }
@@ -264,7 +262,7 @@ final class QueryCollectorTest extends TestCase
     public function testBatchCarriesCollectorHeader(): void
     {
         $collector = new QueryCollector('shop-api', BatchType::Http, 'req_1', 'web-03');
-        $collector->setAction('admin/orders', 'order', 'view');
+        $collector->setRoute('admin/orders/order/view');
         $collector->add($this->entry('SELECT ?'));
 
         $batch = $collector->close(new \DateTimeImmutable('2026-09-22T09:41:05.312Z'));
@@ -274,19 +272,44 @@ final class QueryCollectorTest extends TestCase
         self::assertSame('req_1', $batch->id);
         self::assertSame('web-03', $batch->host);
         self::assertSame(1, $batch->seq);
-        self::assertSame('admin/orders', $batch->module);
-        self::assertSame('order', $batch->controller);
-        self::assertSame('view', $batch->action);
+        self::assertSame('admin/orders/order/view', $batch->route);
         self::assertSame('2026-09-22T09:41:05.312Z', $batch->toArray()['ts']);
     }
 
-    public function testActionDefaultsToNull(): void
+    public function testRouteDefaultsToNull(): void
     {
         $batch = $this->collector()->close($this->ts());
 
-        self::assertNull($batch->module);
-        self::assertNull($batch->controller);
-        self::assertNull($batch->action);
+        self::assertNull($batch->route);
+    }
+
+    /**
+     * spec 02 §5: `caller` counts towards the batch bytes. Three paths of `PATH_MAX` each, with a `query`
+     * of `maxQueryLength`, still fit the default batch limit, but fewer of them than without `caller`.
+     */
+    public function testLongCallerCountsTowardsBatchBytes(): void
+    {
+        $caller = [str_repeat('a', 4090) . '.php:1', str_repeat('b', 4090) . '.php:2', str_repeat('c', 4090) . '.php:3'];
+
+        $with = $this->filledWith($caller);
+        $without = $this->filledWith([]);
+
+        self::assertNotSame([], $with->queries, 'an entry with the longest caller and query fits the default limit');
+        self::assertSame($caller, $with->queries[0]->caller);
+        self::assertLessThan(count($without->queries), count($with->queries), 'caller bytes are counted, so fewer entries fit');
+        self::assertLessThanOrEqual(QueryCollector::DEFAULT_MAX_BATCH_BYTES, strlen($with->toJson()));
+    }
+
+    public function testEntryThatFitsOnlyWithoutCallerIsDropped(): void
+    {
+        $collector = $this->collector(maxBatchBytes: 1000);
+        $collector->add(QueryEntry::success('mysql', 'db', 'select', 'SELECT ?', 1.25, [str_repeat('p', 1000) . '.php:1']));
+
+        $batch = $collector->close($this->ts());
+
+        self::assertSame([], $batch->queries);
+        self::assertSame(1, $batch->dropped);
+        self::assertLessThanOrEqual(1000, strlen($batch->toJson()));
     }
 
     public function testSecondCloseReturnsSameBatchAndIgnoresArguments(): void
@@ -326,6 +349,21 @@ final class QueryCollectorTest extends TestCase
         self::assertIsArray(json_decode($batch->toJson(), true, 512, JSON_THROW_ON_ERROR));
     }
 
+    /**
+     * A collector with default limits, offered 100 entries of a `maxQueryLength` query and the given caller.
+     *
+     * @param list<string> $caller
+     */
+    private function filledWith(array $caller): QueryBatch
+    {
+        $collector = $this->collector();
+        for ($i = 0; $i < 100; $i++) {
+            $collector->add(QueryEntry::success('mysql', 'db', 'select', str_repeat('x', 8192), 1.25, $caller));
+        }
+
+        return $collector->close($this->ts());
+    }
+
     private function assertTight(QueryBatch $batch, QueryEntry $rejected, int $max): void
     {
         $unusedReserve = (QueryCollector::SEQ_DIGITS - strlen((string) $batch->seq))
@@ -348,7 +386,7 @@ final class QueryCollectorTest extends TestCase
 
     private function entry(string $query): QueryEntry
     {
-        return QueryEntry::success('mysql', 'db', 'select', $query, 1.25);
+        return QueryEntry::success('mysql', 'db', 'select', $query, 1.25, ['controllers/SiteController.php:12']);
     }
 
     private function ts(): \DateTimeImmutable

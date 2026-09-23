@@ -33,23 +33,23 @@ final class QueryBatchTest extends TestCase
     public function testHeaderKeysFollowSpecOrder(): void
     {
         self::assertSame(
-            ['v', 'app', 'type', 'id', 'seq', 'module', 'controller', 'action', 'ts', 'host', 'dropped', 'queries'],
+            ['v', 'app', 'type', 'id', 'seq', 'route', 'ts', 'host', 'dropped', 'queries'],
             array_keys($this->specExample()->toArray()),
         );
     }
 
     public function testEntryKeysFollowSpecOrder(): void
     {
-        $success = QueryEntry::success('mysql', 'db', 'select', 'SELECT ?', 1.0);
-        $error = QueryEntry::error('pgsql', 'db', 'insert', null, 1.0, '23505');
+        $success = QueryEntry::success('mysql', 'db', 'select', 'SELECT ?', 1.0, []);
+        $error = QueryEntry::error('pgsql', 'db', 'insert', null, 1.0, '23505', ['models/Order.php:12']);
 
-        self::assertSame(['db', 'conn', 'op', 'query', 'time_ms', 'result'], array_keys($success->toArray()));
-        self::assertSame(['db', 'conn', 'op', 'query', 'time_ms', 'result', 'error'], array_keys($error->toArray()));
+        self::assertSame(['db', 'conn', 'op', 'query', 'time_ms', 'result', 'caller'], array_keys($success->toArray()));
+        self::assertSame(['db', 'conn', 'op', 'query', 'time_ms', 'result', 'error', 'caller'], array_keys($error->toArray()));
     }
 
     public function testErrorKeyOnlyForErrorResult(): void
     {
-        $json = $this->batch([QueryEntry::success('mysql', 'db', 'select', 'SELECT ?', 1.5)])->toJson();
+        $json = $this->batch([QueryEntry::success('mysql', 'db', 'select', 'SELECT ?', 1.5, [])])->toJson();
 
         self::assertStringNotContainsString('"error"', $json);
         self::assertStringContainsString('"result":"success"', $json);
@@ -57,9 +57,9 @@ final class QueryBatchTest extends TestCase
 
     public function testErrorEntryCarriesCodeAsString(): void
     {
-        $json = $this->batch([QueryEntry::error('mongodb', 'mongodb', 'insert', 'contacts n:?', 0.4, '11000')])->toJson();
+        $json = $this->batch([QueryEntry::error('mongodb', 'mongodb', 'insert', 'contacts n:?', 0.4, '11000', [])])->toJson();
 
-        self::assertStringContainsString('"db":"mongodb","conn":"mongodb","op":"insert","query":"contacts n:?","time_ms":0.4,"result":"error","error":"11000"', $json);
+        self::assertStringContainsString('"db":"mongodb","conn":"mongodb","op":"insert","query":"contacts n:?","time_ms":0.4,"result":"error","error":"11000","caller":[]', $json);
     }
 
     public function testTimestampIsConvertedToUtcWithMilliseconds(): void
@@ -79,8 +79,8 @@ final class QueryBatchTest extends TestCase
     public function testTimeIsFloatAndNotRounded(): void
     {
         $json = $this->batch([
-            QueryEntry::success('mysql', 'db', 'select', null, 2.0),
-            QueryEntry::success('mysql', 'db', 'select', null, 1.23456789),
+            QueryEntry::success('mysql', 'db', 'select', null, 2.0, []),
+            QueryEntry::success('mysql', 'db', 'select', null, 1.23456789, []),
         ])->toJson();
 
         self::assertStringContainsString('"time_ms":2.0,', $json);
@@ -89,19 +89,20 @@ final class QueryBatchTest extends TestCase
 
     public function testNullHeaderFieldsAndEmptyQueries(): void
     {
-        $batch = new QueryBatch('app', BatchType::Console, 'id1', 7, null, null, null, new \DateTimeImmutable('2026-09-22T09:41:05.000Z'), 'h', 3, []);
+        $batch = new QueryBatch('app', BatchType::Console, 'id1', 7, null, new \DateTimeImmutable('2026-09-22T09:41:05.000Z'), 'h', 3, []);
 
         self::assertSame(
-            '{"v":1,"app":"app","type":"console","id":"id1","seq":7,"module":null,"controller":null,"action":null,"ts":"2026-09-22T09:41:05.000Z","host":"h","dropped":3,"queries":[]}',
+            '{"v":2,"app":"app","type":"console","id":"id1","seq":7,"route":null,"ts":"2026-09-22T09:41:05.000Z","host":"h","dropped":3,"queries":[]}',
             $batch->toJson(),
         );
     }
 
     public function testUnicodeAndSlashesAreNotEscaped(): void
     {
-        $json = $this->batch([QueryEntry::success('pgsql', 'db', 'select', 'SELECT "zażółć" FROM a/b', 1.0)])->toJson();
+        $json = $this->batch([QueryEntry::success('pgsql', 'db', 'select', 'SELECT "zażółć" FROM a/b', 1.0, ['modules/zażółć/a.php:1'])])->toJson();
 
         self::assertStringContainsString('SELECT \"zażółć\" FROM a/b', $json);
+        self::assertStringContainsString('"caller":["modules/zażółć/a.php:1"]', $json);
     }
 
     public function testAdapterContract(): void
@@ -122,17 +123,15 @@ final class QueryBatchTest extends TestCase
             BatchType::Http,
             'req_9f3a1c2e',
             1,
-            'admin/orders',
-            'order',
-            'view',
+            'admin/orders/order/view',
             new \DateTimeImmutable('2026-09-22T09:41:05.312Z'),
             'web-03',
             0,
             [
-                QueryEntry::success('mysql', 'db', 'select', 'SELECT * FROM `order` WHERE `id` = :qp0', 2.1),
-                QueryEntry::error('mysql', 'db', 'insert', 'INSERT INTO `audit_log` (`order_id`, `action`) VALUES (:qp0, :qp1)', 0.9, '23000'),
-                QueryEntry::success('mongodb', 'mongodb', 'find', 'contacts filter{externalId:?,tenantId:?} sort{updatedAt:?} limit:?', 1.3),
-                QueryEntry::success('mysql', 'db', 'select', null, 0.7),
+                QueryEntry::success('mysql', 'db', 'select', 'SELECT * FROM `order` WHERE `id` = :qp0', 2.1, ['modules/admin/modules/orders/controllers/OrderController.php:41']),
+                QueryEntry::error('mysql', 'db', 'insert', 'INSERT INTO `audit_log` (`order_id`, `action`) VALUES (:qp0, :qp1)', 0.9, '23000', ['models/AuditLog.php:27', 'modules/admin/modules/orders/controllers/OrderController.php:44']),
+                QueryEntry::success('mongodb', 'mongodb', 'find', 'contacts filter{externalId:?,tenantId:?} sort{updatedAt:?} limit:?', 1.3, ['components/ContactRepository.php:88', 'modules/admin/modules/orders/controllers/OrderController.php:52']),
+                QueryEntry::success('mysql', 'db', 'select', null, 0.7, []),
             ],
         );
     }
@@ -142,6 +141,6 @@ final class QueryBatchTest extends TestCase
      */
     private function batch(array $queries, ?\DateTimeImmutable $ts = null): QueryBatch
     {
-        return new QueryBatch('app', BatchType::Http, 'id', 1, null, null, null, $ts ?? new \DateTimeImmutable('2026-09-22T09:41:05.312Z'), 'host', 0, $queries);
+        return new QueryBatch('app', BatchType::Http, 'id', 1, null, $ts ?? new \DateTimeImmutable('2026-09-22T09:41:05.312Z'), 'host', 0, $queries);
     }
 }

@@ -10,26 +10,26 @@ use mrstroz\querymonitoring\tests\Integration\support\ForeignBeforeAction;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
- * YQM-7, spec 01 §4 and 02 §1: the entry action from the first EVENT_BEFORE_ACTION of the application.
+ * YQM-7, YQM-28, spec 01 §4 and 02 §1: `route` is the uniqueId of the first EVENT_BEFORE_ACTION of the application.
  */
 final class FrontActionTest extends IntegrationTestCase
 {
     #[DataProvider('provideDatabaseCases')]
-    public function testActionOfMainApplicationHasNoModule(string $db): void
+    public function testRouteOfMainApplicationIsControllerAndAction(string $db): void
     {
         $batch = $this->singleBatch($this->scenario($db, 'lifecycle'));
 
-        self::assertSame([null, 'scenario', 'run'], self::entryAction($batch));
+        self::assertSame('scenario/run', self::routeOf($batch));
     }
 
     #[DataProvider('provideDatabaseCases')]
-    public function testActionOfNestedModuleHasModulePathAndLocalIds(string $db): void
+    public function testRouteOfNestedModuleIsUniqueIdOfAction(string $db): void
     {
         $result = $this->route($db, 'admin/orders/order/view');
         $this->assertProcessOk($result);
         $batch = $this->singleBatch($result);
 
-        self::assertSame(['admin/orders', 'order', 'view'], self::entryAction($batch));
+        self::assertSame('admin/orders/order/view', self::routeOf($batch));
         self::assertNotEmpty($batch['queries']);
     }
 
@@ -40,7 +40,7 @@ final class FrontActionTest extends IntegrationTestCase
         self::assertSame(['inner' => ['ok' => true], 'value' => 811], $this->scenarioOutput($result));
         $batch = $this->singleBatch($result);
 
-        self::assertSame([null, 'scenario', 'run'], self::entryAction($batch));
+        self::assertSame('scenario/run', self::routeOf($batch));
         self::assertCount(1, $this->entriesWith($batch, 'qm_nested_after'));
     }
 
@@ -51,7 +51,7 @@ final class FrontActionTest extends IntegrationTestCase
         $this->assertProcessOk($result);
         $batch = $this->singleBatch($result);
 
-        self::assertSame([null, 'site', 'nested'], self::entryAction($batch));
+        self::assertSame('site/nested', self::routeOf($batch));
         self::assertNotEmpty($this->entriesWith($batch, 'qm_order'), 'queries of the inner action');
     }
 
@@ -65,18 +65,18 @@ final class FrontActionTest extends IntegrationTestCase
         self::assertSame(['error' => \yii\base\UserException::class], json_decode($result->stdout, true), 'errorAction rendered the response');
         $batch = $this->singleBatch($result);
 
-        self::assertSame([null, 'scenario', 'run'], self::entryAction($batch));
+        self::assertSame('scenario/run', self::routeOf($batch));
         self::assertCount(1, $this->entriesWith($batch, 'qm_life_action'));
         self::assertCount(1, $this->entriesWith($batch, 'qm_in_error'), 'the error action ran its query');
     }
 
     #[DataProvider('provideDatabaseCases')]
-    public function testNotFoundBeforeRoutingHasNoAction(string $db): void
+    public function testNotFoundBeforeRoutingHasNullRoute(string $db): void
     {
         $result = $this->route($db, 'qm-t1-missing/none', ['QM_ERROR_ACTION' => '1']);
         $batch = $this->singleBatch($result);
 
-        self::assertSame([null, null, null], self::entryAction($batch));
+        self::assertNull(self::routeOf($batch));
         self::assertCount(1, $this->entriesWith($batch, 'qm_in_error'), 'the error action ran its query');
     }
 
@@ -88,7 +88,7 @@ final class FrontActionTest extends IntegrationTestCase
 
         self::assertStringContainsString('foreign:before_action', $result->stderr);
         self::assertSame(['action' => 801], $this->scenarioOutput($result));
-        self::assertSame([null, 'scenario', 'run'], self::entryAction($this->singleBatch($result)));
+        self::assertSame('scenario/run', self::routeOf($this->singleBatch($result)));
         $this->assertNoErrors($result);
     }
 
@@ -106,16 +106,17 @@ final class FrontActionTest extends IntegrationTestCase
     }
 
     /**
-     * @param array<string, mixed> $batch
+     * The entry action as `route`; the fields of format v1 are gone (spec 02 §1).
      *
-     * @return array{mixed, mixed, mixed}
+     * @param array<string, mixed> $batch
      */
-    private static function entryAction(array $batch): array
+    private static function routeOf(array $batch): mixed
     {
-        self::assertArrayHasKey('module', $batch);
-        self::assertArrayHasKey('controller', $batch);
-        self::assertArrayHasKey('action', $batch);
+        self::assertArrayHasKey('route', $batch);
+        self::assertArrayNotHasKey('module', $batch);
+        self::assertArrayNotHasKey('controller', $batch);
+        self::assertArrayNotHasKey('action', $batch);
 
-        return [$batch['module'], $batch['controller'], $batch['action']];
+        return $batch['route'];
     }
 }

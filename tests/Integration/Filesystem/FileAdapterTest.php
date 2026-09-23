@@ -251,10 +251,10 @@ final class FileAdapterTest extends TestCase
     {
         $queries = [];
         for ($i = 0; $i < $entries; $i++) {
-            $queries[] = QueryEntry::success('mysql', 'db', 'SELECT', "SELECT * FROM t WHERE c = ? /* " . self::MARKER . " {$i} */", 1.5);
+            $queries[] = QueryEntry::success('mysql', 'db', 'SELECT', "SELECT * FROM t WHERE c = ? /* " . self::MARKER . " {$i} */", 1.5, []);
         }
 
-        return new QueryBatch('app', BatchType::Http, $id, 1, null, 'site', 'index', new \DateTimeImmutable('2026-09-22T09:41:05Z'), 'host', 0, $queries);
+        return new QueryBatch('app', BatchType::Http, $id, 1, 'site/index', new \DateTimeImmutable('2026-09-22T09:41:05Z'), 'host', 0, $queries);
     }
 
     /**

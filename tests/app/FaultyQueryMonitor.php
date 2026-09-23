@@ -15,7 +15,7 @@ use yii\base\Application;
  * The collector and the normaliser are final, so the failing part is an instance created without its
  * constructor: the first read of an uninitialised readonly property throws `\Error`.
  * - `normalizer` — throws in `SqlNormalizer::normalize()`, reading `$maxQueryLength`, for every recorded query;
- * - `collector` — throws first in `QueryCollector::setAction()` (via `measureHeader()`, reading `$app`) on
+ * - `collector` — throws first in `QueryCollector::setRoute()` (via `measureHeader()`, reading `$app`) on
  *   `EVENT_BEFORE_ACTION`, before any query; later `add()` and `close()` throw the same way, and the Guard,
  *   which logs once per process, keeps them silent.
  * If the collector or the normaliser starts reading an initialised property first, these points move.
