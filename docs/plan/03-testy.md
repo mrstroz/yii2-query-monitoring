@@ -23,10 +23,10 @@
       Gotowe, gdy: `ConnectionListTest::mastersOnly()` i `ProtectionTest::faults()` stoją po ostatniej metodzie testowej swojej klasy, a trzy greppy strażnicze nadal kończą się kodem 1: klasa testowa bez `final` poza `IntegrationTestCase` i `LoggedTestCase`, metoda `public function test…` bez `: void`, `grep -rn --include='*.php' '\$this->assert' tests` po odfiltrowaniu ośmiu własnych helperów asercyjnych.
       Trzy greppy są zielone już dziś i mają takie zostać — to strażnik regresji, nie zmiana: wszystkie klasy testowe są `final`, każda metoda testowa ma `: void`, a jedyne `$this->assert…` w zestawie to osiem własnych helperów (`assertFinished`, `assertNoErrors`, `assertNoWarning`, `assertOnePackageError`, `assertProcessOk`, `assertProfilingAndLoggingOff`, `assertSameAnswer`, `assertTight`). Realna praca tego zadania to dwie prywatne fabryki danych stojące przed testami (`ConnectionListTest:31` → 122, `ProtectionTest:22` → 102) oraz układ testu pustymi liniami — ten drugi jest regułą z `tests/README.md` egzekwowaną w przeglądzie, nie warunkiem maszynowym. Data providery zostają nad pierwszym używającym ich testem, zgodnie z konwencją, więc nie są tu „helperem przed testami".
 
-- [ ] (=) **YQM-22** Jedna konwencja data providerów w całym zestawie
+- [x] (=) **YQM-22** Jedna konwencja data providerów w całym zestawie
       Konwencje: [`tests/README.md`](../../tests/README.md) · Zależy od: YQM-21
       Gotowe, gdy: `grep -rhn --include='*.php' '#\[DataProvider(' tests | grep -v 'provide[A-Za-z]*Cases'` kończy się kodem 1, każda metoda-provider ma sygnaturę `public static function provide…Cases(): iterable`, każdy zestaw danych ma nazwę, a `composer test` przechodzi.
-      Czternaście nazw w czterech stylach; `databases()` jest w `IntegrationTestCase` i obsługuje około czterdziestu metod, więc idzie w tym samym commicie. Przemianowanie obejmuje też wywołania poza atrybutem — `FinalizationTest.php:30` woła `self::databases()` wprost. W zakresie są też pętle `foreach (['mysql', 'pgsql'] as $db)` obchodzące `databases()` — `FileAdapterProtectionTest:64`, `ConnectionListTest:109`, `FileAdapterComponentTest:45,74`, `QueryMonitorComponentTest:117`; grep z warunku ich nie łapie, a część z nich i tak traci drugi silnik w YQM-24. Nadanie nazw zestawom w `SqlNormalizerTest` (`unsupportedDbs`, `tooSmallLimits`) zmienia etykiety na liście przypadków; to jedyna dopuszczona różnica tego zadania i wpisuje się ją do tabeli z YQM-24.
+      Czternaście nazw w czterech stylach; `databases()` jest w `IntegrationTestCase` i obsługuje około czterdziestu metod, więc idzie w tym samym commicie. Przemianowanie obejmuje też wywołania poza atrybutem — `FinalizationTest.php:30` woła `self::databases()` wprost. W zakresie są też pętle `foreach (['mysql', 'pgsql'] as $db)` obchodzące `databases()` — `FileAdapterProtectionTest:64`, `ConnectionListTest:109`, `FileAdapterComponentTest:45,74`, `QueryMonitorComponentTest:117`; grep z warunku ich nie łapie, a część z nich i tak traci drugi silnik w YQM-24. Nadanie nazw zestawom w `SqlNormalizerTest` zmienia etykiety na liście przypadków; to jedyna dopuszczona różnica tego zadania, wypisana w „Uwagach" pod tabelą YQM-24. Nazwanie zestawu robi z klucza `string`, więc docblok providera musi mówić `iterable<string, …>` — bez tego PHPStan na poziomie 8 daje `Generator expects key type int, string given`, po jednym błędzie na zestaw.
 
 - [ ] (=) **YQM-23** Asercja na kontrakt zamiast na natywny komunikat systemu
       Konwencje: [`tests/README.md`](../../tests/README.md) · Zależy od: YQM-20
@@ -72,6 +72,13 @@ Tabelę uzupełnia się przed zmianą, nie po niej. Dwa pierwsze wiersze są spr
 | `FileAdapterComponentTest::testEachFileKeyOverridesOnlyItself` | provider `overrides`, warianty `pgsql` | ustawienia klucza `file`, baza jest tylko nośnikiem połączenia |
 | `FileAdapterComponentTest::testBadFileSettingDisablesThePackageBeforeTheCommandSwap` | provider `badFileSettings`, warianty `pgsql` | walidacja konfiguracji przed podmianą `Command`, nic nie idzie przez sterownik |
 | … | … | … |
+
+Osiem wierszy zmieniło etykietę w YQM-22, bez utraty silnika i bez zmiany liczby zestawów — to jedyna różnica wobec baseline w całym etapie poza tabelą wyżej:
+
+| Metoda | przed | po |
+|---|---|---|
+| `SqlNormalizerTest::testLimitSmallerThanEllipsisIsRejected` | `#0`, `#1`, `#2` | `zero`, `shorter than the ellipsis`, `negative` |
+| `SqlNormalizerTest::testUnsupportedDbGivesNull` | `#0`..`#4` | `sqlite`, `mongodb`, `oci`, `empty name`, `mysql in upper case` |
 
 Poza tabelą nic nie traci drugiego silnika. `ReadmeExampleTest::testConfigurationExampleRunsInTheTestApplication` i wszystkie metody `TestApplicationTest` zostają na obu bazach, bo tworzą schemat i wykonują żądania z zapytaniami.
 

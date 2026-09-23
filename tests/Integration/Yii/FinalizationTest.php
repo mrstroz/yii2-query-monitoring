@@ -25,9 +25,9 @@ final class FinalizationTest extends IntegrationTestCase
     /**
      * @return iterable<string, array{string, string, int}>
      */
-    public static function ends(): iterable
+    public static function provideEndCases(): iterable
     {
-        foreach (self::databases() as $name => [$db]) {
+        foreach (self::provideDatabaseCases() as $name => [$db]) {
             yield "{$name} return" => [$db, 'return', 0];
             yield "{$name} end" => [$db, 'end', 0];
             yield "{$name} exit" => [$db, 'exit', 0];
@@ -35,7 +35,7 @@ final class FinalizationTest extends IntegrationTestCase
         }
     }
 
-    #[DataProvider('ends')]
+    #[DataProvider('provideEndCases')]
     public function testOneBatchWhateverTheEnd(string $db, string $end, int $exitCode): void
     {
         $result = $this->lifecycle($db, $end);
@@ -50,7 +50,7 @@ final class FinalizationTest extends IntegrationTestCase
         }
     }
 
-    #[DataProvider('ends')]
+    #[DataProvider('provideEndCases')]
     public function testQueriesAfterFinalisationGiveNoEntry(string $db, string $end, int $exitCode): void
     {
         $result = $this->lifecycle($db, $end);
@@ -65,7 +65,7 @@ final class FinalizationTest extends IntegrationTestCase
         self::assertCount($end === 'throw' ? 1 : 0, $this->entriesWith($batch, 'qm_life_after_send'));
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testRequestWithoutQueriesSendsNothing(string $db): void
     {
         $result = $this->scenario($db, 'no-queries');
@@ -76,7 +76,7 @@ final class FinalizationTest extends IntegrationTestCase
         $this->assertNoErrors($result);
     }
 
-    #[DataProvider('ends')]
+    #[DataProvider('provideEndCases')]
     public function testThrowingAdapterIsNotCalledAgainInShutdown(string $db, string $end, int $exitCode): void
     {
         $result = $this->lifecycle($db, $end, ['QM_ADAPTER' => 'throw']);

@@ -39,6 +39,7 @@ Test sięgający po `/dev/full`, `flock`, `open_basedir`, `sh`, `ulimit`, `proc_
 - Provider jest `public static function provide…Cases(): iterable` — jedna konwencja nazw w całym zestawie.
 - Provider podpina się atrybutem `#[DataProvider('provide…Cases')]`.
 - Każdy zestaw danych ma nazwę: `yield 'pgsql identifier' => [...]`, nie `yield [...]`. Bez nazw lista przypadków mówi `#0`, a zmiana kolejności staje się niewidoczna.
+- Provider deklaruje `@return iterable<string, array{…}>`. Przy tym typie PHPStan na poziomie 8 odrzuca `yield` bez nazwy, więc nazwane zestawy egzekwuje `composer stan`, a nie tylko przegląd.
 - Provider stoi bezpośrednio nad pierwszym testem, który go używa, a gdy używa go kilka testów — nad pierwszym z nich.
 - Rodzaj bazy parametryzujemy tylko wtedy, gdy zachowanie przechodzi przez sterownik albo przez implementację zależną od bazy, albo gdy świadomie potwierdzamy wsparcie obu silników. Scenariusz niezależny od bazy nie jest mnożony przez dwa silniki „na wszelki wypadek".
 - Przypadki na MySQL i PostgreSQL idą przez wspólny mechanizm `IntegrationTestCase`, nie przez własną listę DSN w teście.

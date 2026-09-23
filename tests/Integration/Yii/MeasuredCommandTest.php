@@ -16,7 +16,7 @@ final class MeasuredCommandTest extends IntegrationTestCase
 
     private const DUPLICATE = ['mysql' => '23000', 'pgsql' => '23505'];
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testBindingWorksAsInYiiCommand(string $db): void
     {
         $without = $this->scenarioOutput($this->scenario($db, 'binding', ['enabled' => false]));
@@ -36,7 +36,7 @@ final class MeasuredCommandTest extends IntegrationTestCase
         }
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testExecuteErrorGivesErrorEntryAndUnchangedException(string $db): void
     {
         $without = $this->scenarioOutput($this->scenario($db, 'execute-error', ['enabled' => false]));
@@ -54,7 +54,7 @@ final class MeasuredCommandTest extends IntegrationTestCase
         self::assertSame('INSERT INTO qm_t1_item (id, name, flag) VALUES (:id, :name, ?)', $entries[0]['query']);
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testPrepareErrorGivesErrorEntryAndUnchangedException(string $db): void
     {
         $env = ['QM_FAIL_PREPARE' => '42000'];
@@ -71,7 +71,7 @@ final class MeasuredCommandTest extends IntegrationTestCase
         self::assertSame('42000', $entries[0]['error']);
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testEachRetryAttemptIsOneEntry(string $db): void
     {
         $without = $this->scenarioOutput($this->scenario($db, 'retry', ['enabled' => false]));
@@ -87,7 +87,7 @@ final class MeasuredCommandTest extends IntegrationTestCase
         self::assertSame(self::DUPLICATE[$db], $entries[0]['error']);
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testRequiredTransactionSendsTheStatementOnce(string $db): void
     {
         $without = $this->scenarioOutput($this->scenario($db, 'isolation', ['enabled' => false]));
@@ -103,7 +103,7 @@ final class MeasuredCommandTest extends IntegrationTestCase
         self::assertSame('success', $entries[0]['result']);
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testConnectionOpenIsNotTimed(string $db): void
     {
         $batch = $this->singleBatch($this->scenario($db, 'timing', [], ['QM_SLOW_CONNECT_MS' => (string) self::SLOW_MS]));
@@ -112,7 +112,7 @@ final class MeasuredCommandTest extends IntegrationTestCase
         self::assertLessThan(self::SLOW_MS, $entry['time_ms']);
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testSecondExecutionDoesNotCountPrepareAgain(string $db): void
     {
         $batch = $this->singleBatch($this->scenario($db, 'timing', [], ['QM_SLOW_PREPARE_MS' => (string) self::SLOW_MS]));
@@ -123,7 +123,7 @@ final class MeasuredCommandTest extends IntegrationTestCase
         self::assertLessThan(self::SLOW_MS, $twice[1]['time_ms'], 'second execution reuses the statement');
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testFetchingRowsIsNotTimed(string $db): void
     {
         $batch = $this->singleBatch($this->scenario($db, 'timing', [], ['QM_SLOW_FETCH_MS' => (string) self::SLOW_MS]));
@@ -132,7 +132,7 @@ final class MeasuredCommandTest extends IntegrationTestCase
         self::assertLessThan(self::SLOW_MS, $entry['time_ms']);
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testTimeIsAFloatInMilliseconds(string $db): void
     {
         $batch = $this->singleBatch($this->scenario($db, 'timing'));

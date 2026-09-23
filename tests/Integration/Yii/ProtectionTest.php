@@ -16,9 +16,9 @@ final class ProtectionTest extends IntegrationTestCase
     /**
      * @return iterable<string, array{string, array<string, mixed>, array<string, string>, string, int}>
      */
-    public static function faultsPerDatabase(): iterable
+    public static function provideFaultPerDatabaseCases(): iterable
     {
-        foreach (self::databases() as $name => [$db]) {
+        foreach (self::provideDatabaseCases() as $name => [$db]) {
             foreach (self::faults() as $fault => [$component, $env, $pattern, $calls]) {
                 yield "{$name} {$fault}" => [$db, $component, $env, $pattern, $calls];
             }
@@ -29,7 +29,7 @@ final class ProtectionTest extends IntegrationTestCase
      * @param array<string, mixed> $component
      * @param array<string, string> $env
      */
-    #[DataProvider('faultsPerDatabase')]
+    #[DataProvider('provideFaultPerDatabaseCases')]
     public function testFailureDoesNotChangeWhatTheApplicationGets(string $db, array $component, array $env, string $pattern, int $calls): void
     {
         $off = $this->scenario($db, 'protection', ['enabled' => false]);
@@ -49,7 +49,7 @@ final class ProtectionTest extends IntegrationTestCase
         self::assertStringNotContainsStringIgnoringCase('select', $message, 'no query text in the log');
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testThrowingAdapterIsCalledOnce(string $db): void
     {
         $result = $this->scenario($db, 'protection', [], ['QM_ADAPTER' => 'throw']);
@@ -58,7 +58,7 @@ final class ProtectionTest extends IntegrationTestCase
         self::assertSame([], $result->batches);
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testQueryInsideAdapterGivesNoEntry(string $db): void
     {
         $result = $this->scenario($db, 'protection', [], ['QM_ADAPTER' => 'query']);
@@ -72,7 +72,7 @@ final class ProtectionTest extends IntegrationTestCase
         $this->assertNoErrors($result);
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testLogTargetQueryGoesThroughMonitoredConnection(string $db): void
     {
         // control for the loop cases: without a fault, the log target's query is listed
@@ -83,7 +83,7 @@ final class ProtectionTest extends IntegrationTestCase
         self::assertSame(['qm-t1 application error'], array_column($this->errors($result), 'message'));
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testDisabledPackageLeavesNoTrace(string $db): void
     {
         $result = $this->scenario($db, 'protection', ['enabled' => false], ['QM_ADAPTER' => 'throw']);

@@ -12,7 +12,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
  */
 final class QueryMonitorComponentTest extends IntegrationTestCase
 {
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testHeader(string $db): void
     {
         $before = time();
@@ -36,7 +36,7 @@ final class QueryMonitorComponentTest extends IntegrationTestCase
         self::assertLessThanOrEqual($after + 1, $ts);
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testIdIsRandomPerProcess(string $db): void
     {
         $first = $this->singleBatch($this->scenario($db, 'per-connection'));
@@ -45,7 +45,7 @@ final class QueryMonitorComponentTest extends IntegrationTestCase
         self::assertNotSame($first['id'], $second['id']);
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testOnlyListedConnectionsGiveEntries(string $db): void
     {
         $result = $this->scenario($db, 'per-connection');
@@ -67,7 +67,7 @@ final class QueryMonitorComponentTest extends IntegrationTestCase
         }
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testModuleConnectionIsFound(string $db): void
     {
         $batch = $this->singleBatch($this->scenario($db, 'per-connection'));
@@ -77,7 +77,7 @@ final class QueryMonitorComponentTest extends IntegrationTestCase
         self::assertSame('admin/db', $onAdmin[0]['conn']);
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testListedConnectionsGetMeasuredCommand(string $db): void
     {
         $classes = $this->scenarioOutput($this->scenario($db, 'command-classes'));
@@ -87,7 +87,7 @@ final class QueryMonitorComponentTest extends IntegrationTestCase
         self::assertSame(\yii\db\Command::class, $classes['dbOther']);
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testDisabledChangesNothingAndSendsNothing(string $db): void
     {
         $classes = $this->scenarioOutput($this->scenario($db, 'command-classes', ['enabled' => false]));
@@ -99,7 +99,7 @@ final class QueryMonitorComponentTest extends IntegrationTestCase
         $this->assertNoErrors($result);
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testRequestWithoutQueriesSendsNothing(string $db): void
     {
         $result = $this->scenario($db, 'no-queries');
@@ -112,9 +112,9 @@ final class QueryMonitorComponentTest extends IntegrationTestCase
     /**
      * @return iterable<string, array{string, array<string, mixed>}>
      */
-    public static function badConfigurations(): iterable
+    public static function provideBadConfigurationCases(): iterable
     {
-        foreach (['mysql', 'pgsql'] as $db) {
+        foreach (self::provideDatabaseCases() as [$db]) {
             yield "{$db}: maxQueryLength below 3" => [$db, ['maxQueryLength' => 2]];
             yield "{$db}: empty app" => [$db, ['app' => '']];
         }
@@ -123,7 +123,7 @@ final class QueryMonitorComponentTest extends IntegrationTestCase
     /**
      * @param array<string, mixed> $component
      */
-    #[DataProvider('badConfigurations')]
+    #[DataProvider('provideBadConfigurationCases')]
     public function testBadConfigurationDisablesPackageWithOneError(string $db, array $component): void
     {
         $without = $this->scenario($db, 'per-connection', ['enabled' => false]);
@@ -138,7 +138,7 @@ final class QueryMonitorComponentTest extends IntegrationTestCase
         self::assertSame(\yii\db\Command::class, $classes['db'], 'no Command replacement when disabled');
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testUnknownConnectionIsSkippedWithOneError(string $db): void
     {
         $result = $this->scenario($db, 'per-connection', ['connections' => ['db', 'nope', 'admin/db']]);
@@ -149,7 +149,7 @@ final class QueryMonitorComponentTest extends IntegrationTestCase
         self::assertCount(1, $this->entriesWith($batch, 'qm_on_admin'));
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testUnknownModuleIsSkippedWithOneError(string $db): void
     {
         $result = $this->scenario($db, 'per-connection', ['connections' => ['db', 'nomodule/db']]);

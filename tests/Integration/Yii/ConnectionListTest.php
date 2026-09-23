@@ -25,7 +25,7 @@ final class ConnectionListTest extends IntegrationTestCase
 
     private const MAX_RUN_S = 2;
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testConnectionWithoutDsnIsSkippedWithoutConnecting(string $db): void
     {
         $started = microtime(true);
@@ -41,7 +41,7 @@ final class ConnectionListTest extends IntegrationTestCase
         self::assertSame([], $result->batches);
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testConnectionWithoutDsnLeavesRestOfListWorking(string $db): void
     {
         $result = $this->probe($db, ['db', 'dbMasters', 'admin/db'], self::mastersOnly($db), query: ['db']);
@@ -50,7 +50,7 @@ final class ConnectionListTest extends IntegrationTestCase
         self::assertCount(1, $this->entriesWith($this->singleBatch($result), 'qm_on_db'));
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testListedConnectionIsNotOpenedByBootstrap(string $db): void
     {
         $result = $this->probe($db, ['db', 'admin/db'], [], state: ['db']);
@@ -60,7 +60,7 @@ final class ConnectionListTest extends IntegrationTestCase
         self::assertSame([], $result->batches);
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testOwnCommandClassIsSkippedAndKept(string $db): void
     {
         $result = $this->probe($db, ['db', 'dbCustom'], [
@@ -74,7 +74,7 @@ final class ConnectionListTest extends IntegrationTestCase
         self::assertCount(1, $this->entriesWith($this->singleBatch($result), 'qm_on_db'));
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testOwnCommandMapIsSkippedAndKept(string $db): void
     {
         $result = $this->probe($db, ['db', 'dbMap'], [
@@ -91,9 +91,9 @@ final class ConnectionListTest extends IntegrationTestCase
     /**
      * @return iterable<string, array{string, list<string>, string}>
      */
-    public static function aliasOrders(): iterable
+    public static function provideAliasOrderCases(): iterable
     {
-        foreach (['mysql', 'pgsql'] as $db) {
+        foreach (self::provideDatabaseCases() as [$db]) {
             yield "{$db}: db first" => [$db, ['db', 'aliasDb'], 'db'];
             yield "{$db}: alias first" => [$db, ['aliasDb', 'db'], 'aliasDb'];
         }
@@ -102,7 +102,7 @@ final class ConnectionListTest extends IntegrationTestCase
     /**
      * @param list<string> $connections
      */
-    #[DataProvider('aliasOrders')]
+    #[DataProvider('provideAliasOrderCases')]
     public function testSameConnectionUnderTwoIdsCountsTheFirstId(string $db, array $connections, string $expected): void
     {
         $result = $this->probe($db, $connections, ['aliasDb' => 'alias:db'], query: ['aliasDb', 'db']);

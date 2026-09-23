@@ -14,7 +14,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
  */
 final class FrontActionTest extends IntegrationTestCase
 {
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testActionOfMainApplicationHasNoModule(string $db): void
     {
         $batch = $this->singleBatch($this->scenario($db, 'lifecycle'));
@@ -22,7 +22,7 @@ final class FrontActionTest extends IntegrationTestCase
         self::assertSame([null, 'scenario', 'run'], self::entryAction($batch));
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testActionOfNestedModuleHasModulePathAndLocalIds(string $db): void
     {
         $result = $this->route($db, 'admin/orders/order/view');
@@ -33,7 +33,7 @@ final class FrontActionTest extends IntegrationTestCase
         self::assertNotEmpty($batch['queries']);
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testNestedRunActionKeepsEntryAction(string $db): void
     {
         $result = $this->scenario($db, 'nested-run');
@@ -44,7 +44,7 @@ final class FrontActionTest extends IntegrationTestCase
         self::assertCount(1, $this->entriesWith($batch, 'qm_nested_after'));
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testQueryInInnerActionKeepsOuterAction(string $db): void
     {
         $result = $this->route($db, 'site/nested');
@@ -55,7 +55,7 @@ final class FrontActionTest extends IntegrationTestCase
         self::assertNotEmpty($this->entriesWith($batch, 'qm_order'), 'queries of the inner action');
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testErrorActionDoesNotReplaceEntryAction(string $db): void
     {
         // a UserException: under YII_DEBUG the ErrorHandler runs errorAction only for those
@@ -70,7 +70,7 @@ final class FrontActionTest extends IntegrationTestCase
         self::assertCount(1, $this->entriesWith($batch, 'qm_in_error'), 'the error action ran its query');
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testNotFoundBeforeRoutingHasNoAction(string $db): void
     {
         $result = $this->route($db, 'qm-t1-missing/none', ['QM_ERROR_ACTION' => '1']);
@@ -80,7 +80,7 @@ final class FrontActionTest extends IntegrationTestCase
         self::assertCount(1, $this->entriesWith($batch, 'qm_in_error'), 'the error action ran its query');
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testForeignBeforeActionEventWithPlainEventIsIgnored(string $db): void
     {
         // before routing, so the package's handler is still attached when the plain Event arrives

@@ -13,7 +13,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
  */
 final class ActiveRecordIntegrationTest extends IntegrationTestCase
 {
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testActiveRecordWithDifferentValuesGivesSameQueryWithoutValues(string $db): void
     {
         $this->requireDatabase($db);
@@ -43,7 +43,7 @@ final class ActiveRecordIntegrationTest extends IntegrationTestCase
         }
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testSecondCallInQueryCacheGivesNoEntry(string $db): void
     {
         $result = $this->scenario($db, 'query-cache');
@@ -55,7 +55,7 @@ final class ActiveRecordIntegrationTest extends IntegrationTestCase
         $this->assertNoErrors($result);
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testWithoutQueryCacheBothCallsAreEntries(string $db): void
     {
         // control for the cache case: the same scenario without Connection::cache()
@@ -65,7 +65,7 @@ final class ActiveRecordIntegrationTest extends IntegrationTestCase
         self::assertCount(2, $this->entriesWith($this->singleBatch($result), 'qm_cached'));
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testTwoConnectionsGiveEntriesInOrderOfCompletion(string $db): void
     {
         $result = $this->scenario($db, 'two-connections');
@@ -85,7 +85,7 @@ final class ActiveRecordIntegrationTest extends IntegrationTestCase
         ], $sequence);
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testNestedTransactionsGiveSavepointEntries(string $db): void
     {
         $result = $this->scenario($db, 'savepoints');

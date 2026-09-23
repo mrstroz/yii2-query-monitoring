@@ -19,7 +19,7 @@ abstract class IntegrationTestCase extends TestCase
     /**
      * @return iterable<string, array{string}>
      */
-    public static function databases(): iterable
+    public static function provideDatabaseCases(): iterable
     {
         yield 'mysql' => ['mysql'];
         yield 'pgsql' => ['pgsql'];

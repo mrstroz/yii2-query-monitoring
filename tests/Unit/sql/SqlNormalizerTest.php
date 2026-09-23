@@ -16,7 +16,7 @@ final class SqlNormalizerTest extends TestCase
     /**
      * @return iterable<string, array{string, ?string}>
      */
-    public static function commonCases(): iterable
+    public static function provideCommonCases(): iterable
     {
         yield 'named parameter stays' => ['SELECT * FROM t WHERE a = :qp0', 'SELECT * FROM t WHERE a = :qp0'];
         yield 'many named parameters stay' => ['SELECT * FROM t WHERE a = :qp0 AND b = :qp10', 'SELECT * FROM t WHERE a = :qp0 AND b = :qp10'];
@@ -46,13 +46,13 @@ final class SqlNormalizerTest extends TestCase
         yield 'unclosed block comment' => ['SELECT a /* never closed', null];
     }
 
-    #[DataProvider('commonCases')]
+    #[DataProvider('provideCommonCases')]
     public function testCommonRulesForMysql(string $sql, ?string $expected): void
     {
         self::assertSame($expected, (new SqlNormalizer())->normalize($sql, 'mysql'));
     }
 
-    #[DataProvider('commonCases')]
+    #[DataProvider('provideCommonCases')]
     public function testCommonRulesForPgsql(string $sql, ?string $expected): void
     {
         self::assertSame($expected, (new SqlNormalizer())->normalize($sql, 'pgsql'));
@@ -61,7 +61,7 @@ final class SqlNormalizerTest extends TestCase
     /**
      * @return iterable<string, array{string, ?string}>
      */
-    public static function mysqlCases(): iterable
+    public static function provideMysqlCases(): iterable
     {
         yield 'double quotes are a literal' => ['SELECT "email" FROM "users"', 'SELECT ? FROM ?'];
         yield 'backticks stay' => ['SELECT `email` FROM `order` WHERE `id` = :qp0', 'SELECT `email` FROM `order` WHERE `id` = :qp0'];
@@ -77,7 +77,7 @@ final class SqlNormalizerTest extends TestCase
         yield 'block comment ends at first close' => ['SELECT /* a /* b */ 1', 'SELECT ?'];
     }
 
-    #[DataProvider('mysqlCases')]
+    #[DataProvider('provideMysqlCases')]
     public function testMysqlDialect(string $sql, ?string $expected): void
     {
         self::assertSame($expected, (new SqlNormalizer())->normalize($sql, 'mysql'));
@@ -86,7 +86,7 @@ final class SqlNormalizerTest extends TestCase
     /**
      * @return iterable<string, array{string, ?string}>
      */
-    public static function pgsqlCases(): iterable
+    public static function providePgsqlCases(): iterable
     {
         yield 'double quotes are identifiers' => ['SELECT "email" FROM "users"', 'SELECT "email" FROM "users"'];
         yield 'dollar parameters stay' => ['SELECT * FROM t WHERE a = $1 AND b = $12', 'SELECT * FROM t WHERE a = $1 AND b = $12'];
@@ -106,7 +106,7 @@ final class SqlNormalizerTest extends TestCase
         yield 'nested block comment is unknown' => ['SELECT /* a /* b */ secret */ 1', null];
     }
 
-    #[DataProvider('pgsqlCases')]
+    #[DataProvider('providePgsqlCases')]
     public function testPgsqlDialect(string $sql, ?string $expected): void
     {
         self::assertSame($expected, (new SqlNormalizer())->normalize($sql, 'pgsql'));
@@ -121,18 +121,18 @@ final class SqlNormalizerTest extends TestCase
     }
 
     /**
-     * @return iterable<int, array{string}>
+     * @return iterable<string, array{string}>
      */
-    public static function unsupportedDbs(): iterable
+    public static function provideUnsupportedDbCases(): iterable
     {
-        yield ['sqlite'];
-        yield ['mongodb'];
-        yield ['oci'];
-        yield [''];
-        yield ['MYSQL'];
+        yield 'sqlite' => ['sqlite'];
+        yield 'mongodb' => ['mongodb'];
+        yield 'oci' => ['oci'];
+        yield 'empty name' => [''];
+        yield 'mysql in upper case' => ['MYSQL'];
     }
 
-    #[DataProvider('unsupportedDbs')]
+    #[DataProvider('provideUnsupportedDbCases')]
     public function testUnsupportedDbGivesNull(string $db): void
     {
         self::assertNull((new SqlNormalizer())->normalize('SELECT 1', $db));
@@ -152,16 +152,16 @@ final class SqlNormalizerTest extends TestCase
     }
 
     /**
-     * @return iterable<int, array{int}>
+     * @return iterable<string, array{int}>
      */
-    public static function tooSmallLimits(): iterable
+    public static function provideTooSmallLimitCases(): iterable
     {
-        yield [0];
-        yield [2];
-        yield [-1];
+        yield 'zero' => [0];
+        yield 'shorter than the ellipsis' => [2];
+        yield 'negative' => [-1];
     }
 
-    #[DataProvider('tooSmallLimits')]
+    #[DataProvider('provideTooSmallLimitCases')]
     public function testLimitSmallerThanEllipsisIsRejected(int $max): void
     {
         $this->expectException(\InvalidArgumentException::class);
@@ -229,7 +229,7 @@ final class SqlNormalizerTest extends TestCase
     /**
      * @return iterable<string, array{string, string, string}>
      */
-    public static function operationCases(): iterable
+    public static function provideOperationCases(): iterable
     {
         yield 'select' => ['SELECT 1', 'mysql', 'select'];
         yield 'lower case and whitespace' => ["  \n\tselect 1", 'pgsql', 'select'];
@@ -252,7 +252,7 @@ final class SqlNormalizerTest extends TestCase
         yield 'digit first' => ['1', 'mysql', ''];
     }
 
-    #[DataProvider('operationCases')]
+    #[DataProvider('provideOperationCases')]
     public function testOperation(string $sql, string $db, string $expected): void
     {
         self::assertSame($expected, (new SqlNormalizer())->operation($sql, $db));

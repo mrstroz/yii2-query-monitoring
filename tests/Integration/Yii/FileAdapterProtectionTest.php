@@ -32,7 +32,7 @@ final class FileAdapterProtectionTest extends IntegrationTestCase
         FileHelper::removeDirectory($this->dir);
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testLockHeldByAnotherProcessLosesTheBatchWithoutError(string $db): void
     {
         $working = $this->withFile($db, $this->dir . '/working/queries.jsonl');
@@ -59,15 +59,15 @@ final class FileAdapterProtectionTest extends IntegrationTestCase
     /**
      * @return iterable<string, array{string, string}>
      */
-    public static function unwritableFiles(): iterable
+    public static function provideUnwritableFileCases(): iterable
     {
-        foreach (['mysql', 'pgsql'] as $db) {
+        foreach (self::provideDatabaseCases() as [$db]) {
             yield "{$db}: directory without write permission" => [$db, 'read-only'];
             yield "{$db}: parent is a regular file" => [$db, 'file'];
         }
     }
 
-    #[DataProvider('unwritableFiles')]
+    #[DataProvider('provideUnwritableFileCases')]
     public function testUnwritableFileLogsOneErrorAndChangesNothing(string $db, string $case): void
     {
         $working = $this->withFile($db, $this->dir . '/working/queries.jsonl');

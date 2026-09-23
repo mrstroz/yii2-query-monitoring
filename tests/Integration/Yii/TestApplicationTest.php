@@ -14,7 +14,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
  */
 final class TestApplicationTest extends IntegrationTestCase
 {
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testSchemaIsCreatedAndCreationIsIdempotent(string $db): void
     {
         $this->requireDatabase($db);
@@ -27,7 +27,7 @@ final class TestApplicationTest extends IntegrationTestCase
         $connection->close();
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testApplicationRunsInAnotherProcess(string $db): void
     {
         $out = $this->scenarioOutput($this->scenario($db, 'process'));
@@ -35,7 +35,7 @@ final class TestApplicationTest extends IntegrationTestCase
         self::assertNotSame(getmypid(), $out['pid']);
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testActiveRecordRequestGivesBatchWithoutValues(string $db): void
     {
         $this->requireDatabase($db);
@@ -63,7 +63,7 @@ final class TestApplicationTest extends IntegrationTestCase
         self::assertStringNotContainsString('12.5', $json);
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testModuleRouteUsesModuleConnection(string $db): void
     {
         $this->requireDatabase($db);
@@ -77,7 +77,7 @@ final class TestApplicationTest extends IntegrationTestCase
         self::assertSame(['admin/db'], array_values(array_unique(array_column($orders, 'conn'))));
     }
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testRouteWithoutQueriesGivesNoBatch(string $db): void
     {
         $this->requireDatabase($db);

@@ -16,7 +16,7 @@ final class ReadmeExampleTest extends IntegrationTestCase
 {
     private const MARKER = '<!-- example:sql-config -->';
 
-    #[DataProvider('databases')]
+    #[DataProvider('provideDatabaseCases')]
     public function testConfigurationExampleRunsInTheTestApplication(string $db): void
     {
         $example = $this->example();
