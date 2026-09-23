@@ -56,7 +56,7 @@ Pakiet rejestruje `MongoDB\Driver\Monitoring\CommandSubscriber` przez `addSubscr
 | `query` | Z dokumentu polecenia według [02 §4](02-format-paczki.md#4-normalizacja). Polecenie, którego normalizacja nie opisuje, daje `null` |
 | Pomiar | `durationMicros` zdarzenia końca podzielone przez 1000 i zaokrąglone do trzech miejsc po przecinku |
 | `CommandFailed` | `result: error` z kodem liczbowym |
-| `writeErrors` lub `writeConcernError` w `CommandSucceeded` | `result: error` z kodem pierwszego elementu `writeErrors`, a bez `writeErrors` z kodem `writeConcernError`. Błąd pojedynczej instrukcji jest dokładniejszy niż niepotwierdzony zapis |
+| `writeErrors` lub `writeConcernError` w `CommandSucceeded` | `result: error` z kodem pierwszego elementu `writeErrors`, a bez `writeErrors` z kodem `writeConcernError`. Błąd pojedynczej instrukcji jest dokładniejszy niż niepotwierdzony zapis. Z odpowiedzi pakiet bierze tylko te kody, a czyta ją dla każdego polecenia oprócz `find`, `getMore` i `aggregate`, których odpowiedź niesie dokumenty wyników. `writeConcernError` z `aggregate` z `$out` albo `$merge` nie daje więc `result: error` |
 | `getMore` | Osobny wpis z `op: getMore` |
 | Podzielony `insertMany` | Tyle wpisów, ile poleceń sterownik wysłał |
 

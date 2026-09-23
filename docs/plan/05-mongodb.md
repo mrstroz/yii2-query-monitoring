@@ -33,12 +33,12 @@
       Gotowe, gdy: `find()->all()` modelu `yii\mongodb\ActiveRecord` daje wpis `db: mongodb` z `conn`, `op: find`, znormalizowanym `query`, `time_ms` i `caller` z ramką kontrolera przy granicy 64 z ADR-0009; połączenie otwarte przed bootstrapem pakietu i otwarte ponownie po `close()` daje wpisy, każde polecenie raz; połączenie MongoDB spoza listy nie daje wpisów; testy `mongodb\Recorder` w `Unit` pokrywają parowanie zdarzeń ze spec 01 §3; wyjątek wymuszony w subskrybencie nie zmienia wyniku operacji ani odpowiedzi; polecenie wykonane przez adapter albo po finalizacji nie daje wpisu.
       Wyjątek z subskrybenta przerywa rozsyłanie zdarzenia w sterowniku (`if (EG(exception)) break;` w `phongo_apm_dispatch_event()`, `src/phongo_apm.c` w `mongo-php-driver`) i zostaje wyjątkiem PHP, więc każda metoda subskrybenta idzie przez `Guard`.
 
-- [ ] (=) **YQM-36** Wynik polecenia MongoDB: `CommandFailed`, `writeErrors` i `writeConcernError`
+- [x] (=) **YQM-36** Wynik polecenia MongoDB: `CommandFailed`, `writeErrors` i `writeConcernError`
       Spec: [01 §3](../spec/01-zbieranie-danych.md#3-źródło-mongodb) · [02 §2](../spec/02-format-paczki.md#2-wpis) · Zależy od: YQM-35
       Gotowe, gdy: zduplikowany klucz w `insert` daje w `CommandSucceeded` wpis `result: error` z `error: "11000"`, wymuszony `writeConcernError` daje swój kod jako tekst, odpowiedź z `writeErrors` i `writeConcernError` naraz daje kod z `writeErrors`, polecenie odrzucone przez serwer daje kod z `CommandFailed`, a aplikacja w każdym przypadku dostaje ten sam wynik albo wyjątek co bez pakietu.
       `getReply()` zamienia na obiekty PHP całą odpowiedź, z `firstBatch` wyników `find` włącznie; kiedy pakiet ją czyta, zapisuje spec 01 §3 w tym zadaniu.
 
-- [ ] (=) **YQM-37** `getMore` i podzielony `insert` jako osobne wpisy
+- [x] (=) **YQM-37** `getMore` i podzielony `insert` jako osobne wpisy
       Spec: [01 §3](../spec/01-zbieranie-danych.md#3-źródło-mongodb) · Zależy od: YQM-35
       Gotowe, gdy: odczyt kursora dłuższego niż pierwsza porcja daje wpis `op: find` i po jednym wpisie `op: getMore` na każdą następną porcję, a `batchInsert` większy niż `maxWriteBatchSize` serwera daje tyle wpisów `op: insert`, ile zdarzeń `CommandStarted` polecenia `insert` zobaczył niezależny subskrybent testowy.
 

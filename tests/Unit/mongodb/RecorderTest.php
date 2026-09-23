@@ -21,13 +21,15 @@ final class RecorderTest extends LoggedTestCase
 {
     private int $documentsRead = 0;
 
+    private int $repliesRead = 0;
+
     public function testPairOfEventsGivesOneEntry(): void
     {
         $collector = $this->collector();
         $recorder = $this->recorder($collector);
 
         $recorder->started('7', 'find', $this->document(['find' => 'contacts', 'filter' => (object) ['email' => 'alice@example.com']]));
-        $recorder->succeeded('7', 1235);
+        $recorder->succeeded('7', 1235, $this->reply([]));
 
         $queries = $collector->close(new \DateTimeImmutable())->queries;
         self::assertCount(1, $queries);
@@ -46,6 +48,62 @@ final class RecorderTest extends LoggedTestCase
         self::assertSame([QueryEntry::RESULT_ERROR, '2', 0.4], [$entry->result, $entry->error, $entry->timeMs]);
     }
 
+    /**
+     * @return iterable<string, array{string, array<string, mixed>, ?string}>
+     */
+    public static function provideWriteReplyCases(): iterable
+    {
+        $writeError = (object) ['index' => 0, 'code' => 11000, 'errmsg' => 'E11000 duplicate key dup key: { _id: "alice@example.com" }'];
+        $concernError = (object) ['code' => 64, 'errmsg' => 'waiting for replication timed out'];
+        yield 'write error' => ['insert', ['n' => 0, 'writeErrors' => [$writeError], 'ok' => 1.0], '11000'];
+        yield 'write concern error' => ['update', ['n' => 1, 'writeConcernError' => $concernError, 'ok' => 1.0], '64'];
+        yield 'both: write error wins' => ['delete', ['n' => 0, 'writeErrors' => [$writeError], 'writeConcernError' => $concernError, 'ok' => 1.0], '11000'];
+        yield 'write concern error of findAndModify' => ['findAndModify', ['value' => null, 'writeConcernError' => $concernError, 'ok' => 1.0], '64'];
+        yield 'empty write errors' => ['insert', ['n' => 1, 'writeErrors' => [], 'ok' => 1.0], null];
+        yield 'clean write' => ['insert', ['n' => 1, 'ok' => 1.0], null];
+        yield 'code that is not a number' => ['insert', ['n' => 0, 'writeErrors' => [(object) ['code' => 'x']], 'ok' => 1.0], null];
+    }
+
+    /**
+     * @param array<string, mixed> $reply
+     */
+    #[DataProvider('provideWriteReplyCases')]
+    public function testWriteReplyGivesItsErrorCode(string $command, array $reply, ?string $expected): void
+    {
+        $collector = $this->collector();
+        $recorder = $this->recorder($collector);
+
+        $recorder->started('1', $command, $this->document([$command => 'c']));
+        $recorder->succeeded('1', 1000, $this->reply($reply));
+
+        $entry = $collector->close(new \DateTimeImmutable())->queries[0];
+        self::assertSame([$expected === null ? QueryEntry::RESULT_SUCCESS : QueryEntry::RESULT_ERROR, $expected], [$entry->result, $entry->error]);
+        self::assertStringNotContainsString('alice', (string) json_encode($entry->toArray()), 'only the code leaves the reply');
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function provideReplyNotReadCases(): iterable
+    {
+        yield 'find' => ['find'];
+        yield 'getMore' => ['getMore'];
+        yield 'aggregate' => ['aggregate'];
+    }
+
+    #[DataProvider('provideReplyNotReadCases')]
+    public function testReplyOfCommandsWithResultDocumentsIsNotRead(string $command): void
+    {
+        $collector = $this->collector();
+        $recorder = $this->recorder($collector);
+
+        $recorder->started('1', $command, $this->document([$command => 'c']));
+        $recorder->succeeded('1', 1000, $this->reply(['writeConcernError' => (object) ['code' => 64], 'ok' => 1.0]));
+
+        self::assertSame(0, $this->repliesRead);
+        self::assertSame(QueryEntry::RESULT_SUCCESS, $collector->close(new \DateTimeImmutable())->queries[0]->result);
+    }
+
     public function testInterleavedCommandsArePairedByRequestId(): void
     {
         $collector = $this->collector();
@@ -53,8 +111,8 @@ final class RecorderTest extends LoggedTestCase
 
         $recorder->started('1', 'find', $this->document(['find' => 'a']));
         $recorder->started('2', 'count', $this->document(['count' => 'b']));
-        $recorder->succeeded('2', 1000);
-        $recorder->succeeded('1', 2000);
+        $recorder->succeeded('2', 1000, $this->reply([]));
+        $recorder->succeeded('1', 2000, $this->reply([]));
 
         $queries = $collector->close(new \DateTimeImmutable())->queries;
         self::assertSame([['count', 'b', 1.0], ['find', 'a', 2.0]], array_map(static fn(QueryEntry $e): array => [$e->op, $e->query, $e->timeMs], $queries));
@@ -65,7 +123,7 @@ final class RecorderTest extends LoggedTestCase
         $collector = $this->collector();
         $recorder = $this->recorder($collector);
 
-        $recorder->succeeded('9', 1000);
+        $recorder->succeeded('9', 1000, $this->reply([]));
         $recorder->failed('10', 1000, '2');
 
         self::assertSame([0, 0], [$collector->count(), $collector->dropped()]);
@@ -77,8 +135,8 @@ final class RecorderTest extends LoggedTestCase
         $recorder = $this->recorder($collector);
 
         $recorder->started('1', 'find', $this->document(['find' => 'a']));
-        $recorder->succeeded('1', 1000);
-        $recorder->succeeded('1', 1000);
+        $recorder->succeeded('1', 1000, $this->reply([]));
+        $recorder->succeeded('1', 1000, $this->reply([]));
         $recorder->failed('1', 1000, '2');
 
         self::assertSame(1, $collector->count());
@@ -90,7 +148,7 @@ final class RecorderTest extends LoggedTestCase
         $recorder = $this->recorder($collector);
 
         $recorder->started('1', 'createIndexes', $this->document(['createIndexes' => 'a', 'indexes' => []]));
-        $recorder->succeeded('1', 1000);
+        $recorder->succeeded('1', 1000, $this->reply([]));
 
         $entry = $collector->close(new \DateTimeImmutable())->queries[0];
         self::assertSame(['createIndexes', null], [$entry->op, $entry->query]);
@@ -104,7 +162,7 @@ final class RecorderTest extends LoggedTestCase
         $collector->pause();
         $recorder->started('1', 'find', $this->document(['find' => 'a']));
         $collector->resume();
-        $recorder->succeeded('1', 1000);
+        $recorder->succeeded('1', 1000, $this->reply([]));
 
         self::assertSame([0, 0, 0], [$collector->count(), $collector->dropped(), $this->documentsRead]);
     }
@@ -116,7 +174,7 @@ final class RecorderTest extends LoggedTestCase
 
         $recorder->started('1', 'find', $this->document(['find' => 'a']));
         $batch = $collector->close(new \DateTimeImmutable());
-        $recorder->succeeded('1', 1000);
+        $recorder->succeeded('1', 1000, $this->reply([]));
 
         self::assertSame([], $batch->queries);
         self::assertSame(0, $collector->dropped());
@@ -128,7 +186,7 @@ final class RecorderTest extends LoggedTestCase
         $recorder = $this->recorder($collector);
 
         $recorder->started('1', 'find', $this->document(['find' => 'a']));
-        $recorder->succeeded('1', 1000);
+        $recorder->succeeded('1', 1000, $this->reply([]));
 
         self::assertSame([1, 1, 0], [$collector->count(), $collector->dropped(), $this->documentsRead]);
     }
@@ -140,9 +198,9 @@ final class RecorderTest extends LoggedTestCase
 
         $recorder->started('1', 'find', $this->document(['find' => 'a']));
         $recorder->started('2', 'find', $this->document(['find' => 'b']));
-        $recorder->succeeded('2', 1000);
-        $recorder->succeeded('1', 1000);
-        $recorder->succeeded('1', 1000);
+        $recorder->succeeded('2', 1000, $this->reply([]));
+        $recorder->succeeded('1', 1000, $this->reply([]));
+        $recorder->succeeded('1', 1000, $this->reply([]));
 
         self::assertSame([1, 1], [$collector->count(), $collector->dropped()], 'the end event removed the state before counting it, so a repeated end counts nothing');
     }
@@ -154,9 +212,9 @@ final class RecorderTest extends LoggedTestCase
 
         $recorder->started('1', 'find', $this->document(['find' => 'a']));
         $collector->pause();
-        $recorder->succeeded('1', 1000);
+        $recorder->succeeded('1', 1000, $this->reply([]));
         $collector->resume();
-        $recorder->succeeded('1', 1000);
+        $recorder->succeeded('1', 1000, $this->reply([]));
 
         self::assertSame(0, $collector->count(), 'the command ended while the adapter sent; no state is left for a later event');
     }
@@ -179,7 +237,7 @@ final class RecorderTest extends LoggedTestCase
         $recorder = new Recorder('mongodb', new MongoDbNormalizer(8192), $collector, new Guard(), $callers);
 
         $recorder->started('1', 'find', $this->document(['find' => 'a']));
-        $event === 'succeeded' ? $recorder->succeeded('1', 1000) : $recorder->failed('1', 1000, '2');
+        $event === 'succeeded' ? $recorder->succeeded('1', 1000, $this->reply([])) : $recorder->failed('1', 1000, '2');
 
         self::assertSame(0, $collector->count());
         self::assertCount(1, $this->errors());
@@ -193,7 +251,7 @@ final class RecorderTest extends LoggedTestCase
         $recorder = $this->recorder($collector, $broken);
 
         $recorder->started('1', 'find', $this->document(['find' => 'a', 'filter' => (object) ['email' => 'alice@example.com']]));
-        $recorder->succeeded('1', 1000);
+        $recorder->succeeded('1', 1000, $this->reply([]));
         $recorder->started('2', 'find', $this->document(['find' => 'a']));
 
         self::assertSame([0, 0], [$collector->count(), $collector->dropped()]);
@@ -209,7 +267,7 @@ final class RecorderTest extends LoggedTestCase
         $recorder = $this->recorder($collector);
 
         $recorder->started('1', 'find', static fn(): object => throw new \RuntimeException('BSON'));
-        $recorder->succeeded('1', 1000);
+        $recorder->succeeded('1', 1000, $this->reply([]));
 
         self::assertSame(0, $collector->count());
         self::assertCount(1, $this->errors());
@@ -222,7 +280,7 @@ final class RecorderTest extends LoggedTestCase
 
         $recorder->started('1', 'find', $this->document(['find' => 'a']));
         $line = __LINE__ + 1;
-        $recorder->succeeded('1', 1000);
+        $recorder->succeeded('1', 1000, $this->reply([]));
 
         $caller = $collector->close(new \DateTimeImmutable())->queries[0]->caller;
         self::assertSame('tests/Unit/mongodb/RecorderTest.php:' . $line, $caller[0]);
@@ -239,6 +297,20 @@ final class RecorderTest extends LoggedTestCase
             $this->documentsRead++;
 
             return (object) $command;
+        };
+    }
+
+    /**
+     * @param array<string, mixed> $reply
+     *
+     * @return \Closure(): object
+     */
+    private function reply(array $reply): \Closure
+    {
+        return function () use ($reply): object {
+            $this->repliesRead++;
+
+            return (object) $reply;
         };
     }
 

@@ -13,8 +13,8 @@ use MongoDB\Driver\Monitoring\CommandSucceededEvent;
  * The driver's hook: hands each command event to the {@see Recorder} of its client key (spec 01 §3, ADR-0010).
  *
  * The only class of the package that needs `ext-mongodb`; {@see Source} creates it after checking the interface
- * exists. It reads the event and does nothing else. The command document is passed as a closure, so it is built
- * only when the recorder keeps the entry, and never outlives the call.
+ * exists. It reads the event and does nothing else. The command document and the reply are passed as closures,
+ * so they are built only when the recorder needs them, and never outlive the call.
  */
 final class Subscriber implements CommandSubscriber
 {
@@ -27,7 +27,7 @@ final class Subscriber implements CommandSubscriber
 
     public function commandSucceeded(CommandSucceededEvent $event): void
     {
-        $this->recorder->succeeded($event->getRequestId(), $event->getDurationMicros());
+        $this->recorder->succeeded($event->getRequestId(), $event->getDurationMicros(), static fn(): object => $event->getReply());
     }
 
     public function commandFailed(CommandFailedEvent $event): void

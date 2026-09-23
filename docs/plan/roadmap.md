@@ -4,9 +4,9 @@
 
 | Pole | Wartość |
 |---|---|
-| **Etap** | E4. Źródło MongoDB, 5 z 10 |
-| **Ostatnio ukończone** | [YQM-35](05-mongodb.md): `mongodb\Source`, `mongodb\Subscriber` i `mongodb\Recorder`: jeden subskrybent na klucz klienta sterownika, podpinany przy instalacji i w każdym `EVENT_AFTER_OPEN`, wpis na parę zdarzeń po `requestId`, `CommandFailed` z kodem serwera |
-| **Następne** | [YQM-36](05-mongodb.md): `writeErrors` i `writeConcernError` w `CommandSucceeded`, razem z [YQM-37](05-mongodb.md) (`getMore` i podzielony `insert`) |
+| **Etap** | E4. Źródło MongoDB, 7 z 10 |
+| **Ostatnio ukończone** | [YQM-36 i YQM-37](05-mongodb.md), jeden commit: `writeErrors` przed `writeConcernError` w odpowiedzi `CommandSucceeded` i kod z `CommandFailed` jako `result: error`; odpowiedź czytana dla poleceń innych niż `find`, `getMore` i `aggregate` ([spec 01 §3](../spec/01-zbieranie-danych.md#3-źródło-mongodb)). `getMore` i każda część podzielonego `insert` to osobne wpisy |
+| **Następne** | [YQM-38](05-mongodb.md): granica `caller` zmierzona na ścieżkach zdarzeń sterownika |
 
 Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trzeba zajrzeć na początku sesji.
 
@@ -18,7 +18,7 @@ Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trze
 | **E1** | [02-adapter-plikowy](02-adapter-plikowy.md) | Adapter plikowy z rotacją | Paczki w `runtime/logs`, bezpieczne przy 8 procesach | 6/6 |
 | **E2** | [03-testy](03-testy.md) | Architektura i konwencje testów | Cztery testsuite'y, konwencje spisane i zastosowane, żaden scenariusz nie zniknął | 8/8 |
 | **E3** | [04-kontekst-wpisu](04-kontekst-wpisu.md) | Kontekst wpisu i limity | Paczka `v: 2` z `route` w nagłówku i `caller` we wpisie, `maxQueryLength` 8192, limity paczki potwierdzone pomiarem | 4/4 |
-| **E4** | [05-mongodb](05-mongodb.md) | Źródło MongoDB | Jedna paczka z wpisami SQL i MongoDB | 5/10 |
+| **E4** | [05-mongodb](05-mongodb.md) | Źródło MongoDB | Jedna paczka z wpisami SQL i MongoDB | 7/10 |
 | **E5** | [06-konsola](06-konsola.md) | Zadania konsolowe | Wiele paczek z `seq` w jednym procesie | – |
 | **E6** | [07-wydajnosc-i-odbior](07-wydajnosc-i-odbior.md) | Test wydajności, dokumentacja | Narzut w progu, limity potwierdzone, README pakietu | – |
 
@@ -54,7 +54,7 @@ Efekt uboczny: do końca E3 pakiet nie ma MongoDB, więc demo w aplikacji z Mong
 | Dokumenty poleceń `yii2-mongodb` nie pasują do sekcji z [spec 02 §4](../spec/02-format-paczki.md#4-normalizacja) | Sonda, pytanie 4. YQM-32: `find` niesie `filter`, `sort`, `limit`, `skip`; `update` warunek w `updates[].q` i zmianę w `updates[].u`; `delete` w `deletes[].q`; `count` i `findAndModify` w `query`; `aggregate` w `pipeline`; `insert` w `documents`; `getMore` i `killCursors` kolekcję w `collection` i `killCursors`. Każde polecenie ma `$db` i `lsid`. W trakcie żądania sterownik sam wysyła tylko `killCursors` porzuconego kursora, `hello` nie jest zgłaszane. Poprawka spec 02 §4 zrobiona w YQM-34: tabela poleceń i ich sekcji | YQM-34, E4 |
 | Ślad brany w procedurze zdarzenia końca potrzebuje innej granicy niż 64 z [ADR 0009](../adr/0009-caller-i-route-w-formacie-v2.md) | Sonda, pytanie 5. YQM-32, liczone od domknięcia strażnika w procedurze zdarzenia końca: pierwsza ramka aplikacji na 7 (`Collection::insert()`, `getMore` z `batch()`), 10 (`ActiveRecord::find()->one()`), 11 (`find` z `batch()`) i 22 (`count` i `find` z `ActiveDataProvider` w `GridView`), w granicy 64. Głębsze ścieżki mierzy YQM-38 | YQM-38, E4 |
 | Pojedynczy serwer MongoDB nie zwraca `writeConcernError`, więc YQM-36 nie ma czego testować | Sonda, pytanie 6. YQM-32: `w: 2` i tag na pojedynczym serwerze dają `CommandFailed` z kodem 2, a fail point `failCommand` z `writeConcernError` wymaga `enableTestCommands`, więc compose i CI uruchamiają `mongod` z tym parametrem. Duplikat `_id` daje `writeErrors` z kodem 11000 w `CommandSucceeded`, fail point przy duplikacie daje oba naraz, zły operator w filtrze daje `CommandFailed` z kodem 2 | YQM-36, E4 |
-| `getCommand()` i `getReply()` zamieniają cały BSON polecenia i odpowiedzi na obiekty PHP, więc duży `insert` albo `find` kosztuje proporcjonalnie do danych | Odpowiedź czytana tylko tam, gdzie niesie kod błędu (YQM-36); koszt w teście wydajności | YQM-36, E4; E6 |
+| `getCommand()` i `getReply()` zamieniają cały BSON polecenia i odpowiedzi na obiekty PHP, więc duży `insert` albo `find` kosztuje proporcjonalnie do danych | Dokument i odpowiedź idą do `mongodb\Recorder` jako domknięcia: dokument jest czytany tylko wtedy, gdy kolektor przyjmie wpis, a odpowiedź tylko dla poleceń innych niż `find`, `getMore` i `aggregate` (YQM-35, YQM-36). Koszt w teście wydajności | E6 |
 | Normalizator literałów kosztuje więcej niż 5% czasu | Pomiar całości z normalizacją | E6 |
 
 ## Czego w planie nie ma
