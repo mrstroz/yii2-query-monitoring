@@ -90,7 +90,7 @@ Założenie: nazwy pól, tabel, kolekcji i parametrów są kodem aplikacji, nie 
 | Zagnieżdżony komentarz `/* /* */ */` | Nie występuje | `query: null`, `op` pusty |
 | `E'...'`, `$$...$$`, `$tag$...$tag$` | Nie występuje | Literał, zamiana na `?`. W `E'...'` backslash jest znakiem ucieczki. Niedomknięty daje `null`. Inny `$` niż `$cyfry` i otwarcie literału daje `null` |
 
-**MongoDB.** Postać tekstowa to nazwa kolekcji, a po niej sekcje polecenia w kolejności `filter`, `update`, `pipeline`, `sort`, `limit`, `skip`. Każda sekcja ma postać `nazwa{...}`, `nazwa[...]` albo `nazwa:?`. Klucze w sekcji stoją w kolejności z polecenia, bez spacji, np. `contacts filter{externalId:?,tenantId:?} sort{updatedAt:?} limit:?`. Normalizator czyta dokument polecenia z `CommandStartedEvent::getCommand()` i bierze z niego tylko pola z tabeli poleceń. Pola `lsid`, `$clusterTime`, `txnNumber`, `$db`, `$readPreference`, `batchSize`, `projection` i każde inne nigdy nie trafiają do `query`.
+**MongoDB.** Postać tekstowa to nazwa kolekcji, a po niej sekcje polecenia w kolejności `key`, `filter`, `update`, `pipeline`, `sort`, `limit`, `skip`. Każda sekcja ma postać `nazwa{...}`, `nazwa[...]` albo `nazwa:?`, a `key` postać `key:pole`. Klucze w sekcji stoją w kolejności z polecenia, bez spacji, np. `contacts filter{externalId:?,tenantId:?} sort{updatedAt:?} limit:?`. Normalizator czyta dokument polecenia z `CommandStartedEvent::getCommand()` i bierze z niego tylko pola z tabeli poleceń. Pola `lsid`, `$clusterTime`, `txnNumber`, `$db`, `$readPreference`, `batchSize`, `projection` i każde inne nigdy nie trafiają do `query`.
 
 | Polecenie | Kolekcja | Sekcje |
 |---|---|---|
@@ -100,9 +100,10 @@ Założenie: nazwy pól, tabel, kolekcji i parametrów są kodem aplikacji, nie 
 | `update` | wartość `update` | `filter` z `updates[0].q`, `update` z `updates[0].u`. Więcej niż jedna instrukcja w `updates` daje `null` |
 | `delete` | wartość `delete` | `filter` z `deletes[0].q`. Więcej niż jedna instrukcja w `deletes` daje `null` |
 | `aggregate` | wartość `aggregate` | `pipeline` z `pipeline`, np. `orders pipeline[{$match:{status:?}},{$group:{_id:?,n:{$sum:?}}}]` |
+| `distinct` | wartość `distinct` | `key` z `key` jako nazwa pola, `filter` z `query`, np. `contacts key:status filter{tenantId:?}` |
 | `insert` | wartość `insert` | Tylko liczba dokumentów w `documents`, np. `contacts n:3` |
 | `getMore` | wartość `collection` | Brak, np. `contacts` |
-| Każde inne, np. `createIndexes`, `killCursors`, `distinct` | | `query: null` |
+| Każde inne, np. `createIndexes`, `killCursors` | | `query: null` |
 
 | Element | Reguła |
 |---|---|
@@ -114,8 +115,8 @@ Założenie: nazwy pól, tabel, kolekcji i parametrów są kodem aplikacji, nie 
 | Wyrażenie agregacji `$in` z dwoma elementami, z których drugi jest tablicą | Tablica według wiersza wyżej: `$expr:{$in:["$status",[1,2,3]]}` daje `$expr:{$in:[?,[?,...]]}` |
 | Brak sekcji w poleceniu | Sekcja pominięta. Pusty filtr daje `filter{}` |
 | Zagnieżdżenie | Dokument i tablica na każdej głębokości według tych samych reguł. Compound w compound z Atlas Search daje `pipeline[{$search:{index:?,compound:{filter:[{compound:{should:[{equals:{path:?,value:?}}]}}]}}}]` |
-| Pusta kolekcja albo nazwa pola, nazwa ze znakiem `{`, `}`, `[`, `]`, `,`, `:`, białym (także Unicode, np. NBSP), sterującym albo nie w UTF-8 | `query: null` |
-| Kolekcja, która nie jest tekstem (np. `aggregate: 1` na bazie) | `query: null` |
+| Pusta kolekcja, nazwa pola albo `key` w `distinct`, nazwa ze znakiem `{`, `}`, `[`, `]`, `,`, `:`, białym (także Unicode, np. NBSP), sterującym albo nie w UTF-8 | `query: null` |
+| Kolekcja albo `key` w `distinct`, które nie są tekstem (np. `aggregate: 1` na bazie) | `query: null` |
 | Długość ponad `maxQueryLength` | `query: null`, bez obcinania |
 
 Wartości parametrów, dokumenty, adresy URL z parametrami, dane uwierzytelniające i ścieżki bezwzględne nigdy nie trafiają do paczki.

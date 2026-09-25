@@ -10,7 +10,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * YQM-34: spec 02 §4 (normalizacja MongoDB). YQM-42: `$in` i `$nin` (ADR-0011). YQM-43: any depth (ADR-0004). Commands are canonical Extended JSON turned into the tree
+ * YQM-34: spec 02 §4 (normalizacja MongoDB). YQM-42: `$in` i `$nin` (ADR-0011). YQM-43: any depth (ADR-0004). YQM-44: `distinct`. Commands are canonical Extended JSON turned into the tree
  * `CommandStartedEvent::getCommand()` gives, so BSON types stay objects; ext-mongodb is needed, no server.
  */
 final class MongoDbNormalizerTest extends TestCase
@@ -94,7 +94,12 @@ final class MongoDbNormalizerTest extends TestCase
         yield 'update replacing the document' => ['update', '{"update":"c","updates":[{"q":{"a":1},"u":{"name":"x"}}]}', 'c filter{a:?} update{name:?}'];
         yield 'empty insert' => ['insert', '{"insert":"c","documents":[]}', 'c n:0'];
         yield 'command outside the table' => ['createIndexes', '{"createIndexes":"c","indexes":[{"key":{"a":1},"name":"a_1"}]}', null];
-        yield 'distinct is not described' => ['distinct', '{"distinct":"c","key":"a","query":{"b":1}}', null];
+        yield 'distinct with a filter' => ['distinct', '{"distinct":"c","key":"a","query":{"b":1}}', 'c key:a filter{b:?}'];
+        yield 'distinct without a filter' => ['distinct', '{"distinct":"c","key":"a"}', 'c key:a'];
+        yield 'distinct of a dotted key' => ['distinct', '{"distinct":"c","key":"address.city","query":{"b":{"$in":[1,2]}}}', 'c key:address.city filter{b:{$in:[?,...]}}'];
+        yield 'distinct with an unsafe key is unknown' => ['distinct', '{"distinct":"c","key":"a b"}', null];
+        yield 'distinct with a key that is not text is unknown' => ['distinct', '{"distinct":"c","key":1}', null];
+        yield 'distinct without a key is unknown' => ['distinct', '{"distinct":"c","query":{"b":1}}', null];
         yield 'getMore without collection' => ['getMore', '{"getMore":{"$numberLong":"1"}}', null];
         yield 'dotted field names stay' => ['find', '{"find":"c","filter":{"address.city":"Kraków"}}', 'c filter{address.city:?}'];
         yield 'collection with a space is unknown' => ['find', '{"find":"a b","filter":{}}', null];
@@ -117,6 +122,7 @@ final class MongoDbNormalizerTest extends TestCase
             'findAndModify' => '{"findAndModify":"c","query":{"a":"qm-v7"},"update":{"$set":{"b":"qm-v8"}},"sort":{"x":42420005}}',
             'aggregate' => '{"aggregate":"c","pipeline":[{"$match":{"a":"qm-v9"}},{"$limit":42420006}],"cursor":{}}',
             'insert' => '{"insert":"c","documents":[{"a":"qm-v10","n":42420007}]}',
+            'distinct' => '{"distinct":"c","key":"k","query":{"a":"qm-v11","n":42420008}}',
         ];
         foreach ($commands as $name => $json) {
             $query = (string) self::normalizer()->normalize($name, self::command($json));

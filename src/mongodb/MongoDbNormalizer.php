@@ -59,6 +59,18 @@ final class MongoDbNormalizer
                 }
                 array_push($parts, ...$part);
                 break;
+            case 'distinct':
+                // The key is a field name, which is code (spec 02 §4), so it stays as it is.
+                $key = $command->key ?? null;
+                if (!is_string($key) || !self::isSafeName($key)) {
+                    return null;
+                }
+                $part = $this->sections($command, [['filter', 'query']]);
+                if ($part === null) {
+                    return null;
+                }
+                array_push($parts, "key:{$key}", ...$part);
+                break;
             case 'getMore':
                 break;
             default:
