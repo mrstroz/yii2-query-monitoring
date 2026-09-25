@@ -117,7 +117,7 @@ Założenie: nazwy pól, tabel, kolekcji i parametrów są kodem aplikacji, nie 
 | Zagnieżdżenie | Dokument i tablica na każdej głębokości według tych samych reguł. Compound w compound z Atlas Search daje `pipeline[{$search:{index:?,compound:{filter:[{compound:{should:[{equals:{path:?,value:?}}]}}]}}}]` |
 | Pusta kolekcja, nazwa pola albo `key` w `distinct`, nazwa ze znakiem `{`, `}`, `[`, `]`, `,`, `:`, białym (także Unicode, np. NBSP), sterującym albo nie w UTF-8 | `query: null` |
 | Kolekcja albo `key` w `distinct`, które nie są tekstem (np. `aggregate: 1` na bazie) | `query: null` |
-| Długość ponad `maxQueryLength` | `query: null`, bez obcinania |
+| Długość ponad `maxQueryLength` | Obcięcie jak w SQL: do `maxQueryLength` bajtów UTF-8 razem z `…` na końcu, na granicy znaku, np. długi wielokąt w `geoWithin` |
 
 Wartości parametrów, dokumenty, adresy URL z parametrami, dane uwierzytelniające i ścieżki bezwzględne nigdy nie trafiają do paczki.
 

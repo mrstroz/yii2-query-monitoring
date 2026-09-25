@@ -10,7 +10,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * YQM-34: spec 02 §4 (normalizacja MongoDB). YQM-42: `$in` i `$nin` (ADR-0011). YQM-43: any depth (ADR-0004). YQM-44: `distinct`. Commands are canonical Extended JSON turned into the tree
+ * YQM-34: spec 02 §4 (normalizacja MongoDB). YQM-42: `$in` i `$nin` (ADR-0011). YQM-43: any depth (ADR-0004). YQM-44: `distinct`. YQM-45: truncation. Commands are canonical Extended JSON turned into the tree
  * `CommandStartedEvent::getCommand()` gives, so BSON types stay objects; ext-mongodb is needed, no server.
  */
 final class MongoDbNormalizerTest extends TestCase
@@ -161,12 +161,41 @@ final class MongoDbNormalizerTest extends TestCase
         self::assertNull(self::normalizer()->normalize('find', $command));
     }
 
-    public function testQueryOverTheLimitIsNullNotTruncated(): void
+    /**
+     * @return iterable<string, array{string, int, string}>
+     */
+    public static function provideTruncationCases(): iterable
     {
-        $command = self::command('{"find":"c","filter":{"abcdefgh":1}}');
+        yield 'at the limit' => ['{"find":"c","filter":{"abcdefgh":1}}', 20, 'c filter{abcdefgh:?}'];
+        yield 'one byte over the limit' => ['{"find":"c","filter":{"abcdefgh":1}}', 19, 'c filter{abcdefg…'];
+        // `ó` takes bytes 14 and 15, so a cut after byte 14 moves back before it.
+        yield 'on a character boundary' => ['{"find":"c","filter":{"Kraków":1}}', 17, 'c filter{Krak…'];
+        yield 'limit of the ellipsis alone' => ['{"find":"c","filter":{}}', 3, '…'];
+    }
 
-        self::assertSame('c filter{abcdefgh:?}', (new MongoDbNormalizer(20))->normalize('find', $command));
-        self::assertNull((new MongoDbNormalizer(19))->normalize('find', $command));
+    #[DataProvider('provideTruncationCases')]
+    public function testQueryOverTheLimitIsTruncated(string $json, int $maxQueryLength, string $expected): void
+    {
+        self::assertSame($expected, (new MongoDbNormalizer($maxQueryLength))->normalize('find', self::command($json)));
+    }
+
+    public function testLongGeoWithinPolygonIsTruncated(): void
+    {
+        $ring = (string) json_encode(array_fill(0, 2000, [21.01, 52.23]));
+        $json = '{"aggregate":"property","pipeline":[{"$search":{"index":"property","geoWithin":{"path":"location","geometry":{"type":"Polygon","coordinates":[' . $ring . ']}}}}],"cursor":{}}';
+
+        $query = (string) self::normalizer()->normalize('aggregate', self::command($json));
+
+        self::assertSame(8192, strlen($query));
+        self::assertStringStartsWith('property pipeline[{$search:{index:?,geoWithin:{path:?,geometry:{type:?,coordinates:[[[?,?],', $query);
+        self::assertStringEndsWith('…', $query);
+    }
+
+    public function testLimitShorterThanTheEllipsisIsRejected(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        new MongoDbNormalizer(2);
     }
 
     private static function normalizer(): MongoDbNormalizer

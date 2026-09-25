@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace mrstroz\querymonitoring\sql;
 
+use mrstroz\querymonitoring\support\QueryText;
+
 /**
  * Turns SQL text into a value-free form safe to put in a batch (spec 02 §4, ADR-0004).
  *
@@ -14,7 +16,7 @@ namespace mrstroz\querymonitoring\sql;
 final class SqlNormalizer
 {
     public const DEFAULT_MAX_QUERY_LENGTH = 8192;
-    public const ELLIPSIS = '…';
+    public const ELLIPSIS = QueryText::ELLIPSIS;
 
     private const WHITESPACE = " \t\n\r\f\v";
     private const WORD_START = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_';
@@ -26,9 +28,7 @@ final class SqlNormalizer
     public function __construct(
         private readonly int $maxQueryLength = self::DEFAULT_MAX_QUERY_LENGTH,
     ) {
-        if ($maxQueryLength < strlen(self::ELLIPSIS)) {
-            throw new \InvalidArgumentException('maxQueryLength must be at least ' . strlen(self::ELLIPSIS) . ' bytes.');
-        }
+        QueryText::assertMaxLength($maxQueryLength);
     }
 
     /**
@@ -47,7 +47,7 @@ final class SqlNormalizer
         }
         $normalized = $this->scan($sql, $dialect);
 
-        return $normalized === null ? null : $this->truncate($normalized);
+        return $normalized === null ? null : QueryText::truncate($normalized, $this->maxQueryLength);
     }
 
     /**
@@ -424,18 +424,5 @@ final class SqlNormalizer
         $last = $out[strlen($out) - 1];
 
         return str_contains(self::WORD_REST, $last) || $last === '`' || $last === '"' || ord($last) >= 0x80;
-    }
-
-    private function truncate(string $query): string
-    {
-        if (strlen($query) <= $this->maxQueryLength) {
-            return $query;
-        }
-        $cut = $this->maxQueryLength - strlen(self::ELLIPSIS);
-        while ($cut > 0 && (ord($query[$cut]) & 0xC0) === 0x80) {
-            $cut--;
-        }
-
-        return substr($query, 0, $cut) . self::ELLIPSIS;
     }
 }

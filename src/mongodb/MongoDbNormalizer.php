@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace mrstroz\querymonitoring\mongodb;
 
+use mrstroz\querymonitoring\support\QueryText;
+
 /**
  * Turns a MongoDB command document into the text form of spec 02 §4, with every value replaced by `?`.
  *
  * The input is the tree `CommandStartedEvent::getCommand()` gives: documents as `stdClass`, arrays as PHP
  * lists, values as scalars or BSON objects. Only the sections named in spec 02 §4 are read; `lsid`,
  * `$clusterTime`, `$db`, read preference and everything else stay out. Any object that is not a `stdClass`
- * (`ObjectId`, `UTCDateTime`, `Regex`, …) is a value. Documents and arrays are read at any depth. Returns null
- * when the command is not described or the result would be unsafe or too long (ADR-0004).
+ * (`ObjectId`, `UTCDateTime`, `Regex`, …) is a value. Documents and arrays are read at any depth, and text over
+ * `maxQueryLength` is cut with {@see QueryText::ELLIPSIS}. Returns null when the command is not described or the
+ * result would be unsafe (ADR-0004).
  */
 final class MongoDbNormalizer
 {
@@ -23,7 +26,13 @@ final class MongoDbNormalizer
         'aggregate' => [['pipeline', 'pipeline']],
     ];
 
-    public function __construct(private readonly int $maxQueryLength) {}
+    /**
+     * @throws \InvalidArgumentException when `$maxQueryLength` cannot hold {@see QueryText::ELLIPSIS}
+     */
+    public function __construct(private readonly int $maxQueryLength)
+    {
+        QueryText::assertMaxLength($maxQueryLength);
+    }
 
     public function normalize(string $commandName, object $command): ?string
     {
@@ -83,9 +92,7 @@ final class MongoDbNormalizer
                 }
                 array_push($parts, ...$part);
         }
-        $text = implode(' ', $parts);
-
-        return strlen($text) > $this->maxQueryLength ? null : $text;
+        return QueryText::truncate(implode(' ', $parts), $this->maxQueryLength);
     }
 
     /**

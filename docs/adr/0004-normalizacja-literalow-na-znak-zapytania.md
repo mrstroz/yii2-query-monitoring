@@ -14,11 +14,11 @@ Kolejny etap potoku MongoDB, `$match` z dokumentem, ma wartości w zagnieżdżon
 
 ## Decyzja
 
-SQL: symbole parametrów zostają (poza `:qpN` z [ADR 0011](0011-zwijanie-list-in-i-parametrow-yii.md)), każdy literał tekstowy i liczbowy jest zamieniany na `?`, komentarze są usuwane. Reguły cudzysłowu i komentarzy zależą od dialektu, bo `"..."` jest literałem w MySQL i identyfikatorem w PostgreSQL. Gdy skaner napotka niedomknięty literał lub nieznaną konstrukcję, `query` ma `null`. MongoDB: nazwy pól, operatory i etapy zostają na każdej głębokości, każda wartość jest zamieniana na `?`, przekroczenie długości daje `null`.
+SQL: symbole parametrów zostają (poza `:qpN` z [ADR 0011](0011-zwijanie-list-in-i-parametrow-yii.md)), każdy literał tekstowy i liczbowy jest zamieniany na `?`, komentarze są usuwane. Reguły cudzysłowu i komentarzy zależą od dialektu, bo `"..."` jest literałem w MySQL i identyfikatorem w PostgreSQL. Gdy skaner napotka niedomknięty literał lub nieznaną konstrukcję, `query` ma `null`. MongoDB: nazwy pól, operatory i etapy zostają na każdej głębokości, każda wartość jest zamieniana na `?`. Tekst dłuższy niż `maxQueryLength` jest obcinany tak jak w SQL.
 
 ## Konsekwencje
 
-**Pozytywne:** paginacja daje ten sam `query`. Niepewność nie wycieka, tylko gubi tekst. Potok Atlas Search o dowolnym zagnieżdżeniu ma tekst.
+**Pozytywne:** paginacja daje ten sam `query`. Niepewność nie wycieka, tylko gubi tekst. Potok Atlas Search o dowolnym zagnieżdżeniu i długie polecenie mają tekst.
 
 **Negatywne:** skaner literałów to własny kod z przypadkami brzegowymi na dialekt. MySQL z `ANSI_QUOTES` lub `NO_BACKSLASH_ESCAPES` dostaje błędny `query`, bo tryb nie jest wykrywany. Nazwy pól MongoDB zbudowane z danych użytkownika są ujawniane.
 
@@ -31,6 +31,7 @@ SQL: symbole parametrów zostają (poza `:qpN` z [ADR 0011](0011-zwijanie-list-i
 | Tylko parametry, literały dają `null` | Każde zapytanie z paginacją miałoby `null` |
 | Pełna normalizacja ze scalaniem `IN` i białych znaków | Więcej kodu w parserze przy niejasnym zysku. Scalanie list rozstrzyga [ADR 0011](0011-zwijanie-list-in-i-parametrow-yii.md) bez zmiany formatu |
 | Zamiana wartości MongoDB na typ (`int`, `str`, `oid`) | Więcej informacji, ale bez odbiorcy, który by z niej korzystał |
+| Tekst MongoDB dłuższy niż `maxQueryLength` daje `null` | Wielokąt `geoWithin` z około 1300 punktami gubił cały tekst, choć początek potoku mówi, które to zapytanie. Obcięcie nie ujawnia wartości, bo każda jest już `?` |
 | Klucz MongoDB głębiej niż pięć poziomów daje `null` | Każde wywołanie Atlas Search z compound w compound miało `null`. Głębokość nie chroni przed wyciekiem, bo wartość na każdym poziomie jest `?` |
 
 ## Kiedy wrócić do tej decyzji

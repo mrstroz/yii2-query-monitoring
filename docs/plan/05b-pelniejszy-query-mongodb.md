@@ -17,6 +17,6 @@
       Spec: [02 §4](../spec/02-format-paczki.md#4-normalizacja) · Zależy od: YQM-43
       W rzeczywistej aplikacji 2026-09-25 wszystkie 139 wywołań `distinct` miały `query: null`.
 
-- [ ] (=) **YQM-45** Obcięcie zbyt długiego `query` MongoDB
+- [x] (=) **YQM-45** Obcięcie zbyt długiego `query` MongoDB
       Spec: [02 §4](../spec/02-format-paczki.md#4-normalizacja) · ADR: [0004](../adr/0004-normalizacja-literalow-na-znak-zapytania.md) · Zależy od: YQM-44
       Gotowe, gdy: polecenie dłuższe niż `maxQueryLength` daje tekst tej długości zakończony `…`, na granicy znaku UTF-8.
