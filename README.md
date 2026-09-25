@@ -2,9 +2,10 @@
 
 Collects a flat list of the database queries run during one HTTP request of a Yii 2 application and hands
 it, as one batch, to an output adapter: by default a JSON Lines file, or an adapter you provide. Each
-entry has the connection, the operation, the normalised query text with literals replaced by `?`, the
-time and the result: for SQL the time of `PDO::prepare()` and `PDOStatement::execute()`, for MongoDB the
-duration the driver reports for each command. Parameter values and documents never enter a batch.
+entry has the connection, the operation, the normalised query text with literals and Yii parameters `:qpN`
+replaced by `?` and lists of values collapsed (`IN (?, ...)`), the time and the result: for
+SQL the time of `PDO::prepare()` and `PDOStatement::execute()`, for MongoDB the duration the driver reports
+for each command. Parameter values and documents never enter a batch.
 
 ## Status
 

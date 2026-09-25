@@ -14,6 +14,7 @@ Plan nie opisuje zachowania systemu. Każde zadanie wskazuje sekcję specyfikacj
 | [`03-testy.md`](03-testy.md) | E2: architektura i konwencje testów |
 | [`04-kontekst-wpisu.md`](04-kontekst-wpisu.md) | E3: kontekst wpisu (`caller`, `route`), format `v: 2`, limity |
 | [`05-mongodb.md`](05-mongodb.md) | E4: źródło MongoDB |
+| [`05a-zwijanie-list.md`](05a-zwijanie-list.md) | E4a: zwijanie list `IN` i parametrów `:qpN` w `query` |
 | [`06-konsola.md`](06-konsola.md) | E5: zadania konsolowe |
 | [`07-wydajnosc-i-odbior.md`](07-wydajnosc-i-odbior.md) | E6: test wydajności, dokumentacja użytkownika |
 

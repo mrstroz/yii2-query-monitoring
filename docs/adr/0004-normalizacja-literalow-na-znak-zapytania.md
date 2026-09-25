@@ -14,13 +14,13 @@ Kolejny etap potoku MongoDB, `$match` z dokumentem, ma wartości w zagnieżdżon
 
 ## Decyzja
 
-SQL: symbole parametrów zostają, każdy literał tekstowy i liczbowy jest zamieniany na `?`, komentarze są usuwane. Reguły cudzysłowu i komentarzy zależą od dialektu, bo `"..."` jest literałem w MySQL i identyfikatorem w PostgreSQL. Gdy skaner napotka niedomknięty literał lub nieznaną konstrukcję, `query` ma `null`. MongoDB: nazwy pól, operatory i etapy zostają, każda wartość jest zamieniana na `?`, klucz głębiej niż pięć poziomów lub przekroczenie długości daje `null`. Tablica nie jest poziomem, więc trzy `andWhere()` w Yii (`$and` w `$and` z `$in`) mieszczą się z zapasem. Głębokość nie chroni przed wyciekiem, bo wartość na każdym poziomie jest `?`. Ogranicza tylko strukturę, której nikt nie odczyta.
+SQL: symbole parametrów zostają (poza `:qpN` z [ADR 0011](0011-zwijanie-list-in-i-parametrow-yii.md)), każdy literał tekstowy i liczbowy jest zamieniany na `?`, komentarze są usuwane. Reguły cudzysłowu i komentarzy zależą od dialektu, bo `"..."` jest literałem w MySQL i identyfikatorem w PostgreSQL. Gdy skaner napotka niedomknięty literał lub nieznaną konstrukcję, `query` ma `null`. MongoDB: nazwy pól, operatory i etapy zostają, każda wartość jest zamieniana na `?`, klucz głębiej niż pięć poziomów lub przekroczenie długości daje `null`. Tablica nie jest poziomem, więc trzy `andWhere()` w Yii (`$and` w `$and` z `$in`) mieszczą się z zapasem. Głębokość nie chroni przed wyciekiem, bo wartość na każdym poziomie jest `?`. Ogranicza tylko strukturę, której nikt nie odczyta.
 
 ## Konsekwencje
 
 **Pozytywne:** paginacja daje ten sam `query`. Niepewność nie wycieka, tylko gubi tekst.
 
-**Negatywne:** `IN (?, ?, ?)` i `IN (?, ?)` to różne `query`. Skaner literałów to własny kod z przypadkami brzegowymi na dialekt. MySQL z `ANSI_QUOTES` lub `NO_BACKSLASH_ESCAPES` dostaje błędny `query`, bo tryb nie jest wykrywany. Nazwy pól MongoDB zbudowane z danych użytkownika są ujawniane.
+**Negatywne:** `IN (?, ?, ?)` i `IN (?, ?)` to różne `query`; od [ADR 0011](0011-zwijanie-list-in-i-parametrow-yii.md) oba dają `IN (?, ...)`. Skaner literałów to własny kod z przypadkami brzegowymi na dialekt. MySQL z `ANSI_QUOTES` lub `NO_BACKSLASH_ESCAPES` dostaje błędny `query`, bo tryb nie jest wykrywany. Nazwy pól MongoDB zbudowane z danych użytkownika są ujawniane.
 
 **Wymagania:** testy normalizacji dla MySQL i PostgreSQL. Założenie o kluczach zapisane w spec.
 
@@ -29,9 +29,9 @@ SQL: symbole parametrów zostają, każdy literał tekstowy i liczbowy jest zami
 | Wariant | Dlaczego odrzucony |
 |---|---|
 | Tylko parametry, literały dają `null` | Każde zapytanie z paginacją miałoby `null` |
-| Pełna normalizacja ze scalaniem `IN` i białych znaków | Więcej kodu w parserze przy niejasnym zysku. Można dodać później bez zmiany formatu |
+| Pełna normalizacja ze scalaniem `IN` i białych znaków | Więcej kodu w parserze przy niejasnym zysku. Można dodać później bez zmiany formatu. Scalanie `IN` dodał [ADR 0011](0011-zwijanie-list-in-i-parametrow-yii.md) |
 | Zamiana wartości MongoDB na typ (`int`, `str`, `oid`) | Więcej informacji, ale bez odbiorcy, który by z niej korzystał |
 
 ## Kiedy wrócić do tej decyzji
 
-Gdy `query: null` pojawia się w więcej niż kilku procentach wpisów albo gdy odbiorca potrzebuje scalania `IN`.
+Gdy `query: null` pojawia się w więcej niż kilku procentach wpisów. Scalanie `IN`, drugi warunek z pierwotnej wersji, rozstrzygnął [ADR 0011](0011-zwijanie-list-in-i-parametrow-yii.md).

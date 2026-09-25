@@ -43,6 +43,36 @@ final class ActiveRecordIntegrationTest extends IntegrationTestCase
         }
     }
 
+    /**
+     * YQM-41, ADR-0011: lists Yii builds for `IN`, composite `IN` and `NOT IN` collapse, so a list of another
+     * length gives the same `query`, and no Yii parameter `:qpN` is left in it.
+     */
+    #[DataProvider('provideDatabaseCases')]
+    public function testListsOfDifferentLengthGiveSameQuery(string $db): void
+    {
+        $this->requireDatabase($db);
+        Schema::create(Schema::connection($db));
+
+        $result = $this->scenario($db, 'in-list');
+        self::assertSame(['counts' => [0, 0, 0, 0, 0, 0]], $this->scenarioOutput($result));
+
+        $this->assertNoErrors($result);
+        $queries = array_column(array_values(array_filter(
+            $this->entriesWith($this->singleBatch($result), 'qm_order'),
+            static fn(array $e): bool => $e['op'] === 'select' && str_contains((string) $e['query'], 'customer'),
+        )), 'query');
+        self::assertCount(6, $queries, 'one entry per find()->all()');
+        self::assertSame($queries[0], $queries[1], 'IN with 3 and 211 values');
+        self::assertSame($queries[2], $queries[3], 'composite IN with 2 and 3 tuples');
+        self::assertSame($queries[4], $queries[5], 'NOT IN with 3 and 211 values');
+        self::assertStringContainsString(' IN (?, ...)', (string) $queries[0]);
+        self::assertStringContainsString(' IN ((?, ?), ...)', (string) $queries[2]);
+        self::assertStringContainsString(' NOT IN (?, ...)', (string) $queries[4]);
+        foreach ($queries as $query) {
+            self::assertStringNotContainsString(':qp', (string) $query);
+        }
+    }
+
     #[DataProvider('provideDatabaseCases')]
     public function testSecondCallInQueryCacheGivesNoEntry(string $db): void
     {

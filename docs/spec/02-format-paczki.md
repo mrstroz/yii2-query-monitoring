@@ -43,8 +43,8 @@ Jeden wpis to jedno polecenie faktycznie wysłane do bazy.
  "route":"admin/orders/order/view",
  "ts":"2026-09-22T09:41:05.312Z","host":"web-03","dropped":0,
  "queries":[
-  {"db":"mysql","conn":"db","op":"select","query":"SELECT * FROM `order` WHERE `id` = :qp0","time_ms":2.1,"result":"success","caller":["modules/admin/modules/orders/controllers/OrderController.php:41"]},
-  {"db":"mysql","conn":"db","op":"insert","query":"INSERT INTO `audit_log` (`order_id`, `action`) VALUES (:qp0, :qp1)","time_ms":0.9,"result":"error","error":"23000","caller":["models/AuditLog.php:27","modules/admin/modules/orders/controllers/OrderController.php:44"]},
+  {"db":"mysql","conn":"db","op":"select","query":"SELECT * FROM `order` WHERE `id` = ?","time_ms":2.1,"result":"success","caller":["modules/admin/modules/orders/controllers/OrderController.php:41"]},
+  {"db":"mysql","conn":"db","op":"insert","query":"INSERT INTO `audit_log` (`order_id`, `action`) VALUES (?, ?)","time_ms":0.9,"result":"error","error":"23000","caller":["models/AuditLog.php:27","modules/admin/modules/orders/controllers/OrderController.php:44"]},
   {"db":"mongodb","conn":"mongodb","op":"find","query":"contacts filter{externalId:?,tenantId:?} sort{updatedAt:?} limit:?","time_ms":1.3,"result":"success","caller":["components/ContactRepository.php:88","modules/admin/modules/orders/controllers/OrderController.php:52"]},
   {"db":"mysql","conn":"db","op":"select","query":null,"time_ms":0.7,"result":"success","caller":[]}
  ]}
@@ -58,17 +58,18 @@ Założenie: nazwy pól, tabel, kolekcji i parametrów są kodem aplikacji, nie 
 
 | Element | Reguła |
 |---|---|
-| Symbole parametrów `:name`, `?` | Zostają bez zmian |
+| Symbole parametrów `:name`, `?` | Zostają bez zmian, poza parametrem Yii z następnego wiersza |
+| Parametr Yii: `:qp` i same cyfry (`QueryBuilder::PARAM_PREFIX`) | Zamiana na `?`. `:qpx`, `:qp1a` i `::qp0` zostają |
 | Literały tekstowe `'...'` | Zamiana na `?`, także wewnątrz zapytania z parametrami |
 | Literały liczbowe, w tym w `LIMIT` i `OFFSET`, ułamki i wykładnik (`1.5`, `1e5`) | Zamiana na `?` |
 | Minus przed liczbą | Zostaje jako operator: `-2` daje `-?` |
-| Cyfry w identyfikatorze lub symbolu parametru (`table1`, `:qp0`, `$1`) | Zostają |
+| Cyfry w identyfikatorze lub symbolu parametru (`table1`, `:id2`, `$1`) | Zostają |
 | Cyfry, po których bez odstępu stoją litery (`123abc`, `1table`) | `query: null` |
 | Komentarze `--`, `/* */` | Zamiana na jedną spację |
 | Niedomknięty komentarz `/* ...` | `query: null` |
 | Białe znaki poza literałami | Ciąg zamieniany na jedną spację, bez spacji na początku i końcu |
 | Nazwy tabel i kolumn | Zostają |
-| `IN (?, ?, ?)` | Nie jest scalane. Różna długość listy daje różny `query` |
+| Lista w nawiasie tuż po słowie `IN`, także `NOT IN`, o co najmniej dwóch elementach, z których każdy jest wartością albo krotką wartości. Wartość to `?`, `:name`, `$1`, `NULL`, `TRUE`, `FALSE` (bez względu na wielkość liter), `DATE ?`, `TIME ?` i `TIMESTAMP ?`, każda także ze znakiem `+` lub `-` przed nią | Pierwszy element i `...`: `IN (?, ?, ?)` daje `IN (?, ...)`, `IN ((?, ?), (?, ?))` daje `IN ((?, ?), ...)`. Lista z jednym elementem, pusta, z podzapytaniem, wyrażeniem, rzutowaniem (`?::int`) albo funkcją zostaje. Niedomknięta lista zostaje bez zmian. Zwijanie przed obcięciem do `maxQueryLength` ([ADR 0011](../adr/0011-zwijanie-list-in-i-parametrow-yii.md)) |
 | Niedomknięty literał, nieznana konstrukcja | `query: null` |
 | `db` inne niż `mysql` i `pgsql` | `query: null` |
 | Tekst, który nie jest poprawnym UTF-8 | `query: null` |

@@ -128,8 +128,8 @@ final class QueryBatchTest extends TestCase
             'web-03',
             0,
             [
-                QueryEntry::success('mysql', 'db', 'select', 'SELECT * FROM `order` WHERE `id` = :qp0', 2.1, ['modules/admin/modules/orders/controllers/OrderController.php:41']),
-                QueryEntry::error('mysql', 'db', 'insert', 'INSERT INTO `audit_log` (`order_id`, `action`) VALUES (:qp0, :qp1)', 0.9, '23000', ['models/AuditLog.php:27', 'modules/admin/modules/orders/controllers/OrderController.php:44']),
+                QueryEntry::success('mysql', 'db', 'select', 'SELECT * FROM `order` WHERE `id` = ?', 2.1, ['modules/admin/modules/orders/controllers/OrderController.php:41']),
+                QueryEntry::error('mysql', 'db', 'insert', 'INSERT INTO `audit_log` (`order_id`, `action`) VALUES (?, ?)', 0.9, '23000', ['models/AuditLog.php:27', 'modules/admin/modules/orders/controllers/OrderController.php:44']),
                 QueryEntry::success('mongodb', 'mongodb', 'find', 'contacts filter{externalId:?,tenantId:?} sort{updatedAt:?} limit:?', 1.3, ['components/ContactRepository.php:88', 'modules/admin/modules/orders/controllers/OrderController.php:52']),
                 QueryEntry::success('mysql', 'db', 'select', null, 0.7, []),
             ],
