@@ -148,7 +148,7 @@ final class MongoDbNormalizer
             if ($depth > self::MAX_DEPTH || !self::isSafeName($key)) {
                 return null;
             }
-            $text = $this->value($item, $depth + 1);
+            $text = $key === '$in' || $key === '$nin' ? $this->inOperand($item, $depth + 1) : $this->value($item, $depth + 1);
             if ($text === null) {
                 return null;
             }
@@ -156,6 +156,43 @@ final class MongoDbNormalizer
         }
 
         return '{' . implode(',', $items) . '}';
+    }
+
+    /**
+     * The value of `$in` or `$nin` (ADR-0011): a list of values becomes `[?,...]`, and so does the array in the
+     * aggregation form `$in: [expression, array]`. Anything else follows {@see value()}.
+     */
+    private function inOperand(mixed $item, int $depth): ?string
+    {
+        if (self::isValueList($item)) {
+            return '[?,...]';
+        }
+        if (is_array($item) && count($item) === 2 && array_is_list($item) && is_array($item[1])) {
+            $expression = $this->value($item[0], $depth);
+            $array = self::isValueList($item[1]) ? '[?,...]' : $this->value($item[1], $depth);
+
+            return $expression === null || $array === null ? null : "[{$expression},{$array}]";
+        }
+
+        return $this->value($item, $depth);
+    }
+
+    /**
+     * At least two values, none of them a document, an array, or a string starting with `$`, which is a field
+     * path or a variable in an aggregation expression rather than a value.
+     */
+    private static function isValueList(mixed $item): bool
+    {
+        if (!is_array($item) || count($item) < 2) {
+            return false;
+        }
+        foreach ($item as $element) {
+            if ($element instanceof \stdClass || is_array($element) || (is_string($element) && str_starts_with($element, '$'))) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

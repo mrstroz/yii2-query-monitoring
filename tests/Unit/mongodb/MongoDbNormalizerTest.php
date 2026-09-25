@@ -10,7 +10,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * YQM-34: spec 02 §4 (normalizacja MongoDB). Commands are canonical Extended JSON turned into the tree
+ * YQM-34: spec 02 §4 (normalizacja MongoDB). YQM-42: `$in` i `$nin` (ADR-0011). Commands are canonical Extended JSON turned into the tree
  * `CommandStartedEvent::getCommand()` gives, so BSON types stay objects; ext-mongodb is needed, no server.
  */
 final class MongoDbNormalizerTest extends TestCase
@@ -26,7 +26,7 @@ final class MongoDbNormalizerTest extends TestCase
     {
         yield 'delete-all' => ['delete-all', 'qm_probe_docs filter{}'];
         yield 'insert' => ['insert', 'qm_probe_docs n:3'];
-        yield 'find' => ['find', 'qm_probe_docs filter{k:{$in:[?,?]},tags:?} sort{k:?} limit:? skip:?'];
+        yield 'find' => ['find', 'qm_probe_docs filter{k:{$in:[?,...]},tags:?} sort{k:?} limit:? skip:?'];
         yield 'update' => ['update', 'qm_probe_docs filter{k:?} update{$set:{v:?}}'];
         yield 'delete' => ['delete', 'qm_probe_docs filter{k:?}'];
         yield 'aggregate' => ['aggregate', 'qm_probe_docs pipeline[{$match:{k:{$gt:?}}},{$group:{_id:?,n:{$sum:?}}}]'];
@@ -63,9 +63,24 @@ final class MongoDbNormalizerTest extends TestCase
         yield 'fields outside the sections stay out' => ['find', '{"find":"c","filter":{},"projection":{"secret":1},"batchSize":5,"$db":"qm","lsid":{"id":{"$binary":{"base64":"oEcz6VP/RtqxNM49ySHT7Q==","subType":"04"}}},"$clusterTime":{"clusterTime":{"$timestamp":{"t":1,"i":1}}},"txnNumber":{"$numberLong":"7"},"$readPreference":{"mode":"primary"}}', 'c filter{}'];
         yield 'boolean and null are values' => ['find', '{"find":"c","filter":{"a":true,"b":null}}', 'c filter{a:?,b:?}'];
         yield 'BSON values are one value' => ['find', '{"find":"c","filter":{"d":{"$date":{"$numberLong":"1"}},"r":{"$regularExpression":{"pattern":"^a","options":"i"}},"b":{"$binary":{"base64":"AA==","subType":"00"}},"m":{"$numberDecimal":"1.5"},"l":{"$numberLong":"9"}}}', 'c filter{d:?,r:?,b:?,m:?,l:?}'];
-        yield 'arrays are not merged' => ['find', '{"find":"c","filter":{"a":{"$in":[1,2,3]}}}', 'c filter{a:{$in:[?,?,?]}}'];
+        yield '$in of three values' => ['find', '{"find":"c","filter":{"a":{"$in":[1,2,3]}}}', 'c filter{a:{$in:[?,...]}}'];
+        yield '$in of two values' => ['find', '{"find":"c","filter":{"a":{"$in":["x","y"]}}}', 'c filter{a:{$in:[?,...]}}'];
+        yield '$in of one value stays' => ['find', '{"find":"c","filter":{"a":{"$in":[1]}}}', 'c filter{a:{$in:[?]}}'];
+        yield 'empty $in stays' => ['find', '{"find":"c","filter":{"a":{"$in":[]}}}', 'c filter{a:{$in:[]}}'];
+        yield '$nin of values' => ['find', '{"find":"c","filter":{"a":{"$nin":[1,2,3]}}}', 'c filter{a:{$nin:[?,...]}}'];
+        yield '$in of BSON values' => ['find', '{"find":"c","filter":{"_id":{"$in":[{"$oid":"650000000000000000000001"},{"$oid":"650000000000000000000002"}]}}}', 'c filter{_id:{$in:[?,...]}}'];
+        yield '$in with a document stays' => ['find', '{"find":"c","filter":{"a":{"$in":[1,{"b":2}]}}}', 'c filter{a:{$in:[?,{b:?}]}}'];
+        yield '$in with an array stays' => ['find', '{"find":"c","filter":{"a":{"$in":[[1,2],[3]]}}}', 'c filter{a:{$in:[[?,?],[?]]}}'];
+        yield '$all is not collapsed' => ['find', '{"find":"c","filter":{"a":{"$all":[1,2,3]}}}', 'c filter{a:{$all:[?,?,?]}}'];
+        yield '$in with a field path stays' => ['find', '{"find":"c","filter":{"a":{"$in":["$x",1]}}}', 'c filter{a:{$in:[?,?]}}'];
+        yield '$in expression of two fields stays' => ['aggregate', '{"aggregate":"c","pipeline":[{"$project":{"x":{"$in":["$a","$b"]}}}],"cursor":{}}', 'c pipeline[{$project:{x:{$in:[?,?]}}}]'];
+        yield '$in expression with three values' => ['find', '{"find":"c","filter":{"$expr":{"$in":["$status",[1,2,3]]}}}', 'c filter{$expr:{$in:[?,[?,...]]}}'];
+        yield '$in expression with two values' => ['find', '{"find":"c","filter":{"$expr":{"$in":["$status",["a","b"]]}}}', 'c filter{$expr:{$in:[?,[?,...]]}}'];
+        yield '$in expression with one value' => ['find', '{"find":"c","filter":{"$expr":{"$in":["$status",[1]]}}}', 'c filter{$expr:{$in:[?,[?]]}}'];
+        yield '$in expression with fields in the array' => ['find', '{"find":"c","filter":{"$expr":{"$in":["$status",["$a","$b"]]}}}', 'c filter{$expr:{$in:[?,[?,?]]}}'];
+        yield '$in in a pipeline' => ['aggregate', '{"aggregate":"c","pipeline":[{"$match":{"a":{"$in":[1,2,3]}}}],"cursor":{}}', 'c pipeline[{$match:{a:{$in:[?,...]}}}]'];
         yield 'arrays are no level' => ['find', '{"find":"c","filter":{"$or":[{"a":{"$gt":1}},{"b":2}]}}', 'c filter{$or:[{a:{$gt:?}},{b:?}]}'];
-        yield 'three andWhere() of Yii' => ['find', '{"find":"c","filter":{"$and":[{"$and":[{"tenantId":"x"},{"status":{"$in":[1,2]}}]},{"k":3}]}}', 'c filter{$and:[{$and:[{tenantId:?},{status:{$in:[?,?]}}]},{k:?}]}'];
+        yield 'three andWhere() of Yii' => ['find', '{"find":"c","filter":{"$and":[{"$and":[{"tenantId":"x"},{"status":{"$in":[1,2]}}]},{"k":3}]}}', 'c filter{$and:[{$and:[{tenantId:?},{status:{$in:[?,...]}}]},{k:?}]}'];
         yield 'five levels of keys' => ['find', '{"find":"c","filter":{"a":{"b":{"c":{"d":{"e":1}}}}}}', 'c filter{a:{b:{c:{d:{e:?}}}}}'];
         yield 'six levels of keys is unknown' => ['find', '{"find":"c","filter":{"a":{"b":{"c":{"d":{"e":{"f":1}}}}}}}', null];
         yield 'empty document at the sixth level' => ['find', '{"find":"c","filter":{"a":{"b":{"c":{"d":{"e":{}}}}}}}', 'c filter{a:{b:{c:{d:{e:{}}}}}}'];

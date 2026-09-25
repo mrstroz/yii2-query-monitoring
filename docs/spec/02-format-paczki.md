@@ -109,9 +109,11 @@ Założenie: nazwy pól, tabel, kolekcji i parametrów są kodem aplikacji, nie 
 | Nazwy pól, operatory `$set`, `$in`, `$match`, etapy potoku | Zostają |
 | Każda wartość, także liczba w `sort` i `limit`, wartość logiczna i `null` | Zamiana na `?` |
 | Obiekt BSON (`ObjectId`, `UTCDateTime`, `Regex`, `Binary`, `Decimal128` i inne) | Jedna wartość, zamiana na `?`, bez zaglądania do środka |
-| Tablica | `[...]` z elementami po przecinku, każdy według tych reguł. Tablice nie są scalane: `$in:[?,?]` i `$in:[?,?,?]` to różne `query` |
+| Tablica | `[...]` z elementami po przecinku, każdy według tych reguł |
+| Tablica pod `$in` lub `$nin` z co najmniej dwoma elementami, z których każdy jest wartością (nie dokumentem, tablicą ani napisem zaczynającym się od `$`, czyli ścieżką pola lub zmienną) | `[?,...]`: `$in:[?,?]` i `$in:[?,?,?]` dają `$in:[?,...]`. Jeden element daje `$in:[?]`, a `$in:["$a","$b"]` daje `$in:[?,?]` ([ADR 0011](../adr/0011-zwijanie-list-in-i-parametrow-yii.md)) |
+| Wyrażenie agregacji `$in` z dwoma elementami, z których drugi jest tablicą | Tablica według wiersza wyżej: `$expr:{$in:["$status",[1,2,3]]}` daje `$expr:{$in:[?,[?,...]]}` |
 | Brak sekcji w poleceniu | Sekcja pominięta. Pusty filtr daje `filter{}` |
-| Zagnieżdżenie | Poziomy liczy się po kluczach: klucze sekcji i klucze etapu `pipeline` to poziom pierwszy, klucze dokumentu pod kluczem to kolejny, tablica nie jest poziomem. Klucz ponad pięć poziomów daje `query: null`. `filter{$and:[{$and:[{tenantId:?},{status:{$in:[?,?]}}]},{k:?}]}`, czyli trzy `andWhere()` w Yii, ma cztery poziomy, a `filter{a:{b:{c:{d:{e:{f:?}}}}}}` sześć |
+| Zagnieżdżenie | Poziomy liczy się po kluczach: klucze sekcji i klucze etapu `pipeline` to poziom pierwszy, klucze dokumentu pod kluczem to kolejny, tablica nie jest poziomem. Klucz ponad pięć poziomów daje `query: null`. `filter{$and:[{$and:[{tenantId:?},{status:{$in:[?,...]}}]},{k:?}]}`, czyli trzy `andWhere()` w Yii, ma cztery poziomy, a `filter{a:{b:{c:{d:{e:{f:?}}}}}}` sześć |
 | Pusta kolekcja albo nazwa pola, nazwa ze znakiem `{`, `}`, `[`, `]`, `,`, `:`, białym (także Unicode, np. NBSP), sterującym albo nie w UTF-8 | `query: null` |
 | Kolekcja, która nie jest tekstem (np. `aggregate: 1` na bazie) | `query: null` |
 | Długość ponad `maxQueryLength` | `query: null`, bez obcinania |

@@ -4,9 +4,9 @@
 
 | Pole | Wartość |
 |---|---|
-| **Etap** | E4a. Zwijanie list w `query`, 1 z 2 |
-| **Ostatnio ukończone** | [YQM-41](05a-zwijanie-list.md): parametry `:qpN` jako `?`, lista wartości po `IN` jako pierwszy element i `...` ([ADR 0011](../adr/0011-zwijanie-list-in-i-parametrow-yii.md)) |
-| **Następne** | [YQM-42](05a-zwijanie-list.md): zwinięte tablice `$in` i `$nin` w MongoDB; potem spisanie zadań [E5](06-konsola.md) |
+| **Etap** | E4a. Zwijanie list w `query`, 2 z 2, zakończony |
+| **Ostatnio ukończone** | [YQM-41, YQM-42](05a-zwijanie-list.md): parametry `:qpN` jako `?`, lista wartości po `IN` jako pierwszy element i `...`, `$in` i `$nin` jako `[?,...]` ([ADR 0011](../adr/0011-zwijanie-list-in-i-parametrow-yii.md)) |
+| **Następne** | Spisanie zadań [E5](06-konsola.md) (zadania konsolowe) według obowiązkowych scenariuszy odbioru z tego pliku |
 
 Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trzeba zajrzeć na początku sesji.
 
@@ -19,7 +19,7 @@ Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trze
 | **E2** | [03-testy](03-testy.md) | Architektura i konwencje testów | Cztery testsuite'y, konwencje spisane i zastosowane, żaden scenariusz nie zniknął | 8/8 |
 | **E3** | [04-kontekst-wpisu](04-kontekst-wpisu.md) | Kontekst wpisu i limity | Paczka `v: 2` z `route` w nagłówku i `caller` we wpisie, `maxQueryLength` 8192, limity paczki potwierdzone pomiarem | 4/4 |
 | **E4** | [05-mongodb](05-mongodb.md) | Źródło MongoDB | Jedna paczka z wpisami SQL i MongoDB | 10/10 |
-| **E4a** | [05a-zwijanie-list](05a-zwijanie-list.md) | Zwijanie list w `query` | Ta sama struktura z inną długością listy `IN` lub `$in` daje ten sam `query` | 1/2 |
+| **E4a** | [05a-zwijanie-list](05a-zwijanie-list.md) | Zwijanie list w `query` | Ta sama struktura z inną długością listy `IN` lub `$in` daje ten sam `query` | 2/2 |
 | **E5** | [06-konsola](06-konsola.md) | Zadania konsolowe | Wiele paczek z `seq` w jednym procesie | – |
 | **E6** | [07-wydajnosc-i-odbior](07-wydajnosc-i-odbior.md) | Test wydajności, dokumentacja | Narzut w progu, limity potwierdzone, README pakietu | – |
 
