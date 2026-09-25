@@ -10,7 +10,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * YQM-34: spec 02 §4 (normalizacja MongoDB). YQM-42: `$in` i `$nin` (ADR-0011). Commands are canonical Extended JSON turned into the tree
+ * YQM-34: spec 02 §4 (normalizacja MongoDB). YQM-42: `$in` i `$nin` (ADR-0011). YQM-43: any depth (ADR-0004). Commands are canonical Extended JSON turned into the tree
  * `CommandStartedEvent::getCommand()` gives, so BSON types stay objects; ext-mongodb is needed, no server.
  */
 final class MongoDbNormalizerTest extends TestCase
@@ -81,11 +81,11 @@ final class MongoDbNormalizerTest extends TestCase
         yield '$in in a pipeline' => ['aggregate', '{"aggregate":"c","pipeline":[{"$match":{"a":{"$in":[1,2,3]}}}],"cursor":{}}', 'c pipeline[{$match:{a:{$in:[?,...]}}}]'];
         yield 'arrays are no level' => ['find', '{"find":"c","filter":{"$or":[{"a":{"$gt":1}},{"b":2}]}}', 'c filter{$or:[{a:{$gt:?}},{b:?}]}'];
         yield 'three andWhere() of Yii' => ['find', '{"find":"c","filter":{"$and":[{"$and":[{"tenantId":"x"},{"status":{"$in":[1,2]}}]},{"k":3}]}}', 'c filter{$and:[{$and:[{tenantId:?},{status:{$in:[?,...]}}]},{k:?}]}'];
-        yield 'five levels of keys' => ['find', '{"find":"c","filter":{"a":{"b":{"c":{"d":{"e":1}}}}}}', 'c filter{a:{b:{c:{d:{e:?}}}}}'];
-        yield 'six levels of keys is unknown' => ['find', '{"find":"c","filter":{"a":{"b":{"c":{"d":{"e":{"f":1}}}}}}}', null];
-        yield 'empty document at the sixth level' => ['find', '{"find":"c","filter":{"a":{"b":{"c":{"d":{"e":{}}}}}}}', 'c filter{a:{b:{c:{d:{e:{}}}}}}'];
-        yield 'pipeline levels count inside each stage' => ['aggregate', '{"aggregate":"c","pipeline":[{"$match":{"a":{"b":{"c":{"d":1}}}}}],"cursor":{}}', 'c pipeline[{$match:{a:{b:{c:{d:?}}}}}]'];
-        yield 'pipeline key at the sixth level is unknown' => ['aggregate', '{"aggregate":"c","pipeline":[{"$match":{"a":{"b":{"c":{"d":{"e":1}}}}}}],"cursor":{}}', null];
+        yield 'eight levels of keys' => ['find', '{"find":"c","filter":{"a":{"b":{"c":{"d":{"e":{"f":{"g":{"h":1}}}}}}}}}', 'c filter{a:{b:{c:{d:{e:{f:{g:{h:?}}}}}}}}'];
+        yield 'deep empty document' => ['find', '{"find":"c","filter":{"a":{"b":{"c":{"d":{"e":{}}}}}}}', 'c filter{a:{b:{c:{d:{e:{}}}}}}'];
+        yield 'deep key in a pipeline' => ['aggregate', '{"aggregate":"c","pipeline":[{"$match":{"a":{"b":{"c":{"d":{"e":{"f":1}}}}}}}],"cursor":{}}', 'c pipeline[{$match:{a:{b:{c:{d:{e:{f:?}}}}}}}]'];
+        yield 'Atlas Search compound in compound' => ['aggregate', '{"aggregate":"property","pipeline":[{"$search":{"index":"property","compound":{"filter":[{"compound":{"should":[{"equals":{"path":"status","value":1}},{"range":{"path":"price","gte":100}}]}}]}}},{"$limit":10}],"cursor":{}}', 'property pipeline[{$search:{index:?,compound:{filter:[{compound:{should:[{equals:{path:?,value:?}},{range:{path:?,gte:?}}]}}]}}},{$limit:?}]'];
+        yield 'Atlas Search facet with an embedded document' => ['aggregate', '{"aggregate":"property","pipeline":[{"$searchMeta":{"index":"property","facet":{"operator":{"compound":{"filter":[{"embeddedDocument":{"path":"rooms","operator":{"compound":{"must":[{"equals":{"path":"rooms.type","value":"bed"}}]}}}}]}},"facets":{"byStatus":{"type":"string","path":"status"}}}}}],"cursor":{}}', 'property pipeline[{$searchMeta:{index:?,facet:{operator:{compound:{filter:[{embeddedDocument:{path:?,operator:{compound:{must:[{equals:{path:?,value:?}}]}}}}]}},facets:{byStatus:{type:?,path:?}}}}}]'];
         yield 'aggregate on the database is unknown' => ['aggregate', '{"aggregate":1,"pipeline":[],"cursor":{}}', null];
         yield 'count with limit and skip' => ['count', '{"count":"c","query":{"a":1},"limit":1,"skip":2}', 'c filter{a:?} limit:? skip:?'];
         yield 'findAndModify with sort' => ['findAndModify', '{"findAndModify":"c","query":{"a":1},"sort":{"b":-1},"update":{"$inc":{"n":1}}}', 'c filter{a:?} update{$inc:{n:?}} sort{b:?}'];

@@ -4,9 +4,9 @@
 
 | Pole | Wartość |
 |---|---|
-| **Etap** | E4a. Zwijanie list w `query`, 2 z 2, zakończony |
-| **Ostatnio ukończone** | [YQM-41, YQM-42](05a-zwijanie-list.md): parametry `:qpN` jako `?`, lista wartości po `IN` jako pierwszy element i `...`, `$in` i `$nin` jako `[?,...]` ([ADR 0011](../adr/0011-zwijanie-list-in-i-parametrow-yii.md)) |
-| **Następne** | Spisanie zadań [E5](06-konsola.md) (zadania konsolowe) według obowiązkowych scenariuszy odbioru z tego pliku |
+| **Etap** | E4b. Pełniejszy `query` MongoDB, 1 z 3 |
+| **Ostatnio ukończone** | [YQM-43](05b-pelniejszy-query-mongodb.md): dokumenty MongoDB czytane na każdej głębokości, potok Atlas Search ma tekst `query` ([ADR 0004](../adr/0004-normalizacja-literalow-na-znak-zapytania.md)) |
+| **Następne** | [YQM-44](05b-pelniejszy-query-mongodb.md): `distinct` w postaci tekstowej |
 
 Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trzeba zajrzeć na początku sesji.
 
@@ -20,10 +20,11 @@ Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trze
 | **E3** | [04-kontekst-wpisu](04-kontekst-wpisu.md) | Kontekst wpisu i limity | Paczka `v: 2` z `route` w nagłówku i `caller` we wpisie, `maxQueryLength` 8192, limity paczki potwierdzone pomiarem | 4/4 |
 | **E4** | [05-mongodb](05-mongodb.md) | Źródło MongoDB | Jedna paczka z wpisami SQL i MongoDB | 10/10 |
 | **E4a** | [05a-zwijanie-list](05a-zwijanie-list.md) | Zwijanie list w `query` | Ta sama struktura z inną długością listy `IN` lub `$in` daje ten sam `query` | 2/2 |
+| **E4b** | [05b-pelniejszy-query-mongodb](05b-pelniejszy-query-mongodb.md) | Pełniejszy `query` MongoDB | Głęboki potok Atlas Search, `distinct` i długie polecenie mają tekst `query` | 1/3 |
 | **E5** | [06-konsola](06-konsola.md) | Zadania konsolowe | Wiele paczek z `seq` w jednym procesie | – |
 | **E6** | [07-wydajnosc-i-odbior](07-wydajnosc-i-odbior.md) | Test wydajności, dokumentacja | Narzut w progu, limity potwierdzone, README pakietu | – |
 
-42 zadania spisane. Jedno zadanie to jedna sesja i jeden commit.
+45 zadań spisanych. Jedno zadanie to jedna sesja i jeden commit.
 
 ## Dlaczego w tej kolejności
 

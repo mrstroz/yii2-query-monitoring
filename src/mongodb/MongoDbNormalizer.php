@@ -10,14 +10,11 @@ namespace mrstroz\querymonitoring\mongodb;
  * The input is the tree `CommandStartedEvent::getCommand()` gives: documents as `stdClass`, arrays as PHP
  * lists, values as scalars or BSON objects. Only the sections named in spec 02 §4 are read; `lsid`,
  * `$clusterTime`, `$db`, read preference and everything else stay out. Any object that is not a `stdClass`
- * (`ObjectId`, `UTCDateTime`, `Regex`, …) is a value. Returns null when the command is not described or
- * the result would be unsafe or too long (ADR-0004).
+ * (`ObjectId`, `UTCDateTime`, `Regex`, …) is a value. Documents and arrays are read at any depth. Returns null
+ * when the command is not described or the result would be unsafe or too long (ADR-0004).
  */
 final class MongoDbNormalizer
 {
-    /** Levels of keys: the keys of a section or a pipeline stage are level 1, an array is no level; deeper gives null (spec 02 §4). */
-    public const MAX_DEPTH = 5;
-
     /** Sections in the order of the text form, each as [section name, source key]. */
     private const SECTIONS = [
         'find' => [['filter', 'filter'], ['sort', 'sort'], ['limit', 'limit'], ['skip', 'skip']],
@@ -92,7 +89,7 @@ final class MongoDbNormalizer
                 continue;
             }
             $value = $source->{$key};
-            $text = $name === 'pipeline' ? $this->pipeline($value) : $this->value($value, 1);
+            $text = $name === 'pipeline' ? $this->pipeline($value) : $this->value($value);
             if ($text === null) {
                 return null;
             }
@@ -102,9 +99,6 @@ final class MongoDbNormalizer
         return $parts;
     }
 
-    /**
-     * Each stage counts its levels from its own document, as a section does.
-     */
     private function pipeline(mixed $stages): ?string
     {
         if (!is_array($stages)) {
@@ -112,7 +106,7 @@ final class MongoDbNormalizer
         }
         $items = [];
         foreach ($stages as $stage) {
-            $text = $stage instanceof \stdClass ? $this->value($stage, 1) : null;
+            $text = $stage instanceof \stdClass ? $this->value($stage) : null;
             if ($text === null) {
                 return null;
             }
@@ -123,10 +117,9 @@ final class MongoDbNormalizer
     }
 
     /**
-     * `{k:…,…}` for a document, `[…,…]` for an array, `?` for any other value. `$depth` is the level the keys
-     * of a document at this place would have.
+     * `{k:…,…}` for a document, `[…,…]` for an array, `?` for any other value.
      */
-    private function value(mixed $value, int $depth): ?string
+    private function value(mixed $value): ?string
     {
         if (!$value instanceof \stdClass && !is_array($value)) {
             return '?';
@@ -134,7 +127,7 @@ final class MongoDbNormalizer
         $items = [];
         if (is_array($value)) {
             foreach ($value as $item) {
-                $text = $this->value($item, $depth);
+                $text = $this->value($item);
                 if ($text === null) {
                     return null;
                 }
@@ -145,10 +138,10 @@ final class MongoDbNormalizer
         }
         foreach (get_object_vars($value) as $key => $item) {
             $key = (string) $key;
-            if ($depth > self::MAX_DEPTH || !self::isSafeName($key)) {
+            if (!self::isSafeName($key)) {
                 return null;
             }
-            $text = $key === '$in' || $key === '$nin' ? $this->inOperand($item, $depth + 1) : $this->value($item, $depth + 1);
+            $text = $key === '$in' || $key === '$nin' ? $this->inOperand($item) : $this->value($item);
             if ($text === null) {
                 return null;
             }
@@ -162,19 +155,19 @@ final class MongoDbNormalizer
      * The value of `$in` or `$nin` (ADR-0011): a list of values becomes `[?,...]`, and so does the array in the
      * aggregation form `$in: [expression, array]`. Anything else follows {@see value()}.
      */
-    private function inOperand(mixed $item, int $depth): ?string
+    private function inOperand(mixed $item): ?string
     {
         if (self::isValueList($item)) {
             return '[?,...]';
         }
         if (is_array($item) && count($item) === 2 && array_is_list($item) && is_array($item[1])) {
-            $expression = $this->value($item[0], $depth);
-            $array = self::isValueList($item[1]) ? '[?,...]' : $this->value($item[1], $depth);
+            $expression = $this->value($item[0]);
+            $array = self::isValueList($item[1]) ? '[?,...]' : $this->value($item[1]);
 
             return $expression === null || $array === null ? null : "[{$expression},{$array}]";
         }
 
-        return $this->value($item, $depth);
+        return $this->value($item);
     }
 
     /**
