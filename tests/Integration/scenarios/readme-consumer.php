@@ -27,9 +27,10 @@ return static function (\yii\console\Application $app): array {
     };
     $caught = null;
     try {
-        (static function () use ($code, $message, $job): void {
+        // Parameters, not `use`: the lowest PHPStan does not see eval() reading captured variables.
+        (static function (string $code, object $message, object $job): void {
             eval($code);
-        })();
+        })((string) $code, $message, $job);
     } catch (\RuntimeException $e) {
         $caught = $e->getMessage();
     }
