@@ -76,6 +76,12 @@ final class JobMonitorBehavior extends Behavior
         if ($monitor === null || !$event instanceof ExecEvent) {
             return;
         }
+        // Handles the package already ended, e.g. after `handled` in a queue without a worker loop (sync).
+        foreach ($this->open as $key => $open) {
+            if (!$open->isActive()) {
+                unset($this->open[$key]);
+            }
+        }
         $job = $event->job;
         // Both are untyped properties in yii2-queue, typed only by PHPDoc; a driver may set another type, and
         // that must not become a TypeError in the queue. In `isolate` mode `queue/exec` passes the attempt from its
@@ -89,6 +95,8 @@ final class JobMonitorBehavior extends Behavior
             $this->queueName,
             is_string($id) || is_int($id) ? $id : null,
             is_int($attempt) ? $attempt : (is_string($attempt) ? (filter_var($attempt, FILTER_VALIDATE_INT) ?: null) : null),
+            // The event lives until handleMessage() returns, also when another handler marks it `handled`.
+            $event,
         );
         if ($handle->isActive()) {
             $this->handles[$event] = $handle;

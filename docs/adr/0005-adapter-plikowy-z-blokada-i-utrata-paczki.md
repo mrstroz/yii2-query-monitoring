@@ -12,7 +12,7 @@ Wiele procesów PHP-FPM i procesów konsoli zapisuje do jednego pliku, często j
 
 ## Decyzja
 
-Jedna paczka to jeden wiersz JSON. Zapis i rotacja biorą `flock` z `LOCK_EX | LOCK_NB` na osobnym pliku `.lock`. Gdy blokada jest zajęta, paczka przepada. Plik tylko na lokalnym dysku. Proces, który tworzy katalog, plik danych albo `.lock`, nadaje im tryb z `file.dirMode` i `file.fileMode`, domyślnie zapis dla grupy, a katalog zachowuje odziedziczony bit setgid. Rotacja przesuwa kopie przez `rename` na miejsce starszej, bez osobnego `unlink`, a plik już większy niż `maxSize` jest rotowany przed zapisem i nie dostaje nowego wiersza, gdy rotacja zawiedzie.
+Jedna paczka to jeden wiersz JSON. Zapis i rotacja biorą `flock` z `LOCK_EX | LOCK_NB` na osobnym pliku `.lock`. Gdy blokada jest zajęta, paczka przepada. Plik tylko na lokalnym dysku. Proces, który tworzy katalog, plik danych albo `.lock`, nadaje im tryb z `file.dirMode` i `file.fileMode`, domyślnie zapis dla grupy, a katalog zachowuje odziedziczony bit setgid. Rotacja przesuwa przez `rename` tylko kopie przed pierwszą brakującą, a gdy żadnej nie brakuje, najstarsza ustępuje, bez osobnego `unlink`, a plik już większy niż `maxSize` jest rotowany przed zapisem i nie dostaje nowego wiersza, gdy rotacja zawiedzie.
 
 ## Konsekwencje
 
@@ -30,7 +30,7 @@ Jedna paczka to jeden wiersz JSON. Zapis i rotacja biorą `flock` z `LOCK_EX | L
 | Plik tymczasowy plus `rename`, bez blokady | Działa na NFS, ale daje wiele plików na sekundę i wymaga sprzątania |
 | Blokada na samym pliku danych | Po rotacji stary uchwyt wskazuje przeniesiony plik, blokada nie chroni rotacji |
 | Tryb plików tylko z `umask` procesu (jak domyślnie w `yii\log\FileTarget`) | Plik utworzony przez serwer WWW z `umask` 022 nie jest zapisywalny dla konsoli i odwrotnie. Paczki drugiego użytkownika przepadają z błędem aż do rotacji |
-| `unlink` najstarszej kopii przed przesunięciem | Rotacja przerwana w połowie (np. `rename` cudzej kopii w katalogu ze sticky bit) zostawia przesunięte kopie, a każda następna próba usuwa kolejną z nich. `rename` na miejsce starszej przy powtórzonej porażce niczego więcej nie usuwa |
+| `unlink` najstarszej kopii przed przesunięciem | Rotacja przerwana w połowie (np. `rename` cudzej kopii w katalogu ze sticky bit) zostawia przesunięte kopie, a każda następna próba usuwa kolejną z nich. Przesunięcie tylko do pierwszej brakującej kopii zostawia po porażce wolne `.1`, więc ponowienie przenosi sam bieżący plik |
 
 ## Kiedy wrócić do tej decyzji
 

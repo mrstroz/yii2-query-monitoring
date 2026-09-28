@@ -33,6 +33,7 @@ final class Context
      * @param bool $split whether limits send a batch (console, job) instead of truncating (http)
      * @param bool $routed whether the route is decided; a root context gets it from the entry action
      * @param bool $excluded whether the context is excluded from the start (a job, by its name)
+     * @param \WeakReference<object>|null $scope a job whose scope object is released is over (spec 01 §5.3)
      */
     public function __construct(
         public readonly BatchType $type,
@@ -43,6 +44,7 @@ final class Context
         private bool $routed,
         private ?string $route = null,
         private bool $excluded = false,
+        private readonly ?\WeakReference $scope = null,
     ) {
         $this->lastSend = ($this->settings->clock)();
         if (!$this->excluded) {
@@ -60,13 +62,25 @@ final class Context
         return $this->ended;
     }
 
+    /** Whether the context has a scope object and that object was released. */
+    public function isReleased(): bool
+    {
+        return $this->scope !== null && $this->scope->get() === null;
+    }
+
     /**
-     * Sets `route` of the current and every later batch (spec 02 §1).
+     * Sets `route` of the current and every later batch (spec 02 §1). In a splitting context a header grown past
+     * `maxBatchBytes` moves entries to the next batch instead of dropping them.
+     *
+     * @param \Closure(QueryBatch): void $emit
      */
-    public function setRoute(?string $route): void
+    public function setRoute(?string $route, \Closure $emit): void
     {
         $this->route = $route;
         $this->collector?->setRoute($route);
+        if ($this->isAccepting() && $this->splits()) {
+            $this->rebalance($emit);
+        }
     }
 
     /**
@@ -87,8 +101,11 @@ final class Context
 
             return;
         }
-        if ($this->split && $this->collector !== null && $this->collector->isFull()) {
-            $emit($this->closeBatch());
+        if ($this->split) {
+            $this->rebalance($emit);
+            if ($this->collector !== null && $this->collector->isFull()) {
+                $emit($this->closeBatch());
+            }
         }
     }
 
@@ -168,6 +185,30 @@ final class Context
         $this->collector = null;
         if ($collector !== null && !$collector->isEmpty()) {
             $emit($collector->close(new \DateTimeImmutable(), $this->seq++));
+        }
+    }
+
+    /**
+     * Sends the entries that still fit with the current header and adds the rest, in order, to the next batch.
+     * Nothing is sent when no entry fits; the entries then go through {@see self::add()}, which counts one too
+     * large even for an empty batch in `dropped`.
+     *
+     * @param \Closure(QueryBatch): void $emit
+     */
+    private function rebalance(\Closure $emit): void
+    {
+        if ($this->collector === null) {
+            return;
+        }
+        $spilled = $this->collector->spill();
+        if ($spilled === []) {
+            return;
+        }
+        if ($this->collector->count() > 0) {
+            $emit($this->closeBatch());
+        }
+        foreach ($spilled as $entry) {
+            $this->add($entry, $emit);
         }
     }
 

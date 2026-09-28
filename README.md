@@ -135,9 +135,12 @@ directory to that group with the setgid bit, so every file created in it gets th
 chgrp www-data runtime/logs && chmod 2775 runtime/logs   # the console user is a member of www-data
 ```
 
+Do not set the sticky bit on that directory: with `fs.protected_regular`, the kernel then stops the second user
+from opening the other user's lock and data file, and rotation cannot move them.
+
 With the default modes the file and the lock are then writable by both users, whoever created them.
-Rotation renames files, which needs write permission on the directory. A copy is moved only onto the next
-older one, so a rotation that fails removes no other copy; a file already over `maxSize` is rotated before
+Rotation renames files, which needs write permission on the directory. Copies move up only to the first
+missing one, so a rotation that fails, and its retry, remove no copy; a file already over `maxSize` is rotated before
 the next write, and when that fails too, the batch is not appended, so the file does not keep growing.
 
 ## Console commands and jobs
@@ -204,7 +207,12 @@ A pattern like `queue/*` excludes every command of that component, `queue/info` 
 The behavior opens the job in `Queue::EVENT_BEFORE_EXEC` and ends it in `EVENT_AFTER_EXEC` or
 `EVENT_AFTER_ERROR`. In `isolate` mode, the default of `queue/listen` and `queue/run`, the job runs in a child
 process `queue/exec`, and the child sends the job's batches; that is why `queue/exec` is excluded too. A job
-another handler marks as `handled` gets no end event; the behavior ends it in the next worker loop.
+another handler marks as `handled` gets no end event; it ends at the first monitored operation after the queue
+returns from it, also in `yii\queue\sync\Queue`, which has no worker loop. A `sync\Queue` with `handle: true`
+runs its jobs in `EVENT_AFTER_REQUEST`; when the queue component is created after the package's bootstrap (for
+example at the first `push()`), that happens after the package has finalised and their queries are not monitored.
+List the queue in `bootstrap` before `queryMonitor` to monitor them. When
+`monitor` does not name a `QueryMonitor` component, the behavior logs one `Yii::error` and monitors no jobs.
 
 ### Any other consumer
 
@@ -225,6 +233,10 @@ try {
 }
 ```
 
+Pass the message object as `scope:` to `beginJob()` as a safety net: the package keeps only a weak reference,
+and once the object is released the job ends at the latest at the next monitored operation. `endJob()` in
+`finally` stays the way to end it on time.
+
 `beginJob()` and `endJob()` never throw and never change what the job does, throws, or how the queue
 retries or acknowledges it. A handle that was already ended, or one returned while the package is disabled,
 does nothing.
@@ -237,7 +249,8 @@ does nothing.
   belong only to it, and the parent collects again after `endJob()`. Ending a parent ends its children that
   are still open. At most 16 contexts are open at once, the request or command included; a `beginJob()` over
   that limit returns an inert handle, logs one `Yii::error`, and the job's queries go to the deepest open
-  context with that context's metadata. A consumer that forgets `endJob()` reaches the limit, so use `finally`.
+  context with that context's metadata, even when the job's name is excluded. A consumer that forgets `endJob()`
+  reaches the limit, so use `finally`.
 - **Idle workers.** A job sends its remainder when it ends, so nothing waits for the next message.
 - **Shutdown.** The end of the process sends what is left, also after `exit()` or an unhandled exception, and
   ends jobs that were not ended. A fatal error in some phases or `SIGKILL` loses the unsent remainder.

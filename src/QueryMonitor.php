@@ -118,8 +118,9 @@ class QueryMonitor extends Component implements BootstrapInterface
      * (spec 01 §5.5, ADR-0003). Called from `Application::EVENT_AFTER_REQUEST` and from the shutdown callback,
      * whichever comes first.
      *
-     * `$finalized` is the only finalisation state of the process: it is set before anything else, also when the
-     * package was not installed, and never reset, so an adapter or collector failure is not retried in shutdown.
+     * `$finalized` is the finalisation state of the process: it is set before anything else, also when the package
+     * was not installed, and never reset, so an adapter or collector failure is not retried in shutdown. The context
+     * stack keeps its own flag, so nothing reaches it after its finalisation either.
      * Intake is paused while the adapter sends, so queries the adapter runs are not entries (spec 01 §6).
      */
     public function finalize(): void
@@ -142,15 +143,22 @@ class QueryMonitor extends Component implements BootstrapInterface
      * @param string $name class or handler name of the job, never its arguments
      * @param string|int|null $messageId id of the message in the queue, not of the attempt
      * @param int|null $attempt number of the attempt, from 1
+     * @param object|null $scope object whose lifetime is the latest end of the job, e.g. the message; only a weak
+     *                           reference is kept, and once it is released the job ends at the next operation
      */
-    public function beginJob(string $name, ?string $queue = null, string|int|null $messageId = null, ?int $attempt = null): JobHandle
-    {
+    public function beginJob(
+        string $name,
+        ?string $queue = null,
+        string|int|null $messageId = null,
+        ?int $attempt = null,
+        ?object $scope = null,
+    ): JobHandle {
         $contexts = $this->contexts;
         if ($this->finalized || $contexts === null || $this->guard === null) {
             return new JobHandle();
         }
         $context = $this->guard->run(
-            static fn() => $contexts->beginJob(JobInfo::create($name, $queue, $messageId, $attempt), JobInfo::name($name)),
+            static fn() => $contexts->beginJob(JobInfo::create($name, $queue, $messageId, $attempt), JobInfo::name($name), $scope),
             'beginJob',
         );
 

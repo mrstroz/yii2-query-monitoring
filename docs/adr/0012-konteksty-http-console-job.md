@@ -16,7 +16,7 @@ Recordery obu źródeł trzymają jeden obiekt kolektora przez cały proces: `sq
 
 ## Decyzja
 
-Wpis należy do **kontekstu**: `http` (żądanie), `console` (uruchomienie komendy) albo `job` (jedna próba joba). Każdy kontekst ma własne `id` i `seq` od 1. Kontekst korzenia powstaje w bootstrapie, joby otwiera aplikacja przez `QueryMonitor::beginJob()` i zamyka przez `endJob()` z uchwytem. Konteksty tworzą stos w jednym obiekcie procesu, a recordery obu źródeł pytają ten stos przy każdym wpisie. Wpis trafia do najgłębszego otwartego kontekstu. `http` wysyła jedną paczkę jak dotąd, `console` i `job` porcjują po limicie wpisów, rozmiaru i czasu. Metadane joba zapisuje nowe pole nagłówka `job`, a format dostaje `v: 3`.
+Wpis należy do **kontekstu**: `http` (żądanie), `console` (uruchomienie komendy) albo `job` (jedna próba joba). Każdy kontekst ma własne `id` i `seq` od 1. Kontekst korzenia powstaje w bootstrapie, joby otwiera aplikacja przez `QueryMonitor::beginJob()` i zamyka przez `endJob()` z uchwytem. Opcjonalny obiekt zakresu wyznacza najpóźniejszy koniec joba: gdy zostanie zwolniony, job kończy się przy najbliższej operacji pakietu, bo kolejka może nie wywołać zdarzenia końca. Konteksty tworzą stos w jednym obiekcie procesu, a recordery obu źródeł pytają ten stos przy każdym wpisie. Wpis trafia do najgłębszego otwartego kontekstu. `http` wysyła jedną paczkę jak dotąd, `console` i `job` porcjują po limicie wpisów, rozmiaru i czasu. Metadane joba zapisuje nowe pole nagłówka `job`, a format dostaje `v: 3`.
 
 ## Konsekwencje
 

@@ -5,7 +5,7 @@
 | Pole | Wartość |
 |---|---|
 | **Etap** | E5. Konsola i joby, 11 z 11, zakończony |
-| **Ostatnio ukończone** | [YQM-46..56](06-konsola.md): konteksty `http`, `console` i `job` ([ADR 0012](../adr/0012-konteksty-http-console-job.md)), porcjowanie, `beginJob()`/`endJob()`, `excludedRoutes` ([ADR 0013](../adr/0013-wykluczenia-tras-per-typ-kontekstu.md)), format `v: 3`, behavior `yii2-queue`, adapter plikowy dla dwóch użytkowników, README; macierz PHP 8.1 i 8.4 oraz najniższe zależności zielone |
+| **Ostatnio ukończone** | [YQM-46..56](06-konsola.md): konteksty `http`, `console` i `job` ([ADR 0012](../adr/0012-konteksty-http-console-job.md)), porcjowanie, `beginJob()`/`endJob()`, `excludedRoutes` ([ADR 0013](../adr/0013-wykluczenia-tras-per-typ-kontekstu.md)), format `v: 3`, behavior `yii2-queue`, adapter plikowy dla dwóch użytkowników, README; macierz PHP 8.1 i 8.4 oraz najniższe zależności zielone. Poprawki po przeglądzie: rotacja tylko do pierwszej brakującej kopii (YQM-54), `beginJob(..., $scope)` kończy job `handled` przy powrocie z kolejki (YQM-53), trasa po wpisach przenosi nadmiar do następnej paczki (YQM-48) |
 | **Następne** | Spisanie zadań [E6](07-wydajnosc-i-odbior.md) (wydajność i odbiór) według obowiązkowych punktów z tego pliku |
 
 Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trzeba zajrzeć na początku sesji.

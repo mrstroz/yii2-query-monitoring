@@ -172,6 +172,24 @@ final class QueryCollector
     }
 
     /**
+     * Removes entries from the end until the batch with the current header fits in `maxBatchBytes`, and returns them
+     * in their order, uncounted: a splitting context moves them to its next batch when a longer `route` grew the
+     * header (spec 01 §5.2). Nothing after close.
+     *
+     * @return list<QueryEntry>
+     */
+    public function spill(): array
+    {
+        $spilled = [];
+        while ($this->batch === null && $this->entries !== [] && $this->totalBytes(0, count($this->entries)) > $this->maxBatchBytes) {
+            $spilled[] = array_pop($this->entries);
+            $this->entryBytes -= (int) array_pop($this->entryLengths);
+        }
+
+        return array_reverse($spilled);
+    }
+
+    /**
      * True once the batch holds `maxEntries` entries or {@see self::add()} stopped intake.
      */
     public function isFull(): bool

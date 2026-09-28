@@ -110,7 +110,7 @@ final class ProtectionTest extends IntegrationTestCase
             // calls in record and send are silenced by the guard
             'collector fails' => [$faulty, ['QM_FAULT' => 'collector'], '/ failed in action with Error$/', 0],
             'log target queries while logging the normaliser failure' => [$faulty, ['QM_FAULT' => 'normalizer', 'QM_LOG_QUERY' => '1'], '/ failed in record with Error$/', 0],
-            // the adapter's failure is logged while the collector is closed and paused: the log target's query is no entry
+            // the adapter's failure is logged while the context stack sends with intake paused: the log target's query is no entry
             'log target queries while logging the adapter failure' => [[], ['QM_ADAPTER' => 'throw', 'QM_LOG_QUERY' => '1'], '/ failed in send with /', 1],
         ];
     }

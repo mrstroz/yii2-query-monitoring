@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace mrstroz\querymonitoring\adapter;
 
 use mrstroz\querymonitoring\batch\QueryBatch;
-use yii\helpers\FileHelper;
 
 /**
  * Default adapter: appends each batch as one JSON line to a file, with size rotation (spec 03 §3, ADR-0005).
@@ -17,8 +16,9 @@ use yii\helpers\FileHelper;
  *
  * The web server and the console may run as two users of one group: whoever creates the directory, the data file
  * or the lock gives it `$dirMode` or `$fileMode`, and the directory keeps a setgid bit inherited from its parent.
- * Rotation moves copies with `rename()` onto the older one, so a failed rotation removes no other copy, and a file
- * already over `$maxSize` (an earlier rotation failed) is rotated before the write and gets no line when that fails.
+ * Rotation moves copies with `rename()` only up to the first missing one, so a failed rotation and its retry remove
+ * no copy, and a file already over `$maxSize` (an earlier rotation failed) is rotated before the write and gets no
+ * line when that fails.
  *
  * The constructor takes a resolved path and does not validate: {@see \mrstroz\querymonitoring\QueryMonitor}
  * checks the `file` setting. Nothing touches the file system before the first write.
@@ -107,7 +107,7 @@ final class FileAdapter implements BatchAdapterInterface
         $directory = dirname($this->path);
         error_clear_last();
         // is_dir() itself warns outside open_basedir. A mkdir lost to another process returns false, hence the
-        // second is_dir(). Not FileHelper::createDirectory(): its chmod() would drop an inherited setgid bit.
+        // second is_dir(). Not yii\helpers\FileHelper::createDirectory(): its chmod() would drop an inherited setgid bit.
         if (@is_dir($directory)) {
             return;
         }
@@ -172,18 +172,22 @@ final class FileAdapter implements BatchAdapterInterface
     }
 
     /**
-     * Each `.N` becomes `.N+1` up to `.$maxFiles`, the oldest first, and `$path` becomes `.1`. Every step is a
-     * `rename()` onto the next copy, so the old `.$maxFiles` goes only when `.$maxFiles-1` replaces it, and a step
-     * that fails leaves every copy not yet moved in place.
+     * `$path` becomes `.1` after the copies before the first missing one move up by one, the oldest first. With no
+     * copy missing the oldest, `.$maxFiles`, gives way. Every step is a `rename()`, so a rotation that fails leaves a
+     * gap at `.1` at the latest, and its retry moves only `$path` there instead of shifting the copies again.
      */
     private function rotate(): void
     {
         clearstatcache();
-        for ($i = $this->maxFiles - 1; $i >= 1; $i--) {
-            $from = $this->path . '.' . $i;
-            if (self::exists($from)) {
-                $this->rename($from, $this->path . '.' . ($i + 1));
+        $gap = $this->maxFiles;
+        for ($i = 1; $i < $this->maxFiles; $i++) {
+            if (!self::exists($this->path . '.' . $i)) {
+                $gap = $i;
+                break;
             }
+        }
+        for ($i = $gap - 1; $i >= 1; $i--) {
+            $this->rename($this->path . '.' . $i, $this->path . '.' . ($i + 1));
         }
         $this->rename($this->path, $this->path . '.1');
     }

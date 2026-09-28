@@ -35,11 +35,16 @@ final class ContextStack
     /** `route` of the root, given to every job opened later (spec 02 §1). */
     private ?string $route = null;
 
+    /** @var \Closure(QueryBatch): void hands a batch to {@see self::send()}; one instance for the process */
+    private readonly \Closure $emit;
+
     public function __construct(
         private readonly Guard $guard,
         private readonly BatchAdapterInterface $adapter,
         private readonly ContextSettings $settings,
-    ) {}
+    ) {
+        $this->emit = fn(QueryBatch $batch) => $this->send($batch);
+    }
 
     /**
      * Opens the root context of the process: `http` sends one batch, `console` splits once its route is known
@@ -60,12 +65,14 @@ final class ContextStack
     public function setRoute(?string $route): void
     {
         $this->route = $route;
+        // The root does not split before it is routed, so setting the route sends nothing of it before the
+        // exclusion is decided (spec 01 §5.4); open jobs split already and move what no longer fits.
         foreach ($this->contexts as $context) {
-            $context->setRoute($route);
+            $context->setRoute($route, $this->emit);
         }
         if ($this->contexts !== []) {
             $root = $this->contexts[0];
-            $root->markRouted($this->settings->exclusions->matches($root->type, $route), $this->emit());
+            $root->markRouted($this->settings->exclusions->matches($root->type, $route), $this->emit);
         }
     }
 
@@ -75,11 +82,13 @@ final class ContextStack
      * Null when there is nothing to open: no root, or after finalisation.
      *
      * @param string $name the job name before truncation, as `excludedRoutes['job']` matches it
+     * @param object|null $scope the job ends at the next operation after this object is released
      *
      * @throws ContextLimitException when {@see self::MAX_DEPTH} contexts are open; entries stay with the deepest
      */
-    public function beginJob(JobInfo $job, string $name): ?Context
+    public function beginJob(JobInfo $job, string $name, ?object $scope = null): ?Context
     {
+        $this->prune();
         $parent = $this->current();
         if ($parent === null || $this->finalized) {
             return null;
@@ -88,7 +97,7 @@ final class ContextStack
             throw new ContextLimitException('The context stack already holds ' . self::MAX_DEPTH . ' contexts; the job is not monitored on its own.');
         }
         // Its own guard: a failure while the parent sends must not leave this job unmonitored.
-        $this->guard->run(fn() => $parent->flushIfDue($this->emit()), 'send');
+        $this->guard->run(fn() => $parent->flushIfDue($this->emit), 'send');
         $context = new Context(
             BatchType::Job,
             self::newId(),
@@ -98,6 +107,7 @@ final class ContextStack
             routed: true,
             route: $this->route,
             excluded: $this->settings->exclusions->matches(BatchType::Job, $name),
+            scope: $scope === null ? null : \WeakReference::create($scope),
         );
         $this->contexts[] = $context;
 
@@ -111,13 +121,14 @@ final class ContextStack
      */
     public function end(Context $context): void
     {
+        $this->prune();
         $index = array_search($context, $this->contexts, true);
         if ($index === false || $index === 0) {
             return;
         }
         while (count($this->contexts) > $index) {
             $ending = array_pop($this->contexts);
-            $this->guard->run(fn() => $ending->end($this->emit()), 'send');
+            $this->guard->run(fn() => $ending->end($this->emit), 'send');
         }
     }
 
@@ -127,9 +138,14 @@ final class ContextStack
      */
     public function isAccepting(): bool
     {
+        if ($this->paused) {
+            return false;
+        }
+        // A job whose scope was released ends before this entry is decided, so the entry goes to its parent.
+        $this->prune();
         $context = $this->current();
 
-        return !$this->paused && !$this->finalized && $context !== null && $context->isAccepting();
+        return !$this->finalized && $context !== null && $context->isAccepting();
     }
 
     /**
@@ -138,9 +154,11 @@ final class ContextStack
      */
     public function dropIfFull(): bool
     {
-        $context = $this->current();
+        if (!$this->isAccepting()) {
+            return false;
+        }
 
-        return $this->isAccepting() && $context !== null && $context->dropIfFull();
+        return $this->current()?->dropIfFull() ?? false;
     }
 
     /**
@@ -148,11 +166,11 @@ final class ContextStack
      */
     public function add(QueryEntry $entry): void
     {
-        $context = $this->current();
-        if (!$this->isAccepting() || $context === null) {
+        // isAccepting() first: it may end released jobs, which changes the deepest context.
+        if (!$this->isAccepting()) {
             return;
         }
-        $context->add($entry, $this->emit());
+        $this->current()?->add($entry, $this->emit);
     }
 
     /**
@@ -167,7 +185,7 @@ final class ContextStack
         $this->finalized = true;
         while ($this->contexts !== []) {
             $context = array_pop($this->contexts);
-            $this->guard->run(fn() => $context->end($this->emit()), 'send');
+            $this->guard->run(fn() => $context->end($this->emit), 'send');
         }
     }
 
@@ -183,11 +201,23 @@ final class ContextStack
     }
 
     /**
-     * @return \Closure(QueryBatch): void
+     * Ends the deepest contexts whose scope object was released (spec 01 §5.3), each sending its remainder, and stops
+     * at the first one whose scope is alive or that has none. Nothing while the adapter sends, so no batch is sent
+     * from inside another send, and nothing after finalisation.
      */
-    private function emit(): \Closure
+    private function prune(): void
     {
-        return fn(QueryBatch $batch) => $this->send($batch);
+        if ($this->paused || $this->finalized) {
+            return;
+        }
+        while (count($this->contexts) > 1) {
+            $context = $this->contexts[count($this->contexts) - 1];
+            if (!$context->isReleased()) {
+                return;
+            }
+            array_pop($this->contexts);
+            $this->guard->run(fn() => $context->end($this->emit), 'send');
+        }
     }
 
     /**

@@ -56,3 +56,26 @@ size=$(stat -c %s "$LOG")
 [ "$size" -le $((2000 + line + 200)) ] || fail "current file grew to $size bytes"
 grep -q "$LOG" "$DIR/err" || fail "the failure does not name the file: $(cat "$DIR/err")"
 echo "ok: failed rotation keeps copies and bounds the file"
+
+# 3. A rotation whose last step fails keeps every copy, also when it is tried again. In a sticky directory the
+# console user may move its own copies but not the web user's current file, so `.2 → .3` and `.1 → .2` succeed
+# and `current → .1` fails; the retry must only fill the gap at `.1`, not move `.2` over `.3` again.
+STICKY="$DIR/sticky"
+mkdir "$STICKY"
+chgrp "$GROUP" "$STICKY"
+chmod 3775 "$STICKY"
+LOG3="$STICKY/queries.jsonl"
+# The lock belongs to the console user too: with fs.protected_regular an O_CREAT open of another user's file in a
+# sticky directory fails, which would stop the adapter before it reaches the rotation.
+as "$CLI" sh -c "printf '{\"copy\":\"A\"}\n' > '$LOG3.1'; printf '{\"copy\":\"B\"}\n' > '$LOG3.2'; printf '{\"copy\":\"C\"}\n' > '$LOG3.3'; : > '$LOG3.lock'; chmod 664 '$LOG3'.[123] '$LOG3.lock'"
+as "$WEB" sh -c "head -c 3000 /dev/zero | tr '\\\\0' 'x' > '$LOG3'; chmod 664 '$LOG3'"
+size3=$(stat -c %s "$LOG3")
+for try in 1 2; do
+    if as "$CLI" $PHP "$LOG3" 1 2000 3 "sticky$try" 2>"$DIR/err3"; then fail "rotation of another user's file in a sticky directory did not fail (try $try)"; fi
+done
+copies=$(cat "$LOG3".[0-9]* 2>/dev/null | sort | tr -d '\n')
+case "$copies" in *'"A"'*) ;; *) fail "copy A lost after a failed rotation and its retry: $copies" ;; esac
+case "$copies" in *'"B"'*) ;; *) fail "copy B lost after a failed rotation and its retry: $copies" ;; esac
+[ "$(stat -c %s "$LOG3")" -eq "$size3" ] || fail "the current file changed after failed rotations"
+grep -q "rename $LOG3 to" "$DIR/err3" || fail "the retry did not fail at the last step: $(cat "$DIR/err3")"
+echo "ok: failed last rotation step and its retry keep the copies"
