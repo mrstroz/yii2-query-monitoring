@@ -20,10 +20,12 @@ Każdy plik opisuje jedną decyzję: kontekst, wybór, konsekwencje i odrzucone 
 | [0004](0004-normalizacja-literalow-na-znak-zapytania.md) | Normalizacja literałów na `?`, przy niepewności `null` | Zaakceptowany | 2026-09-22 |
 | [0005](0005-adapter-plikowy-z-blokada-i-utrata-paczki.md) | Adapter plikowy JSON Lines z blokadą nieblokującą | Zaakceptowany | 2026-09-22 |
 | [0006](0006-blad-adaptera-gubi-paczke.md) | Błąd adaptera gubi paczkę, bez ponowień | Zaakceptowany | 2026-09-22 |
-| [0007](0007-zadanie-konsolowe-to-jeden-proces.md) | Zadanie konsolowe to jedno uruchomienie procesu | Zaakceptowany | 2026-09-22 |
+| [0007](0007-zadanie-konsolowe-to-jeden-proces.md) | Zadanie konsolowe to jedno uruchomienie procesu | Zastąpiony przez 0012 | 2026-09-22 |
 | [0008](0008-architektura-i-konwencje-testow.md) | Architektura testów i wersja PHPUnit | Zaakceptowany | 2026-09-22 |
 | [0009](0009-caller-i-route-w-formacie-v2.md) | `caller` we wpisie i `route` w nagłówku, format `v: 2` | Zaakceptowany | 2026-09-23 |
 | [0010](0010-subskrybent-na-manager-polaczenia-mongodb.md) | Subskrybent sterownika na `Manager` połączenia MongoDB | Zaakceptowany | 2026-09-23 |
 | [0011](0011-zwijanie-list-in-i-parametrow-yii.md) | Zwijanie list `IN` i parametrów `:qpN` Yii | Zaakceptowany | 2026-09-25 |
+| [0012](0012-konteksty-http-console-job.md) | Konteksty `http`, `console` i `job` z jawnymi granicami joba, format `v: 3` | Zaakceptowany | 2026-09-28 |
+| [0013](0013-wykluczenia-tras-per-typ-kontekstu.md) | Wykluczenia tras osobno dla każdego typu kontekstu | Zaakceptowany | 2026-09-28 |
 
 Szablon: [`template.md`](template.md).

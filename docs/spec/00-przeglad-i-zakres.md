@@ -15,7 +15,7 @@
 
 Kilka aplikacji Yii 2 wykonuje zapytania do MySQL, PostgreSQL i MongoDB, a nikt nie widzi, ile ich jest w jednym żądaniu, ile trwają i które kończą się błędem. Włączenie `enableProfiling` w Yii na produkcji jest za drogie i zapisuje wartości parametrów do logu.
 
-Biblioteka instalowana przez Composer ma zbudować jedną paczkę na żądanie HTTP i serię paczek na zadanie konsolowe. Paczka to nagłówek i płaska lista zapytań z czasem i wynikiem. Paczkę odbiera adapter wskazany przez aplikację. Domyślnie jest to plik JSON Lines z rotacją.
+Biblioteka instalowana przez Composer ma zbudować jedną paczkę na żądanie HTTP i serię paczek na zadanie konsolowe oraz na każdą próbę joba, którą aplikacja oznaczy. Paczka to nagłówek i płaska lista zapytań z czasem i wynikiem. Paczkę odbiera adapter wskazany przez aplikację. Domyślnie jest to plik JSON Lines z rotacją.
 
 Paczka ma odpowiadać na trzy pytania:
 
@@ -35,7 +35,8 @@ Z tego wynika reszta: wyjątek w kolektorze lub adapterze jest przechwytywany i 
 |---|---|
 | Źródła SQL | `yii\db\Connection` dla MySQL i PostgreSQL, przez podmienioną klasę `Command` |
 | Źródło MongoDB | `yii\mongodb\Connection`, przez zdarzenia sterownika `ext-mongodb` |
-| Konteksty | Żądanie HTTP w PHP-FPM, zadanie konsolowe `php yii ...` |
+| Konteksty | Żądanie HTTP w PHP-FPM, zadanie konsolowe `php yii ...`, job oznaczony przez `beginJob()` i `endJob()` albo behavior `yii2-queue`, także zagnieżdżony synchronicznie |
+| Wykluczenia | Trasy HTTP i komend oraz nazwy jobów wyłączone z pomiaru w konfiguracji |
 | Dane | Wszystkie polecenia wysłane do bazy, bez progu czasu i bez próbkowania |
 | Paczka | Nagłówek z akcją wejściową, płaska lista wpisów, licznik pominiętych |
 | Normalizacja | Usunięcie wartości z SQL i z dokumentów MongoDB |
@@ -50,7 +51,9 @@ Z tego wynika reszta: wyjątek w kolektorze lub adapterze jest przechwytywany i 
 | Próg wolnego zapytania i próbkowanie | Lista ma być pełna. Filtrowanie robi odbiorca |
 | Worker, wysyłka do konkretnego systemu, dashboard | Osobne prace. Biblioteka daje tylko punkt podłączenia adaptera |
 | `begin`, `commit`, `rollback` | Yii wykonuje je bezpośrednio przez PDO, poza `Command`. Dodanie wymaga podpięcia pod zdarzenia `Connection` |
-| Rozpoznawanie jobów kolejki | Worker to jedno długie zadanie z wieloma paczkami. Wymaga zależności od konkretnej kolejki |
+| Rozpoznawanie jobów bez udziału aplikacji | Granice joba zna tylko kolejka. Pakiet daje API i opcjonalny behavior `yii2-queue`, bez zależności od kolejki ([ADR 0012](../adr/0012-konteksty-http-console-job.md)) |
+| Wykonania równoległe w jednym procesie (fibers) | Stos kontekstów zakłada zagnieżdżenie synchroniczne |
+| Wynik joba i treść wyjątku w paczce | Paczka opisuje zapytania, nie job. Treść wyjątku może zawierać dane |
 | RoadRunner, Swoole dla HTTP | Wymaga resetu stanu kolektora między żądaniami |
 | NFS i współdzielone wolumeny | Blokada `flock` na NFS nie jest wiarygodna |
 | Własne klasy `Command`, dynamiczne połączenia | Podmiana klasy działa tylko dla połączeń z konfiguracji |
@@ -67,7 +70,7 @@ Z tego wynika reszta: wyjątek w kolektorze lub adapterze jest przechwytywany i 
 
 ## 6. Kryteria sukcesu
 
-1. Seria operacji daje pełną listę wpisów z czasami i wynikami, w kolejności zakończenia, do pierwszego osiągniętego limitu. Nadwyżka jest zliczona w `dropped`.
+1. Seria operacji daje pełną listę wpisów z czasami i wynikami, w kolejności zakończenia. W HTTP lista kończy się na pierwszym osiągniętym limicie, a nadwyżka jest zliczona w `dropped`. W konsoli i w jobie seria jest podzielona na paczki bez utraty wpisów, poza wpisem większym niż cała paczka.
 2. Operacje z różnymi wartościami parametrów dają ten sam `query`. Paczka nie zawiera tych wartości.
 3. Active Record i zwykłe polecenia są mierzone bez zmian w kodzie aplikacji. Trafienie w cache Yii nie daje wpisu.
 4. Domyślny adapter zapisuje poprawne paczki, rotuje pliki i nie przerywa aplikacji przy błędzie zapisu.
@@ -82,16 +85,19 @@ Z tego wynika reszta: wyjątek w kolektorze lub adapterze jest przechwytywany i 
 | CI | GitHub Actions | Matryca PHP 8.1 do 8.4 |
 | Produkcja | Aplikacje Yii 2 na PHP-FPM | Każda aplikacja podaje własne `app` w konfiguracji |
 
-Wymagania: PHP 8.1 lub nowszy, Yii 2.0.55 lub nowszy, Composer 2.1 lub nowszy (korzeń projektu dla `caller`, [ADR 0009](../adr/0009-caller-i-route-w-formacie-v2.md)). Starsze wydania 2.0.x mają security advisories, przez które domyślna polityka Composera 2.10 ich nie instaluje. `yiisoft/yii2-mongodb` i `ext-mongodb` są zależnościami opcjonalnymi w `suggest`. Aplikacja tylko z SQL instaluje pakiet bez MongoDB. Źródło MongoDB wymaga `yiisoft/yii2-mongodb` 3.0.4 lub nowszego i `ext-mongodb` 2.0 lub nowszego ([ADR 0010](../adr/0010-subskrybent-na-manager-polaczenia-mongodb.md)).
+Wymagania: PHP 8.1 lub nowszy, Yii 2.0.55 lub nowszy, Composer 2.1 lub nowszy (korzeń projektu dla `caller`, [ADR 0009](../adr/0009-caller-i-route-w-formacie-v2.md)). Starsze wydania 2.0.x mają security advisories, przez które domyślna polityka Composera 2.10 ich nie instaluje. `yiisoft/yii2-mongodb`, `ext-mongodb` i `yiisoft/yii2-queue` są zależnościami opcjonalnymi w `suggest`. Aplikacja tylko z SQL instaluje pakiet bez MongoDB. Źródło MongoDB wymaga `yiisoft/yii2-mongodb` 3.0.4 lub nowszego i `ext-mongodb` 2.0 lub nowszego ([ADR 0010](../adr/0010-subskrybent-na-manager-polaczenia-mongodb.md)).
 
 ## 8. Słownik
 
 | Termin | Znaczenie |
 |---|---|
-| Paczka | Jeden obiekt JSON: nagłówek plus lista wpisów. Jedna na żądanie HTTP, wiele na zadanie konsolowe |
+| Paczka | Jeden obiekt JSON: nagłówek plus lista wpisów. Jedna na żądanie HTTP, wiele na zadanie konsolowe i na job |
+| Kontekst | Jednostka z własnym `id` i `seq`, do której należą wpisy: `http`, `console` albo `job` ([01 §5.1](01-zbieranie-danych.md#51-konteksty)) |
+| Job | Jedna próba wykonania zadania z kolejki albo innej jednostki pracy, oznaczona przez `beginJob()` i `endJob()`. Ponowienie to nowy job |
 | Wpis | Jedno polecenie faktycznie wysłane do bazy: `db`, `conn`, `op`, `query`, `time_ms`, `result`, `caller` |
 | Kolektor | Obiekt w pamięci, który przyjmuje wpisy, pilnuje limitów i buduje paczkę |
-| Finalizacja | Zamknięcie kolektora i przekazanie paczki do adaptera. Po niej kolektor nie przyjmuje wpisów |
+| Finalizacja | Koniec procesu dla pakietu: zakończenie wszystkich otwartych kontekstów i wysłanie ich reszty. Po niej żaden wpis nie jest zbierany |
+| Wykluczenie | Wzorzec z `excludedRoutes`, po którym kontekst nie zbiera ani nie wysyła swoich wpisów |
 | Adapter | Obiekt lub `callable` z metodą `send(QueryBatch): void`, odbiorca paczki |
 | Akcja wejściowa | Pierwsza akcja kontrolera w żądaniu, zapamiętana z `EVENT_BEFORE_ACTION` aplikacji; w paczce jako `route` |
 | Ramka aplikacji | Ramka śladu wywołań z kodu aplikacji, nie z vendor, pakietu ani skryptu wejściowego ([02 §2](02-format-paczki.md#2-wpis)) |

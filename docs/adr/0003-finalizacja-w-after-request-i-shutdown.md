@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Zaakceptowany |
 | **Data** | 2026-09-22 |
-| **Dotyczy** | Cykl życia kolektora, [spec 01 §4](../spec/01-zbieranie-danych.md#4-żądanie-http) |
+| **Dotyczy** | Cykl życia procesu, [spec 01 §4](../spec/01-zbieranie-danych.md#4-żądanie-http) i [§5](../spec/01-zbieranie-danych.md#5-konsola-i-joby) |
 
 ## Kontekst
 
@@ -12,15 +12,15 @@
 
 ## Decyzja
 
-Finalizacja następuje w `EVENT_AFTER_REQUEST`. Przy starcie komponent rejestruje `register_shutdown_function`, która wykonuje finalizację, jeśli jeszcze nie nastąpiła. Operacje po finalizacji nie są zliczane.
+Finalizacja procesu następuje w `EVENT_AFTER_REQUEST`. Przy starcie komponent rejestruje `register_shutdown_function`, która wykonuje finalizację, jeśli jeszcze nie nastąpiła. Finalizacja kończy wszystkie otwarte konteksty ([ADR-0012](0012-konteksty-http-console-job.md)) od najgłębszego do korzenia, a każdy wysyła swoją resztę. Operacje po finalizacji nie są zliczane.
 
 ## Konsekwencje
 
-**Pozytywne:** `exit()` i `exit(1)` z `ErrorHandler` nie gubią paczki. Jedna paczka na żądanie, `seq` w HTTP zawsze `1`.
+**Pozytywne:** `exit()` i `exit(1)` z `ErrorHandler` nie gubią paczki, także reszty komendy i joba, którego aplikacja nie zamknęła. Jedna paczka na kontekst HTTP, `seq` w HTTP zawsze `1`.
 
 **Negatywne:** błąd krytyczny PHP nadal gubi paczkę. Adapter może działać w fazie shutdown, gdy część komponentów Yii jest zamknięta. Zapytania po `EVENT_AFTER_REQUEST` są niewidoczne.
 
-**Wymagania:** flaga „sfinalizowano” na jedynej ścieżce finalizacji komponentu, a nie w kolektorze, bo błąd przy budowie paczki zostawiłby kolektor otwarty. Ustawiana przed budową paczki, także przy pustym buforze, i nie cofana przy błędzie adaptera ani kolektora. Sprawdzana w obu ścieżkach.
+**Wymagania:** flaga „sfinalizowano” na jedynej ścieżce finalizacji procesu, a nie w kolektorze, bo błąd przy budowie paczki zostawiłby kolektor otwarty. Ustawiana przed budową pierwszej paczki, także przy pustym buforze, i nie cofana przy błędzie adaptera ani kolektora. Sprawdzana w obu ścieżkach. Zakończenie kontekstu, wysłanie paczki i finalizacja procesu to trzy osobne operacje: kontekst ma własną flagę zakończenia, także nie cofaną, więc zakończony job nie wysyła drugi raz w shutdown.
 
 ## Rozważane warianty
 

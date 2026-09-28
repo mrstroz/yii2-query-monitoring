@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace mrstroz\querymonitoring\sql;
 
-use mrstroz\querymonitoring\collector\QueryCollector;
+use mrstroz\querymonitoring\context\ContextStack;
 use mrstroz\querymonitoring\SourceInterface;
 use mrstroz\querymonitoring\support\CallerFrames;
 use mrstroz\querymonitoring\support\Guard;
@@ -24,7 +24,7 @@ final class Source implements SourceInterface
      * @param \Closure(): SqlNormalizer $createNormalizer
      */
     public function __construct(
-        private readonly QueryCollector $collector,
+        private readonly ContextStack $contexts,
         private readonly Guard $guard,
         private readonly CallerFrames $callers,
         private readonly \Closure $createNormalizer,
@@ -65,7 +65,7 @@ final class Source implements SourceInterface
         $this->normalizer ??= ($this->createNormalizer)();
         $component->commandMap[$driver] = [
             'class' => Command::class,
-            'recorder' => new Recorder($id, $driver, $this->normalizer, $this->collector, $this->guard, $this->callers),
+            'recorder' => new Recorder($id, $driver, $this->normalizer, $this->contexts, $this->guard, $this->callers),
         ];
     }
 }

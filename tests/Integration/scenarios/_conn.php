@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /** Connection by id as in `connections`, `module/id` for a module; shared helper, not a scenario. */
-return static function (\yii\web\Application $app, string $id): \yii\db\Connection {
+return static function (\yii\base\Application $app, string $id): \yii\db\Connection {
     $owner = $app;
     if (str_contains($id, '/')) {
         [$module, $id] = explode('/', $id, 2);

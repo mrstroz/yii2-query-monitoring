@@ -15,6 +15,11 @@ use yii\helpers\FileHelper;
  * {@see FileAdapterException} whose message names the operation and the path, never the batch; PHP
  * warnings of the file functions are suppressed, the exception reports them.
  *
+ * The web server and the console may run as two users of one group: whoever creates the directory, the data file
+ * or the lock gives it `$dirMode` or `$fileMode`, and the directory keeps a setgid bit inherited from its parent.
+ * Rotation moves copies with `rename()` onto the older one, so a failed rotation removes no other copy, and a file
+ * already over `$maxSize` (an earlier rotation failed) is rotated before the write and gets no line when that fails.
+ *
  * The constructor takes a resolved path and does not validate: {@see \mrstroz\querymonitoring\QueryMonitor}
  * checks the `file` setting. Nothing touches the file system before the first write.
  */
@@ -23,16 +28,22 @@ final class FileAdapter implements BatchAdapterInterface
     public const DEFAULT_PATH = '@runtime/logs/query-monitoring.jsonl';
     public const DEFAULT_MAX_SIZE = 10485760;
     public const DEFAULT_MAX_FILES = 5;
+    public const DEFAULT_FILE_MODE = 0o664;
+    public const DEFAULT_DIR_MODE = 0o775;
 
     /**
      * @param string $path file path without aliases; the lock is `$path . '.lock'`
      * @param int $maxSize bytes after which the file is rotated; a file of exactly this size is not
      * @param int $maxFiles number of archived copies `$path.1` … `$path.$maxFiles`
+     * @param int $fileMode mode given to the data file and the lock by the process that creates them
+     * @param int $dirMode mode given to the directory by the process that creates it
      */
     public function __construct(
         public readonly string $path,
         public readonly int $maxSize = self::DEFAULT_MAX_SIZE,
         public readonly int $maxFiles = self::DEFAULT_MAX_FILES,
+        public readonly int $fileMode = self::DEFAULT_FILE_MODE,
+        public readonly int $dirMode = self::DEFAULT_DIR_MODE,
     ) {}
 
     public function send(QueryBatch $batch): void
@@ -41,7 +52,8 @@ final class FileAdapter implements BatchAdapterInterface
     }
 
     /**
-     * Appends the batch and rotates the file when it grew over `$maxSize`.
+     * Appends the batch and rotates the file when it grew over `$maxSize`. A file already over `$maxSize` is rotated
+     * first; when that fails, the batch is not appended.
      *
      * @return bool false when the lock was busy and the batch was lost
      *
@@ -53,10 +65,14 @@ final class FileAdapter implements BatchAdapterInterface
         $this->ensureDirectory();
 
         $lockPath = $this->path . '.lock';
+        $created = !self::exists($lockPath);
         error_clear_last();
         $lock = @fopen($lockPath, 'c');
         if ($lock === false) {
             throw $this->failure('open the lock file', $lockPath);
+        }
+        if ($created) {
+            @chmod($lockPath, $this->fileMode);
         }
         try {
             error_clear_last();
@@ -68,6 +84,11 @@ final class FileAdapter implements BatchAdapterInterface
                 throw $this->failure('lock', $lockPath);
             }
             try {
+                clearstatcache();
+                $size = @filesize($this->path);
+                if ($size !== false && $size > $this->maxSize) {
+                    $this->rotate();
+                }
                 if ($this->append($line) > $this->maxSize) {
                     $this->rotate();
                 }
@@ -85,10 +106,24 @@ final class FileAdapter implements BatchAdapterInterface
     {
         $directory = dirname($this->path);
         error_clear_last();
-        // Under `@` a mkdir lost to another process returns false instead of throwing, hence the second
-        // is_dir(). is_dir() itself warns outside open_basedir.
-        if (!@is_dir($directory) && !@FileHelper::createDirectory($directory) && !@is_dir($directory)) {
-            throw $this->failure('create the directory', $directory);
+        // is_dir() itself warns outside open_basedir. A mkdir lost to another process returns false, hence the
+        // second is_dir(). Not FileHelper::createDirectory(): its chmod() would drop an inherited setgid bit.
+        if (@is_dir($directory)) {
+            return;
+        }
+        $missing = [];
+        for ($dir = $directory; !@is_dir($dir) && dirname($dir) !== $dir; $dir = dirname($dir)) {
+            $missing[] = $dir;
+        }
+        // Top down, one level at a time, so every directory this process creates gets `$dirMode`.
+        foreach (array_reverse($missing) as $dir) {
+            if (@mkdir($dir, $this->dirMode)) {
+                clearstatcache();
+                $perms = @fileperms($dir);
+                @chmod($dir, $this->dirMode | ($perms === false ? 0 : $perms & 0o2000));
+            } elseif (!@is_dir($dir)) {
+                throw $this->failure('create the directory', $directory);
+            }
         }
     }
 
@@ -98,10 +133,14 @@ final class FileAdapter implements BatchAdapterInterface
      */
     private function append(string $line): int
     {
+        $created = !self::exists($this->path);
         error_clear_last();
         $data = @fopen($this->path, 'a');
         if ($data === false) {
             throw $this->failure('open', $this->path);
+        }
+        if ($created) {
+            @chmod($this->path, $this->fileMode);
         }
         try {
             // In append mode ftell() says 0 until the first write; fstat() reports the real size.
@@ -133,18 +172,13 @@ final class FileAdapter implements BatchAdapterInterface
     }
 
     /**
-     * `$path` becomes `.1`, each `.N` becomes `.N+1` up to `.$maxFiles`, and the old `.$maxFiles` is removed.
+     * Each `.N` becomes `.N+1` up to `.$maxFiles`, the oldest first, and `$path` becomes `.1`. Every step is a
+     * `rename()` onto the next copy, so the old `.$maxFiles` goes only when `.$maxFiles-1` replaces it, and a step
+     * that fails leaves every copy not yet moved in place.
      */
     private function rotate(): void
     {
         clearstatcache();
-        $last = $this->path . '.' . $this->maxFiles;
-        if (self::exists($last)) {
-            error_clear_last();
-            if (!@unlink($last)) {
-                throw $this->failure('remove', $last);
-            }
-        }
         for ($i = $this->maxFiles - 1; $i >= 1; $i--) {
             $from = $this->path . '.' . $i;
             if (self::exists($from)) {

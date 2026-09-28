@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace mrstroz\querymonitoring\tests\Unit\collector;
 
 use mrstroz\querymonitoring\batch\BatchType;
+use mrstroz\querymonitoring\batch\JobInfo;
 use mrstroz\querymonitoring\batch\QueryBatch;
 use mrstroz\querymonitoring\batch\QueryEntry;
 use mrstroz\querymonitoring\collector\QueryCollector;
 use PHPUnit\Framework\TestCase;
 
 /**
- * YQM-3: spec 02 §5 (HTTP column), including the size invariant.
+ * YQM-3 and YQM-49: spec 02 §5 (HTTP column), including the size invariant with `route` and `job` in the header.
  */
 final class QueryCollectorTest extends TestCase
 {
@@ -259,6 +260,43 @@ final class QueryCollectorTest extends TestCase
         self::assertSame(200, count($batch->queries) + $batch->dropped);
     }
 
+    public function testJobMetadataCountsTowardsBatchBytes(): void
+    {
+        $long = str_repeat('j', 300);
+        $plain = $this->collector(maxBatchBytes: 3000);
+        $job = new QueryCollector('app', BatchType::Job, 'job_1', 'host', maxBatchBytes: 3000, job: JobInfo::create($long, $long, $long, 1));
+        for ($i = 0; $i < 100; $i++) {
+            $plain->add($this->entry("SELECT {$i}"));
+            $job->add($this->entry("SELECT {$i}"));
+        }
+
+        $batch = $job->close($this->ts());
+
+        self::assertLessThanOrEqual(3000, strlen($batch->toJson()));
+        self::assertLessThan($plain->count(), count($batch->queries), 'the job header takes room from the entries');
+        self::assertSame(['name', 'queue', 'message_id', 'attempt'], array_keys((array) json_decode($batch->toJson(), true)['job']));
+    }
+
+    public function testRouteSetAfterEntriesOfAJobRemovesEntriesFromTheEnd(): void
+    {
+        $job = JobInfo::create(str_repeat('n', 255), 'queue', 'm-1', 1);
+        $collector = new QueryCollector('app', BatchType::Job, 'job_1', 'host', maxBatchBytes: 3000, job: $job);
+        $added = [];
+        for ($i = 0; $i < 200; $i++) {
+            $entry = $this->entry("SELECT * FROM t WHERE id = :qp{$i}");
+            $added[] = $entry;
+            $collector->add($entry);
+        }
+        $collector->setRoute(str_repeat('m', 900));
+
+        $batch = $collector->close($this->ts());
+
+        self::assertLessThanOrEqual(3000, strlen($batch->toJson()));
+        self::assertSame($job, $batch->job);
+        self::assertSame(array_slice($added, 0, count($batch->queries)), $batch->queries, 'kept entries are a prefix of the added ones');
+        self::assertSame(200, count($batch->queries) + $batch->dropped);
+    }
+
     public function testBatchCarriesCollectorHeader(): void
     {
         $collector = new QueryCollector('shop-api', BatchType::Http, 'req_1', 'web-03');
@@ -338,6 +376,30 @@ final class QueryCollectorTest extends TestCase
         self::assertSame(0, $collector->dropped());
         self::assertSame($batch, $collector->close($this->ts()));
         self::assertCount(1, $batch->queries);
+    }
+
+    public function testOpenCollectorAcceptsAndClosedDoesNot(): void
+    {
+        $collector = $this->collector();
+        self::assertTrue($collector->isAccepting());
+
+        $collector->close($this->ts());
+
+        self::assertFalse($collector->isAccepting());
+    }
+
+    public function testCollectorIsEmptyUntilItHoldsAnEntryOrADroppedOne(): void
+    {
+        $empty = $this->collector();
+        $withEntry = $this->collector();
+        $withEntry->add($this->entry('q'));
+        $withDropped = $this->collector(maxBatchBytes: 300);
+        $withDropped->add($this->entry(str_repeat('x', 400)));
+
+        self::assertTrue($empty->isEmpty());
+        self::assertFalse($withEntry->isEmpty());
+        self::assertSame([0, 1], [$withDropped->count(), $withDropped->dropped()]);
+        self::assertFalse($withDropped->isEmpty(), 'a batch with only dropped is still sent');
     }
 
     public function testEmptyCollectorGivesValidEmptyBatch(): void

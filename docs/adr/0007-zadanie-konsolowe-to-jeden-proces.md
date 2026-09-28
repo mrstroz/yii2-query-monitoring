@@ -2,9 +2,9 @@
 
 | Pole | Wartość |
 |---|---|
-| **Status** | Zaakceptowany |
+| **Status** | Zastąpiony przez [ADR-0012](0012-konteksty-http-console-job.md) (2026-09-28) |
 | **Data** | 2026-09-22 |
-| **Dotyczy** | Zadania konsolowe, [spec 01 §5](../spec/01-zbieranie-danych.md#5-zadanie-konsolowe) |
+| **Dotyczy** | Zadania konsolowe, [spec 01 §5](../spec/01-zbieranie-danych.md#5-konsola-i-joby) |
 
 ## Kontekst
 

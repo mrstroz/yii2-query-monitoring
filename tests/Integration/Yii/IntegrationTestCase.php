@@ -6,6 +6,7 @@ namespace mrstroz\querymonitoring\tests\Integration\Yii;
 
 use mrstroz\querymonitoring\support\Guard;
 use mrstroz\querymonitoring\tests\app\AppRunner;
+use mrstroz\querymonitoring\tests\app\ConsoleRunner;
 use mrstroz\querymonitoring\tests\app\RunResult;
 use PHPUnit\Framework\TestCase;
 
@@ -63,6 +64,31 @@ abstract class IntegrationTestCase extends TestCase
         $this->requireDatabase($db);
 
         return AppRunner::run(array_replace(self::defaultComponent(), $component), $route, ['QM_DB' => $db] + $env);
+    }
+
+    /**
+     * Runs a scenario from tests/Integration/scenarios in the console application, as `php yii scenario/run`.
+     *
+     * @param array<string, mixed> $component merged over {@see self::defaultComponent()}
+     * @param array<string, string> $env
+     */
+    protected function consoleScenario(string $db, string $name, array $component = [], array $env = []): RunResult
+    {
+        return $this->command($db, ConsoleRunner::SCENARIO_ROUTE, [], $component, ['QM_SCENARIO' => $name] + $env);
+    }
+
+    /**
+     * Runs one console command of the test application.
+     *
+     * @param list<string> $args
+     * @param array<string, mixed> $component merged over {@see self::defaultComponent()}
+     * @param array<string, string> $env
+     */
+    protected function command(string $db, string $route, array $args = [], array $component = [], array $env = []): RunResult
+    {
+        $this->requireDatabase($db);
+
+        return ConsoleRunner::run(array_replace(self::defaultComponent(), $component), $route, $args, ['QM_DB' => $db] + $env);
     }
 
     /**

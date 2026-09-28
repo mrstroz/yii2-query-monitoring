@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace mrstroz\querymonitoring\tests\Unit\mongodb;
 
-use mrstroz\querymonitoring\batch\BatchType;
-use mrstroz\querymonitoring\collector\QueryCollector;
 use mrstroz\querymonitoring\mongodb\MongoDbNormalizer;
 use mrstroz\querymonitoring\mongodb\Recorder;
 use mrstroz\querymonitoring\support\CallerFrames;
 use mrstroz\querymonitoring\support\Guard;
 use mrstroz\querymonitoring\tests\Unit\LoggedTestCase;
+use mrstroz\querymonitoring\tests\Unit\StackProbe;
 use mrstroz\querymonitoring\tests\Unit\mongodb\deep\Deep;
 
 /**
@@ -39,15 +38,15 @@ final class RecorderCallerTest extends LoggedTestCase
      */
     private function callerAt(int $levels): array
     {
-        $collector = new QueryCollector('app', BatchType::Http, 'req_1', 'host');
+        $probe = new StackProbe();
         $frames = new CallerFrames($this->root(), __DIR__ . '/deep', $this->root() . '/src', null);
-        $recorder = new Recorder('mongodb', new MongoDbNormalizer(8192), $collector, new Guard(), $frames);
+        $recorder = new Recorder('mongodb', new MongoDbNormalizer(8192), $probe->stack, new Guard(), $frames);
         $recorder->started('1', 'find', static fn(): object => (object) ['find' => 'c']);
 
         $line = __LINE__ + 1;
         Deep::succeeded($levels, $recorder);
 
-        $queries = $collector->close(new \DateTimeImmutable())->queries;
+        $queries = $probe->finish();
         self::assertCount(1, $queries);
         self::assertSame([], $this->errors());
 

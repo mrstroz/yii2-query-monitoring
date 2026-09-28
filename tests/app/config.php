@@ -73,7 +73,12 @@ return [
             assert($mongodb instanceof yii\mongodb\Connection);
             $mongodb->open();
         }, 'queryMonitor']
-        : ['log', 'queryMonitor'],
+        : ['log', 'queryMonitor', ...(getenv('QM_BOOTSTRAP_QUERY') === '1' ? [static function (yii\base\Application $app): void {
+            // QM_BOOTSTRAP_QUERY=1: a query after the package's bootstrap and before routing (YQM-52).
+            $db = $app->get('db');
+            assert($db instanceof yii\db\Connection);
+            $db->createCommand('SELECT 1 AS qm_bootstrap')->queryScalar();
+        }] : [])],
     'modules' => [
         'admin' => [
             'class' => AdminModule::class,

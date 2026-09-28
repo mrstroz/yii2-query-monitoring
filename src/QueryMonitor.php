@@ -8,8 +8,12 @@ use mrstroz\querymonitoring\adapter\BatchAdapterInterface;
 use mrstroz\querymonitoring\adapter\CallableAdapter;
 use mrstroz\querymonitoring\adapter\FileAdapter;
 use mrstroz\querymonitoring\batch\BatchType;
+use mrstroz\querymonitoring\batch\JobInfo;
 use mrstroz\querymonitoring\batch\QueryBatch;
 use mrstroz\querymonitoring\collector\QueryCollector;
+use mrstroz\querymonitoring\context\ContextSettings;
+use mrstroz\querymonitoring\context\ContextStack;
+use mrstroz\querymonitoring\context\RouteExclusions;
 use mrstroz\querymonitoring\mongodb\MongoDbNormalizer;
 use mrstroz\querymonitoring\mongodb\Source as MongoDbSource;
 use mrstroz\querymonitoring\sql\Source as SqlSource;
@@ -41,8 +45,9 @@ use yii\base\InvalidConfigException;
  *
  * All work happens inside one {@see support\Guard}: a wrong setting disables the package for the
  * process with one `Yii::error`, and the application answers as without the package.
- * {@see self::createNormalizer()}, {@see self::createCollector()} and {@see self::createSources()} are the only
- * extension points.
+ * {@see self::createNormalizer()}, {@see self::createCollector()}, {@see self::createSources()} and
+ * {@see self::createClock()} are the only extension points; {@see self::beginJob()} and {@see self::endJob()}
+ * are the public API of job boundaries (spec 01 §5.3).
  */
 class QueryMonitor extends Component implements BootstrapInterface
 {
@@ -60,6 +65,17 @@ class QueryMonitor extends Component implements BootstrapInterface
 
     public int $maxQueryLength = SqlNormalizer::DEFAULT_MAX_QUERY_LENGTH;
 
+    /** Seconds after which a console or job context sends its batch at the next entry (spec 01 §5.2). */
+    public int $flushIntervalSeconds = 30;
+
+    /**
+     * Patterns excluded from monitoring by context type, e.g. `['console' => ['queue/*']]` (spec 01 §5.4): keys
+     * `http` and `console` match `route`, `job` matches the job name; a pattern ending with `*` is a prefix.
+     *
+     * @var array<string, list<string>>
+     */
+    public array $excludedRoutes = [];
+
     /**
      * Class name, {@see BatchAdapterInterface} object or `callable(QueryBatch): mixed` (spec 03 §1);
      * `null` writes to a file with {@see FileAdapter}, set by {@see self::$file}.
@@ -70,15 +86,16 @@ class QueryMonitor extends Component implements BootstrapInterface
 
     /**
      * Settings of the file adapter, used only when `adapter` is `null` (spec 03 §3): `path` (Yii alias
-     * allowed), `maxSize` in bytes and `maxFiles` archived copies. An omitted key keeps its default
-     * from {@see FileAdapter}; an unknown key or a wrong value disables the package.
+     * allowed), `maxSize` in bytes, `maxFiles` archived copies, and `fileMode`, `dirMode` given to what it
+     * creates. An omitted key keeps its default from {@see FileAdapter}; an unknown key or a wrong value disables
+     * the package.
      *
      * @var array<string, mixed>
      */
     public array $file = [];
 
     private ?Guard $guard = null;
-    private ?QueryCollector $collector = null;
+    private ?ContextStack $contexts = null;
     private ?BatchAdapterInterface $batchAdapter = null;
     private bool $finalized = false;
 
@@ -97,12 +114,13 @@ class QueryMonitor extends Component implements BootstrapInterface
     }
 
     /**
-     * Closes the collector and sends a non-empty batch to the adapter, once per process (spec 01 §4, ADR-0003).
-     * Called from `Application::EVENT_AFTER_REQUEST` and from the shutdown callback, whichever comes first.
+     * Finalises the process: ends every open context, the deepest first, and sends each non-empty remainder
+     * (spec 01 §5.5, ADR-0003). Called from `Application::EVENT_AFTER_REQUEST` and from the shutdown callback,
+     * whichever comes first.
      *
-     * `$finalized` is the only finalisation state: it is set before anything else, also when the package
-     * was not installed, and never reset, so an adapter or collector failure is not retried in shutdown.
-     * The collector is paused while the adapter sends, so queries the adapter runs are not entries (spec 01 §6).
+     * `$finalized` is the only finalisation state of the process: it is set before anything else, also when the
+     * package was not installed, and never reset, so an adapter or collector failure is not retried in shutdown.
+     * Intake is paused while the adapter sends, so queries the adapter runs are not entries (spec 01 §6).
      */
     public function finalize(): void
     {
@@ -110,22 +128,47 @@ class QueryMonitor extends Component implements BootstrapInterface
             return;
         }
         $this->finalized = true;
-        $collector = $this->collector;
-        $adapter = $this->batchAdapter;
-        if ($collector === null || $adapter === null || $this->guard === null) {
+        $contexts = $this->contexts;
+        if ($contexts === null || $this->guard === null) {
             return;
         }
-        $this->guard->run(static function () use ($collector, $adapter): void {
-            $collector->pause();
-            try {
-                $batch = $collector->close(new \DateTimeImmutable());
-                if ($batch->queries !== [] || $batch->dropped > 0) {
-                    $adapter->send($batch);
-                }
-            } finally {
-                $collector->resume();
-            }
-        }, 'send');
+        $this->guard->run(static fn() => $contexts->finalize(), 'send');
+    }
+
+    /**
+     * Opens a job context over the deepest open context (spec 01 §5.3). Never throws; returns an inert handle
+     * when there is nothing to open.
+     *
+     * @param string $name class or handler name of the job, never its arguments
+     * @param string|int|null $messageId id of the message in the queue, not of the attempt
+     * @param int|null $attempt number of the attempt, from 1
+     */
+    public function beginJob(string $name, ?string $queue = null, string|int|null $messageId = null, ?int $attempt = null): JobHandle
+    {
+        $contexts = $this->contexts;
+        if ($this->finalized || $contexts === null || $this->guard === null) {
+            return new JobHandle();
+        }
+        $context = $this->guard->run(
+            static fn() => $contexts->beginJob(JobInfo::create($name, $queue, $messageId, $attempt), JobInfo::name($name)),
+            'beginJob',
+        );
+
+        return $context === null ? new JobHandle() : new JobHandle($contexts, $context);
+    }
+
+    /**
+     * Ends the job context of `$handle` and sends its remainder (spec 01 §5.3). Never throws; an ended, inert
+     * or foreign handle does nothing.
+     */
+    public function endJob(JobHandle $handle): void
+    {
+        $contexts = $this->contexts;
+        $context = $handle->context();
+        if ($contexts === null || $this->guard === null || $context === null || !$handle->belongsTo($contexts)) {
+            return;
+        }
+        $this->guard->run(static fn() => $contexts->end($context), 'endJob');
     }
 
     /**
@@ -137,31 +180,44 @@ class QueryMonitor extends Component implements BootstrapInterface
     }
 
     /**
-     * Creates the collector for this process, with a new random batch id.
+     * Creates the buffer of one batch of a context. Called for every new batch, with the id of its context.
      */
-    protected function createCollector(Application $app): QueryCollector
+    protected function createCollector(BatchType $type, string $id, ?JobInfo $job): QueryCollector
     {
         return new QueryCollector(
             app: $this->app,
-            type: $app instanceof \yii\console\Application ? BatchType::Console : BatchType::Http,
-            id: bin2hex(random_bytes(8)),
+            type: $type,
+            id: $id,
             host: (string) gethostname(),
             maxEntries: $this->maxEntries,
             maxBatchBytes: $this->maxBatchBytes,
+            job: $job,
         );
     }
 
     /**
      * The sources a listed component is offered to, in order; the first whose `supports()` accepts it installs.
+     * Every source hands its entries to `$contexts`, never to one batch.
      *
      * @return list<SourceInterface>
      */
-    protected function createSources(QueryCollector $collector, Guard $guard, CallerFrames $callers): array
+    protected function createSources(ContextStack $contexts, Guard $guard, CallerFrames $callers): array
     {
         return [
-            new SqlSource($collector, $guard, $callers, fn(): SqlNormalizer => $this->createNormalizer()),
-            new MongoDbSource($collector, $guard, $callers, fn(): MongoDbNormalizer => new MongoDbNormalizer($this->maxQueryLength)),
+            new SqlSource($contexts, $guard, $callers, fn(): SqlNormalizer => $this->createNormalizer()),
+            new MongoDbSource($contexts, $guard, $callers, fn(): MongoDbNormalizer => new MongoDbNormalizer($this->maxQueryLength)),
         ];
+    }
+
+    /**
+     * The monotonic clock of `flushIntervalSeconds`, in seconds. Called once, in bootstrap, after the settings
+     * are checked.
+     *
+     * @return \Closure(): float
+     */
+    protected function createClock(): \Closure
+    {
+        return static fn(): float => hrtime(true) / 1e9;
     }
 
     private function install(Application $app, Guard $guard): void
@@ -172,19 +228,28 @@ class QueryMonitor extends Component implements BootstrapInterface
         if ($this->maxEntries < 1 || $this->maxBatchBytes < 1) {
             throw new InvalidConfigException('QueryMonitor::$maxEntries and $maxBatchBytes must be positive.');
         }
+        if ($this->flushIntervalSeconds < 1) {
+            throw new InvalidConfigException('QueryMonitor::$flushIntervalSeconds must be at least 1.');
+        }
         // Checked here, not by the lazily created normaliser: a wrong setting disables the whole package (spec 01 §1).
         if ($this->maxQueryLength < strlen(SqlNormalizer::ELLIPSIS)) {
             throw new InvalidConfigException('QueryMonitor::$maxQueryLength must be at least ' . strlen(SqlNormalizer::ELLIPSIS) . ' bytes.');
         }
-        $adapter = $this->resolveAdapter();
-        $collector = $this->createCollector($app);
-        $sources = $this->createSources($collector, $guard, CallerFrames::forProcess());
+        $exclusions = RouteExclusions::fromConfig($this->excludedRoutes);
+        $this->batchAdapter = $this->resolveAdapter();
+        $contexts = new ContextStack($guard, $this->batchAdapter, new ContextSettings(
+            fn(BatchType $type, string $id, ?JobInfo $job): QueryCollector => $this->createCollector($type, $id, $job),
+            $this->createClock(),
+            $this->flushIntervalSeconds,
+            $exclusions,
+        ));
+        $contexts->openRoot($app instanceof \yii\console\Application ? BatchType::Console : BatchType::Http);
+        $sources = $this->createSources($contexts, $guard, CallerFrames::forProcess());
         foreach ($this->connections as $id) {
             $guard->run(fn() => $this->installOn($app, $id, $sources), "connection {$id}");
         }
-        $this->collector = $collector;
-        $this->batchAdapter = $adapter;
-        $this->captureEntryAction($app, $collector, $guard);
+        $this->contexts = $contexts;
+        $this->captureEntryAction($app, $contexts, $guard);
         $app->on(Application::EVENT_AFTER_REQUEST, fn() => $this->finalize());
         // exit() in an action and exit(1) from the ErrorHandler skip EVENT_AFTER_REQUEST (ADR-0003).
         register_shutdown_function(fn() => $this->finalize());
@@ -195,18 +260,18 @@ class QueryMonitor extends Component implements BootstrapInterface
      * itself after the first action; an action run by the error handler (`errorAction`) is skipped and leaves
      * it attached, so a 404 before routing keeps `route` null.
      */
-    private function captureEntryAction(Application $app, QueryCollector $collector, Guard $guard): void
+    private function captureEntryAction(Application $app, ContextStack $contexts, Guard $guard): void
     {
         // The parameter is a plain Event: a type error on a foreign trigger() must happen inside the guard.
-        $handler = static function (Event $event) use (&$handler, $app, $collector, $guard): void {
-            $guard->run(static function () use ($event, $handler, $app, $collector): void {
+        $handler = static function (Event $event) use (&$handler, $app, $contexts, $guard): void {
+            $guard->run(static function () use ($event, $handler, $app, $contexts): void {
                 if (!$event instanceof ActionEvent) {
                     return;
                 }
                 if ($app->has('errorHandler') && $app->getErrorHandler()->exception !== null) {
                     return;
                 }
-                $collector->setRoute($event->action->getUniqueId());
+                $contexts->setRoute($event->action->getUniqueId());
                 $app->off(Application::EVENT_BEFORE_ACTION, $handler);
             }, 'action');
         };
@@ -273,7 +338,13 @@ class QueryMonitor extends Component implements BootstrapInterface
      */
     private function createFileAdapter(): FileAdapter
     {
-        $defaults = ['path' => FileAdapter::DEFAULT_PATH, 'maxSize' => FileAdapter::DEFAULT_MAX_SIZE, 'maxFiles' => FileAdapter::DEFAULT_MAX_FILES];
+        $defaults = [
+            'path' => FileAdapter::DEFAULT_PATH,
+            'maxSize' => FileAdapter::DEFAULT_MAX_SIZE,
+            'maxFiles' => FileAdapter::DEFAULT_MAX_FILES,
+            'fileMode' => FileAdapter::DEFAULT_FILE_MODE,
+            'dirMode' => FileAdapter::DEFAULT_DIR_MODE,
+        ];
         $unknown = array_diff_key($this->file, $defaults);
         if ($unknown !== []) {
             throw new InvalidConfigException('QueryMonitor::$file has unknown keys: ' . implode(', ', array_keys($unknown)) . '.');
@@ -287,11 +358,16 @@ class QueryMonitor extends Component implements BootstrapInterface
                 throw new InvalidConfigException("QueryMonitor::\$file['{$key}'] must be an integer of at least 1.");
             }
         }
+        foreach (['fileMode', 'dirMode'] as $key) {
+            if (!is_int($file[$key]) || $file[$key] < 0 || $file[$key] > 0o777) {
+                throw new InvalidConfigException("QueryMonitor::\$file['{$key}'] must be an integer from 0 to 0777.");
+            }
+        }
         $path = \Yii::getAlias($file['path'], false);
         if ($path === false) {
             throw new InvalidConfigException("QueryMonitor::\$file['path'] uses an unknown alias: {$file['path']}.");
         }
 
-        return new FileAdapter($path, $file['maxSize'], $file['maxFiles']);
+        return new FileAdapter($path, $file['maxSize'], $file['maxFiles'], $file['fileMode'], $file['dirMode']);
     }
 }

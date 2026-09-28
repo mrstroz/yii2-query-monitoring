@@ -123,3 +123,14 @@ jobs:
 
       - run: composer install --no-progress --working-dir=tests/consumer
       - run: php tests/consumer/smoke.php
+
+  # The file adapter shared by a web server user and a console user of one group (YQM-54, spec 03 §3). Needs root to
+  # switch users, so it runs in the package image outside PHPUnit, like tests/consumer.
+  multiuser:
+    name: File adapter with two users
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose build php
+      - run: docker compose run --rm --no-deps --user "$(id -u):$(id -g)" php composer install --no-progress
+      - run: tests/multiuser/run.sh

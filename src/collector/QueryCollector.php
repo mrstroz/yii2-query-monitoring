@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace mrstroz\querymonitoring\collector;
 
 use mrstroz\querymonitoring\batch\BatchType;
+use mrstroz\querymonitoring\batch\JobInfo;
 use mrstroz\querymonitoring\batch\QueryBatch;
 use mrstroz\querymonitoring\batch\QueryEntry;
 
@@ -12,13 +13,21 @@ use mrstroz\querymonitoring\batch\QueryEntry;
  * In-memory buffer for one batch with the entry and byte limits of spec 02 §5.
  *
  * Invariant: `strlen($this->close(...)->toJson()) <= $maxBatchBytes` whenever the header alone fits.
- * The byte counter holds the header with its current values (with {@see self::SEQ_DIGITS} and
- * {@see self::DROPPED_DIGITS} digits reserved for `seq` and `dropped`, and the 24-character `ts`)
+ * The byte counter holds the header with its current values, `route` and `job` included (with
+ * {@see self::SEQ_DIGITS} and {@see self::DROPPED_DIGITS} digits reserved for `seq` and `dropped`, and the
+ * 24-character `ts`)
  * plus each entry serialised with {@see QueryBatch::JSON_FLAGS} and its separating comma.
  * The first entry that does not fit in `maxBatchBytes` or `maxEntries` stops intake: it and every
  * later entry, shorter ones included, are not stored and increase `dropped`.
  * When {@see self::setRoute()} makes the header too long for the entries already stored,
  * {@see self::close()} removes entries from the end and counts them in `dropped`.
+ *
+ * In the console and job contexts the owning context splits instead of truncating: it asks {@see self::fits()}
+ * and {@see self::fitsEmpty()}, stores with {@see self::append()} and counts an entry too large even for an
+ * empty batch with {@see self::countDropped()} (spec 01 §5.2).
+ *
+ * One collector is one batch. The context that owns it ({@see \mrstroz\querymonitoring\context\Context})
+ * replaces it after each batch; the re-entry flag of spec 01 §6 belongs to the context stack, not here.
  */
 final class QueryCollector
 {
@@ -43,7 +52,6 @@ final class QueryCollector
     private int $dropped = 0;
     private bool $full = false;
     private ?QueryBatch $batch = null;
-    private bool $paused = false;
     private ?string $route = null;
 
     public function __construct(
@@ -53,6 +61,7 @@ final class QueryCollector
         private readonly string $host,
         private readonly int $maxEntries = self::DEFAULT_MAX_ENTRIES,
         private readonly int $maxBatchBytes = self::DEFAULT_MAX_BATCH_BYTES,
+        private readonly ?JobInfo $job = null,
     ) {
         $this->headerBytes = $this->measureHeader();
     }
@@ -79,7 +88,7 @@ final class QueryCollector
         if (!$this->isAccepting() || $this->dropIfFull()) {
             return;
         }
-        $bytes = strlen(json_encode($entry->toArray(), QueryBatch::JSON_FLAGS));
+        $bytes = $this->measure($entry);
         if ($this->totalBytes($bytes, count($this->entries) + 1) > $this->maxBatchBytes) {
             $this->full = true;
             $this->drop();
@@ -113,6 +122,64 @@ final class QueryCollector
     }
 
     /**
+     * Serialised length of `$entry`, the bytes it adds to the batch without its separating comma.
+     */
+    public function measure(QueryEntry $entry): int
+    {
+        return strlen(json_encode($entry->toArray(), QueryBatch::JSON_FLAGS));
+    }
+
+    /**
+     * Whether an entry of `$bytes` fits next to the stored ones, under both limits.
+     */
+    public function fits(int $bytes): bool
+    {
+        return count($this->entries) < $this->maxEntries
+            && $this->totalBytes($bytes, count($this->entries) + 1) <= $this->maxBatchBytes;
+    }
+
+    /**
+     * Whether an entry of `$bytes` would fit in an empty batch with the current header.
+     */
+    public function fitsEmpty(int $bytes): bool
+    {
+        return $this->headerBytes + $bytes <= $this->maxBatchBytes;
+    }
+
+    /**
+     * Stores the entry without checking the limits; the caller checked {@see self::fits()}. Ignored after close.
+     *
+     * @param int $bytes the value of {@see self::measure()} for `$entry`
+     */
+    public function append(QueryEntry $entry, int $bytes): void
+    {
+        if ($this->batch !== null) {
+            return;
+        }
+        $this->entries[] = $entry;
+        $this->entryLengths[] = $bytes;
+        $this->entryBytes += $bytes;
+    }
+
+    /**
+     * Counts one entry in `dropped` without storing it. Ignored after close.
+     */
+    public function countDropped(): void
+    {
+        if ($this->batch === null) {
+            $this->drop();
+        }
+    }
+
+    /**
+     * True once the batch holds `maxEntries` entries or {@see self::add()} stopped intake.
+     */
+    public function isFull(): bool
+    {
+        return $this->full || count($this->entries) >= $this->maxEntries;
+    }
+
+    /**
      * Closes the collector and builds the batch. A second call returns the same batch and ignores its arguments.
      */
     public function close(\DateTimeImmutable $ts, int $seq = 1): QueryBatch
@@ -136,6 +203,7 @@ final class QueryCollector
             host: $this->host,
             dropped: $this->dropped,
             queries: $this->entries,
+            job: $this->job,
         );
     }
 
@@ -144,24 +212,16 @@ final class QueryCollector
         return $this->batch !== null;
     }
 
-    /**
-     * Stops intake until {@see self::resume()}: the re-entry flag of spec 01 §6, set around the
-     * adapter's `send()` so that queries the adapter runs do not become entries.
-     */
-    public function pause(): void
-    {
-        $this->paused = true;
-    }
-
-    public function resume(): void
-    {
-        $this->paused = false;
-    }
-
-    /** False after {@see self::close()} and while paused; {@see self::add()} then ignores entries. */
+    /** False after {@see self::close()}; {@see self::add()} then ignores entries. */
     public function isAccepting(): bool
     {
-        return $this->batch === null && !$this->paused;
+        return $this->batch === null;
+    }
+
+    /** True when the batch would hold no entry and `dropped` is 0: there is nothing to send. */
+    public function isEmpty(): bool
+    {
+        return $this->entries === [] && $this->dropped === 0;
     }
 
     /** Number of stored entries. */
@@ -203,6 +263,7 @@ final class QueryCollector
             host: $this->host,
             dropped: self::RESERVED_NUMBER,
             queries: [],
+            job: $this->job,
         );
 
         return strlen($header->toJson());

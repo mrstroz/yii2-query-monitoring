@@ -25,7 +25,7 @@
   - **`caller: []` pozostaje stanem możliwym** i oznacza „nie znaleziono ramki aplikacji w granicach `N`”, a nie dowód, że kod aplikacji jej nie ma. Podłoga jest oszacowaniem ze zmierzonej próby ścieżek, a nie ograniczeniem głębokości stosu: `findWith`, `BatchQueryResult`, zachowania i domknięcia w `Connection::cache()` mogą być głębsze niż to, co mierzy YQM-27. Pole nie odróżnia obu stanów, bo rozróżnienie wymaga przejścia stosu do końca, czyli kosztu, który `N` ogranicza.
   - **`caller: null` nie powstał:** był przewidziany tylko dla trzeciego wariantu, z flagą wyłączającą zbieranie. Pomiar dał pierwszy, więc `caller` jest zawsze listą.
   - **Ramka skryptu wejściowego** (`web/index.php`, `yii`) nie mówi nic o miejscu zapytania. ADR-0009 ją wyklucza, bo w pomiarze YQM-27 ta sama ścieżka przed kontrolerem dawała raz `[index.php:24]`, raz `[]`.
-  - **`route`:** reguła `null` przed routingiem przechodzi z trzech starych pól jeden do jednego. Dla `type: console` `route` niesie `uniqueId` akcji konsolowej, co dotyczy [spec 01 §5](../spec/01-zbieranie-danych.md#5-zadanie-konsolowe) i późniejszego E5.
+  - **`route`:** reguła `null` przed routingiem przechodzi z trzech starych pól jeden do jednego. Dla `type: console` `route` niesie `uniqueId` akcji konsolowej, co dotyczy [spec 01 §5](../spec/01-zbieranie-danych.md#5-konsola-i-joby) i późniejszego E5.
   - **Rachunek bajtów nagłówka** z ostatniego akapitu [spec 02 §5](../spec/02-format-paczki.md#5-limity) przeliczony dla nowego zestawu pól. Zasada, że pierwszy wpis przekraczający limit kończy przyjmowanie, zostaje bez zmian.
   - `"v":1` znika z przykładu w [spec 02 §3](../spec/02-format-paczki.md#3-przykład) i z asercji w `tests/`.
 

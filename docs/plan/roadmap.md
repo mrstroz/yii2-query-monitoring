@@ -4,9 +4,9 @@
 
 | Pole | Wartość |
 |---|---|
-| **Etap** | E4b. Pełniejszy `query` MongoDB, 3 z 3, zakończony |
-| **Ostatnio ukończone** | [YQM-43..45](05b-pelniejszy-query-mongodb.md): dokumenty MongoDB na każdej głębokości, `distinct` jako `key:pole filter{…}`, zbyt długi `query` MongoDB obcięty `…` ([ADR 0004](../adr/0004-normalizacja-literalow-na-znak-zapytania.md)) |
-| **Następne** | Spisanie zadań [E5](06-konsola.md) (zadania konsolowe) według obowiązkowych scenariuszy odbioru z tego pliku |
+| **Etap** | E5. Konsola i joby, 11 z 11, zakończony |
+| **Ostatnio ukończone** | [YQM-46..56](06-konsola.md): konteksty `http`, `console` i `job` ([ADR 0012](../adr/0012-konteksty-http-console-job.md)), porcjowanie, `beginJob()`/`endJob()`, `excludedRoutes` ([ADR 0013](../adr/0013-wykluczenia-tras-per-typ-kontekstu.md)), format `v: 3`, behavior `yii2-queue`, adapter plikowy dla dwóch użytkowników, README; macierz PHP 8.1 i 8.4 oraz najniższe zależności zielone |
+| **Następne** | Spisanie zadań [E6](07-wydajnosc-i-odbior.md) (wydajność i odbiór) według obowiązkowych punktów z tego pliku |
 
 Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trzeba zajrzeć na początku sesji.
 
@@ -21,10 +21,10 @@ Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trze
 | **E4** | [05-mongodb](05-mongodb.md) | Źródło MongoDB | Jedna paczka z wpisami SQL i MongoDB | 10/10 |
 | **E4a** | [05a-zwijanie-list](05a-zwijanie-list.md) | Zwijanie list w `query` | Ta sama struktura z inną długością listy `IN` lub `$in` daje ten sam `query` | 2/2 |
 | **E4b** | [05b-pelniejszy-query-mongodb](05b-pelniejszy-query-mongodb.md) | Pełniejszy `query` MongoDB | Głęboki potok Atlas Search, `distinct` i długie polecenie mają tekst `query` | 3/3 |
-| **E5** | [06-konsola](06-konsola.md) | Zadania konsolowe | Wiele paczek z `seq` w jednym procesie | – |
+| **E5** | [06-konsola](06-konsola.md) | Konsola i joby | Wiele paczek z `seq` na komendę i na próbę joba, wykluczony listener, adapter plikowy dla dwóch użytkowników | 11/11 |
 | **E6** | [07-wydajnosc-i-odbior](07-wydajnosc-i-odbior.md) | Test wydajności, dokumentacja | Narzut w progu, limity potwierdzone, README pakietu | – |
 
-45 zadań spisanych. Jedno zadanie to jedna sesja i jeden commit.
+56 zadań spisanych. Jedno zadanie to jedna sesja i jeden commit.
 
 ## Dlaczego w tej kolejności
 
@@ -36,7 +36,7 @@ E2 przed E4 i E5, bo zestaw testów po dwóch etapach przestał mieć jedną zas
 
 E3 przed E4, bo zmienia kontrakt paczki: `v: 2` z `caller` we wpisie i `route` w nagłówku. MongoDB dokłada drugie źródło wpisów, więc wchodzi od razu w nowym formacie, zamiast przerabiać dwa źródła naraz.
 
-E5 po E4, bo limity konsoli i `seq` mają sens dopiero z oboma źródłami. E6 na końcu, bo test wydajności mierzy całość z normalizacją i zapisem, a limity w spec są wartościami początkowymi do korekty tym pomiarem.
+E5 po E4, bo limity konsoli i `seq` mają sens dopiero z oboma źródłami, a stos kontekstów musi obsłużyć recordery obu. E6 na końcu, bo test wydajności mierzy całość z normalizacją i zapisem, a limity w spec są wartościami początkowymi do korekty tym pomiarem.
 
 Efekt uboczny: do końca E3 pakiet nie ma MongoDB, więc demo w aplikacji z MongoDB pokaże tylko połowę zapytań.
 
@@ -58,7 +58,9 @@ Efekt uboczny: do końca E3 pakiet nie ma MongoDB, więc demo w aplikacji z Mong
 | Pojedynczy serwer MongoDB nie zwraca `writeConcernError`, więc YQM-36 nie ma czego testować | Sonda, pytanie 6. YQM-32: `w: 2` i tag na pojedynczym serwerze dają `CommandFailed` z kodem 2, a fail point `failCommand` z `writeConcernError` wymaga `enableTestCommands`, więc compose i CI uruchamiają `mongod` z tym parametrem. Duplikat `_id` daje `writeErrors` z kodem 11000 w `CommandSucceeded`, fail point przy duplikacie daje oba naraz, zły operator w filtrze daje `CommandFailed` z kodem 2 | YQM-36, E4 |
 | `getCommand()` i `getReply()` zamieniają cały BSON polecenia i odpowiedzi na obiekty PHP, więc duży `insert` albo `find` kosztuje proporcjonalnie do danych | Dokument i odpowiedź idą do `mongodb\Recorder` jako domknięcia: dokument jest czytany tylko wtedy, gdy kolektor przyjmie wpis, a odpowiedź tylko dla poleceń innych niż `find`, `getMore` i `aggregate` (YQM-35, YQM-36). Koszt w teście wydajności | E6 |
 | Normalizator literałów kosztuje więcej niż 5% czasu | Pomiar całości z normalizacją | E6 |
+| `yii2-queue` w trybie `isolate` wykonuje job w procesie potomnym, a zdarzenie oznaczone `handled` nie ma zdarzenia końca | Sprawdzone w kodzie 2.3.8: zdarzenia wykonania wyzwala tylko proces `queue/exec`, jeden obiekt `ExecEvent` przechodzi przez początek i koniec, listener wywołuje `handleError()` z nowym obiektem tylko po awarii potomka. Behavior kończy job w `EVENT_WORKER_LOOP`/`EVENT_WORKER_STOP`, a scenariusze testuje YQM-53 na prawdziwej kolejce | YQM-53, E5 |
+| Konsument jobów bez `finally` zostawia otwarte konteksty i pamięć rośnie | Limit 16 kontekstów na stosie ([ADR 0012](../adr/0012-konteksty-http-console-job.md)) | YQM-51, E5 |
 
 ## Czego w planie nie ma
 
-Lista w [spec 00 §4](../spec/00-przeglad-i-zakres.md#4-poza-zakresem-wersji-1). Agregaty i próbkowanie nie wrócą bez zmiany [ADR 0002](../adr/0002-plaska-lista-zamiast-agregatow.md). Rozpoznawanie jobów kolejki wymaga zmiany [ADR 0007](../adr/0007-zadanie-konsolowe-to-jeden-proces.md).
+Lista w [spec 00 §4](../spec/00-przeglad-i-zakres.md#4-poza-zakresem-wersji-1). Agregaty i próbkowanie nie wrócą bez zmiany [ADR 0002](../adr/0002-plaska-lista-zamiast-agregatow.md). Rozpoznawanie jobów bez udziału aplikacji i wykonania równoległe w jednym procesie wymagają zmiany [ADR 0012](../adr/0012-konteksty-http-console-job.md).

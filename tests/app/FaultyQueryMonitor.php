@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace mrstroz\querymonitoring\tests\app;
 
+use mrstroz\querymonitoring\batch\BatchType;
+use mrstroz\querymonitoring\batch\JobInfo;
 use mrstroz\querymonitoring\collector\QueryCollector;
+use mrstroz\querymonitoring\context\ContextStack;
 use mrstroz\querymonitoring\mongodb\MongoDbNormalizer;
 use mrstroz\querymonitoring\mongodb\Source as MongoDbSource;
 use mrstroz\querymonitoring\support\CallerFrames;
 use mrstroz\querymonitoring\support\Guard;
 use mrstroz\querymonitoring\QueryMonitor;
 use mrstroz\querymonitoring\sql\SqlNormalizer;
-use yii\base\Application;
 
 /**
  * The component with a failing part, chosen by `QM_FAULT`, for the protection tests (spec 01 §6).
@@ -26,9 +28,9 @@ use yii\base\Application;
  *   listed MongoDB connection opens;
  * - `mongodb-callers` — the MongoDB source gets a `CallerFrames` whose `frames()` throws, so the package's
  *   driver subscriber fails at every command end;
- * - `collector` — throws first in `QueryCollector::setRoute()` (via `measureHeader()`, reading `$app`) on
- *   `EVENT_BEFORE_ACTION`, before any query; later `add()` and `close()` throw the same way, and the Guard,
- *   which logs once per process, keeps them silent.
+ * - `collector` — every batch buffer is broken: it throws first in `QueryCollector::setRoute()` (via
+ *   `measureHeader()`, reading `$app`) on `EVENT_BEFORE_ACTION`, before any query; later `add()` and the
+ *   finalisation throw the same way, and the Guard, which logs once per process, keeps them silent.
  * If the collector or the normaliser starts reading an initialised property first, these points move.
  * {@see self::$normalizersCreated} counts the calls of createNormalizer() for the scenario `normalizers`.
  */
@@ -48,9 +50,9 @@ final class FaultyQueryMonitor extends QueryMonitor
             : parent::createNormalizer();
     }
 
-    protected function createSources(QueryCollector $collector, Guard $guard, CallerFrames $callers): array
+    protected function createSources(ContextStack $contexts, Guard $guard, CallerFrames $callers): array
     {
-        $sources = parent::createSources($collector, $guard, $callers);
+        $sources = parent::createSources($contexts, $guard, $callers);
         $normalizer = static fn(): MongoDbNormalizer => new MongoDbNormalizer(8192);
         switch (getenv('QM_FAULT')) {
             case 'mongodb-normalizer':
@@ -67,13 +69,13 @@ final class FaultyQueryMonitor extends QueryMonitor
         }
         $sources = array_values(array_filter($sources, static fn(object $source): bool => !$source instanceof MongoDbSource));
 
-        return [...$sources, new MongoDbSource($collector, $guard, $callers, $normalizer)];
+        return [...$sources, new MongoDbSource($contexts, $guard, $callers, $normalizer)];
     }
 
-    protected function createCollector(Application $app): QueryCollector
+    protected function createCollector(BatchType $type, string $id, ?JobInfo $job): QueryCollector
     {
         return getenv('QM_FAULT') === 'collector'
             ? (new \ReflectionClass(QueryCollector::class))->newInstanceWithoutConstructor()
-            : parent::createCollector($app);
+            : parent::createCollector($type, $id, $job);
     }
 }

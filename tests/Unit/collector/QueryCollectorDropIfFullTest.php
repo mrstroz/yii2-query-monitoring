@@ -61,16 +61,6 @@ final class QueryCollectorDropIfFullTest extends TestCase
         self::assertSame(0, $collector->dropped());
     }
 
-    public function testPausedFullCollectorNeitherDropsNorCounts(): void
-    {
-        $collector = $this->collector(maxEntries: 1);
-        $collector->add($this->entry('first'));
-        $collector->pause();
-
-        self::assertFalse($collector->dropIfFull(), 'a query of the adapter is not an entry');
-        self::assertSame(0, $collector->dropped());
-    }
-
     public function testClosedFullCollectorNeitherDropsNorCounts(): void
     {
         $collector = $this->collector(maxEntries: 1);

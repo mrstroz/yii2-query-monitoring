@@ -1,7 +1,7 @@
 # Yii 2 Query Monitoring
 
-Collects a flat list of the database queries run during one HTTP request of a Yii 2 application and hands
-it, as one batch, to an output adapter: by default a JSON Lines file, or an adapter you provide. Each
+Collects a flat list of the database queries run during one HTTP request, console command or queue job of a
+Yii 2 application and hands it, in batches, to an output adapter: by default a JSON Lines file, or an adapter you provide. Each
 entry has the connection, the operation, the normalised query text with literals and Yii parameters `:qpN`
 replaced by `?` and lists of values collapsed (`IN (?, ...)`, `$in:[?,...]`), the time and the result: for
 SQL the time of `PDO::prepare()` and `PDOStatement::execute()`, for MongoDB the duration the driver reports
@@ -9,9 +9,9 @@ for each command. Parameter values and documents never enter a batch.
 
 ## Status
 
-Milestone E4: MySQL, PostgreSQL and MongoDB over HTTP requests, written to a rotated JSON Lines file or
-handed to an adapter you write. Console commands are planned and not available yet. The specification
-(in Polish) is in [`docs/spec/`](docs/spec/).
+Milestone E5: MySQL, PostgreSQL and MongoDB over HTTP requests, console commands and queue jobs, written to
+a rotated JSON Lines file or handed to an adapter you write. The specification (in Polish) is in
+[`docs/spec/`](docs/spec/).
 
 ## Requirements
 
@@ -21,6 +21,8 @@ handed to an adapter you write. Console commands are planned and not available y
 - PHP-FPM request model (no RoadRunner or Swoole)
 - For MongoDB only: `ext-mongodb` 2.0 or newer and `yiisoft/yii2-mongodb` 3.0.4 or newer. An application
   without MongoDB installs the package without them
+- For the `yii2-queue` behavior only: `yiisoft/yii2-queue` 2.3.7 or newer. Any other queue uses two method
+  calls instead
 
 ## Installation
 
@@ -56,8 +58,10 @@ return [
 | `adapter` | `null` | Class name, object implementing `BatchAdapterInterface`, or `callable(QueryBatch)`; `null` writes to a file |
 | `file` | `[]` | Settings of the file adapter, see below; ignored when `adapter` is set |
 | `enabled` | `true` | `false` installs nothing and sends nothing |
-| `maxEntries` | `500` | Entries per batch; the excess is counted in `dropped` |
-| `maxBatchBytes` | `262144` | Size of the batch JSON; the excess is counted in `dropped` |
+| `maxEntries` | `500` | Entries per batch. HTTP counts the excess in `dropped`; a console command or a job sends the batch and starts the next one |
+| `maxBatchBytes` | `262144` | Size of the batch JSON. HTTP counts the excess in `dropped`; a console command or a job sends the batch and starts the next one |
+| `flushIntervalSeconds` | `30` | A console command or a job sends its batch at the first query after this many seconds since its last batch |
+| `excludedRoutes` | `[]` | Patterns not monitored, per context type: `['http' => ['health/index'], 'console' => ['queue/*'], 'job' => [...]]`. See [Excluding routes](#excluding-routes) |
 | `maxQueryLength` | `8192` | Bytes of one normalised `query`, cut with `…` |
 
 A monitored connection must not set its own `commandClass` or `commandMap` for its driver: the package
@@ -107,6 +111,8 @@ others keep their defaults:
 | `file.path` | `@runtime/logs/query-monitoring.jsonl` | File path; Yii aliases allowed. The directory is created on the first write |
 | `file.maxSize` | `10485760` | Bytes; a file that grows over it is rotated |
 | `file.maxFiles` | `5` | Rotated copies kept: `.1` is the newest, `.5` the oldest |
+| `file.fileMode` | `0664` | Mode given to the file and its `.lock` by the process that creates them |
+| `file.dirMode` | `0775` | Mode given to the directory, and to any missing parent, by the process that creates it; an inherited setgid bit is kept |
 
 ```php
 'queryMonitor' => [
@@ -118,9 +124,135 @@ others keep their defaults:
 ```
 
 Writing and rotation take a non-blocking lock on `<path>.lock`. When another process holds it, the
-batch is dropped rather than making the request wait. The file must be on a local disk (no NFS) and
-writable by both the web server and console users. A write that fails, for example on a full disk or a
-directory without write permission, is logged once per process with `Yii::error` and the batch is lost.
+batch is dropped rather than making the request wait. The file must be on a local disk (no NFS). A write
+that fails, for example on a full disk or a directory without write permission, is logged once per
+process with `Yii::error` and the batch is lost.
+
+When the web server and console commands run as different users, put both in one group and give the
+directory to that group with the setgid bit, so every file created in it gets the group:
+
+```
+chgrp www-data runtime/logs && chmod 2775 runtime/logs   # the console user is a member of www-data
+```
+
+With the default modes the file and the lock are then writable by both users, whoever created them.
+Rotation renames files, which needs write permission on the directory. A copy is moved only onto the next
+older one, so a rotation that fails removes no other copy; a file already over `maxSize` is rotated before
+the next write, and when that fails too, the batch is not appended, so the file does not keep growing.
+
+## Console commands and jobs
+
+A console command is monitored like a request, but it may send many batches. Its batches share one `id` and
+count up in `seq` from 1. A batch is sent when it reaches `maxEntries`, before an entry that no longer fits
+in `maxBatchBytes`, at the first query after `flushIntervalSeconds`, and at the end of the command. There is
+no timer: an idle process sends nothing until its next query or its end.
+
+<!-- example:console-config -->
+```php
+<?php
+
+return [
+    'bootstrap' => ['queryMonitor'],
+    'components' => [
+        'queryMonitor' => [
+            'class' => \mrstroz\querymonitoring\QueryMonitor::class,
+            'app' => 'shop-console',
+            'connections' => ['db'],
+            'flushIntervalSeconds' => 30,
+        ],
+    ],
+];
+```
+
+A job is one attempt to run one unit of work, usually a message of a queue. It gets batches of its own,
+`type: job`, with a new `id` and `seq` from 1, and a `job` header with its class name, queue name, message
+id and attempt number, never its arguments or exception. Its queries do not appear in the batches of the
+command or request that ran it.
+
+### Queue workers with `yii2-queue`
+
+Attach the behavior to the queue component and exclude the worker commands, whose own queries only poll
+the queue. The jobs they run are still monitored:
+
+<!-- example:queue-config -->
+```php
+<?php
+
+return [
+    'bootstrap' => ['queryMonitor', 'queue'],
+    'components' => [
+        'queryMonitor' => [
+            'class' => \mrstroz\querymonitoring\QueryMonitor::class,
+            'app' => 'shop-worker',
+            'connections' => ['db'],
+            'excludedRoutes' => ['console' => ['queue/listen', 'queue/run', 'queue/exec']],
+        ],
+        'queue' => [
+            'class' => \yii\queue\db\Queue::class,
+            'as queryMonitor' => [
+                'class' => \mrstroz\querymonitoring\queue\JobMonitorBehavior::class,
+                'queueName' => 'queue',
+            ],
+        ],
+    ],
+];
+```
+
+The routes start with the id of the queue component: with `mailQueue` they are `mailQueue/listen` and so on.
+A pattern like `queue/*` excludes every command of that component, `queue/info` included.
+
+The behavior opens the job in `Queue::EVENT_BEFORE_EXEC` and ends it in `EVENT_AFTER_EXEC` or
+`EVENT_AFTER_ERROR`. In `isolate` mode, the default of `queue/listen` and `queue/run`, the job runs in a child
+process `queue/exec`, and the child sends the job's batches; that is why `queue/exec` is excluded too. A job
+another handler marks as `handled` gets no end event; the behavior ends it in the next worker loop.
+
+### Any other consumer
+
+Mark the job yourself. `endJob()` in `finally` ends it after success and after an exception alike:
+
+<!-- example:consumer -->
+```php
+<?php
+
+/** @var \mrstroz\querymonitoring\QueryMonitor $monitor */
+$monitor = Yii::$app->get('queryMonitor');
+
+$handle = $monitor->beginJob(SendInvoice::class, queue: 'invoices', messageId: $message->id, attempt: $message->attempt);
+try {
+    $job->run();
+} finally {
+    $monitor->endJob($handle);
+}
+```
+
+`beginJob()` and `endJob()` never throw and never change what the job does, throws, or how the queue
+retries or acknowledges it. A handle that was already ended, or one returned while the package is disabled,
+does nothing.
+
+### What to expect
+
+- **Retries.** Every attempt is a new job with a new `id`; `job.message_id` and `job.attempt` tie the attempts
+  of one message together.
+- **Nesting.** A job run synchronously inside a request, a command or another job is a child: its queries
+  belong only to it, and the parent collects again after `endJob()`. Ending a parent ends its children that
+  are still open. At most 16 contexts are open at once, the request or command included; a `beginJob()` over
+  that limit returns an inert handle, logs one `Yii::error`, and the job's queries go to the deepest open
+  context with that context's metadata. A consumer that forgets `endJob()` reaches the limit, so use `finally`.
+- **Idle workers.** A job sends its remainder when it ends, so nothing waits for the next message.
+- **Shutdown.** The end of the process sends what is left, also after `exit()` or an unhandled exception, and
+  ends jobs that were not ended. A fatal error in some phases or `SIGKILL` loses the unsent remainder.
+- **Several jobs at once** in one process (fibers, Swoole) are not supported.
+
+### Excluding routes
+
+`excludedRoutes` has one list per context type. `http` and `console` patterns are compared with the route of
+the request or command (`health/index`, `queue/listen`, no leading `/`), `job` patterns with the job name. A
+pattern matches exactly, or as a prefix when it ends with `*`; `*` alone matches everything. Case matters. A
+request or command whose route is never known (a 404, an unknown command) is never excluded.
+
+An excluded context records nothing and sends nothing; its queries are not counted in `dropped`. Queries run
+before the route is known, in bootstrap, are held and dropped once the route turns out excluded. A job inside
+an excluded command is judged by its own name, so excluding a worker command keeps its jobs monitored.
 
 ## Writing an adapter
 
@@ -140,7 +272,8 @@ final class QueueAdapter implements BatchAdapterInterface
 ```
 
 `send()` is called at most once per request, in `EVENT_AFTER_REQUEST` or, when the request ends with
-`exit()` or an unhandled exception, during PHP shutdown. A request without queries sends nothing. In the
+`exit()` or an unhandled exception, during PHP shutdown. A console command and a job call it once per batch,
+also while the command runs. A request without queries sends nothing. In the
 normal path the call happens before the response is sent, so a slow adapter delays it; the adapter is
 responsible for its own timeouts.
 

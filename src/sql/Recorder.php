@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace mrstroz\querymonitoring\sql;
 
 use mrstroz\querymonitoring\batch\QueryEntry;
-use mrstroz\querymonitoring\collector\QueryCollector;
+use mrstroz\querymonitoring\context\ContextStack;
 use mrstroz\querymonitoring\support\CallerFrames;
 use mrstroz\querymonitoring\support\Guard;
 
@@ -14,7 +14,7 @@ use mrstroz\querymonitoring\support\Guard;
  *
  * One recorder per monitored connection. It knows the connection id (`conn`) and the driver
  * name (`db`), derives `op` and `query` with the normaliser, `caller` from the call stack, and adds
- * the entry to the collector, all inside the guard, so a failure here never reaches the application.
+ * the entry to the deepest open context of the stack, all inside the guard, so a failure here never reaches the application.
  */
 final class Recorder
 {
@@ -29,7 +29,7 @@ final class Recorder
         private readonly string $connectionId,
         private readonly string $driverName,
         private readonly SqlNormalizer $normalizer,
-        private readonly QueryCollector $collector,
+        private readonly ContextStack $contexts,
         private readonly Guard $guard,
         private readonly CallerFrames $callers,
     ) {}
@@ -42,9 +42,9 @@ final class Recorder
     public function record(string $sql, float $timeMs, ?string $sqlState): void
     {
         $this->guard->run(function () use ($sql, $timeMs, $sqlState): void {
-            // After finalisation and while the adapter sends, a query is not an entry: skip the normaliser too.
+            // After finalisation, in an excluded context and while the adapter sends, a query is not an entry: skip the normaliser too.
             // Once the batch is full the query only counts in `dropped`: no trace, no normaliser.
-            if (!$this->collector->isAccepting() || $this->collector->dropIfFull()) {
+            if (!$this->contexts->isAccepting() || $this->contexts->dropIfFull()) {
                 return;
             }
             // Called right here, in the closure: frame 0 of the limit is this closure (spec 01 §2).
@@ -52,7 +52,7 @@ final class Recorder
             $op = $this->normalizer->operation($sql, $this->driverName);
             $query = $this->normalizer->normalize($sql, $this->driverName);
             $timeMs = round($timeMs, 3);
-            $this->collector->add($sqlState === null
+            $this->contexts->add($sqlState === null
                 ? QueryEntry::success($this->driverName, $this->connectionId, $op, $query, $timeMs, $caller)
                 : QueryEntry::error($this->driverName, $this->connectionId, $op, $query, $timeMs, $sqlState, $caller));
         }, 'record');

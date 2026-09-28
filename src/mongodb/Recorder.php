@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace mrstroz\querymonitoring\mongodb;
 
 use mrstroz\querymonitoring\batch\QueryEntry;
-use mrstroz\querymonitoring\collector\QueryCollector;
+use mrstroz\querymonitoring\context\ContextStack;
 use mrstroz\querymonitoring\support\CallerFrames;
 use mrstroz\querymonitoring\support\Guard;
 
@@ -34,20 +34,20 @@ final class Recorder
     public function __construct(
         private readonly string $connectionId,
         private readonly MongoDbNormalizer $normalizer,
-        private readonly QueryCollector $collector,
+        private readonly ContextStack $contexts,
         private readonly Guard $guard,
         private readonly CallerFrames $callers,
     ) {}
 
     /**
-     * @param \Closure(): object $command the command document, read only when the collector takes the entry
+     * @param \Closure(): object $command the command document, read only when the context stack takes the entry
      */
     public function started(string $requestId, string $commandName, \Closure $command): void
     {
         $this->guard->run(function () use ($requestId, $commandName, $command): void {
-            // After finalisation and while the adapter sends there is no state; once the batch is full the
+            // After finalisation, in an excluded context and while the adapter sends there is no state; once the batch is full the
             // command only counts in `dropped`, without reading or normalising the document.
-            if (!$this->collector->isAccepting() || $this->collector->dropIfFull()) {
+            if (!$this->contexts->isAccepting() || $this->contexts->dropIfFull()) {
                 return;
             }
             $this->pending[$requestId] = [$commandName, $this->normalizer->normalize($commandName, $command())];
@@ -61,14 +61,14 @@ final class Recorder
     {
         $this->guard->run(function () use ($requestId, $durationMicros, $reply): void {
             $state = $this->take($requestId);
-            if ($state === null || !$this->collector->isAccepting() || $this->collector->dropIfFull()) {
+            if ($state === null || !$this->contexts->isAccepting() || $this->contexts->dropIfFull()) {
                 return;
             }
             // Called right here, in the closure: frame 0 of the limit is this closure (spec 01 §3).
             $caller = $this->callers->frames(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, self::TRACE_LIMIT));
             $code = in_array($state[0], self::REPLY_NOT_READ, true) ? null : self::writeErrorCode($reply());
             $timeMs = self::timeMs($durationMicros);
-            $this->collector->add($code === null
+            $this->contexts->add($code === null
                 ? QueryEntry::success('mongodb', $this->connectionId, $state[0], $state[1], $timeMs, $caller)
                 : QueryEntry::error('mongodb', $this->connectionId, $state[0], $state[1], $timeMs, $code, $caller));
         }, 'mongodb succeeded');
@@ -81,12 +81,12 @@ final class Recorder
     {
         $this->guard->run(function () use ($requestId, $durationMicros, $code): void {
             $state = $this->take($requestId);
-            if ($state === null || !$this->collector->isAccepting() || $this->collector->dropIfFull()) {
+            if ($state === null || !$this->contexts->isAccepting() || $this->contexts->dropIfFull()) {
                 return;
             }
             // Called right here, in the closure: frame 0 of the limit is this closure (spec 01 §3).
             $caller = $this->callers->frames(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, self::TRACE_LIMIT));
-            $this->collector->add(QueryEntry::error('mongodb', $this->connectionId, $state[0], $state[1], self::timeMs($durationMicros), $code, $caller));
+            $this->contexts->add(QueryEntry::error('mongodb', $this->connectionId, $state[0], $state[1], self::timeMs($durationMicros), $code, $caller));
         }, 'mongodb failed');
     }
 

@@ -19,7 +19,7 @@ Pakiet nie zna adresu workera, kolejki ani formatu API odbiorcy.
 
 | Sytuacja | Zachowanie |
 |---|---|
-| Wyjątek z `send()` | Paczka przepada. Jeden `Yii::error` na proces, bez treści zapytań. Wyjątek własnego adaptera plikowego ([§3](#3-domyślny-adapter-plikowy)) jest logowany z komunikatem, który nazywa operację i ścieżkę, bez treści zapytań i bez JSON paczki; wyjątek innego adaptera tylko z nazwą klasy |
+| Wyjątek z `send()` | Paczka przepada. Kontekst konsoli albo joba zbiera dalej do następnej paczki z kolejnym `seq` ([01 §5.2](01-zbieranie-danych.md#52-porcjowanie)). Jeden `Yii::error` na proces, bez treści zapytań. Wyjątek własnego adaptera plikowego ([§3](#3-domyślny-adapter-plikowy)) jest logowany z komunikatem, który nazywa operację i ścieżkę, bez treści zapytań i bez JSON paczki; wyjątek innego adaptera tylko z nazwą klasy |
 | Ponowienia | Brak |
 | Zapis awaryjny | Brak |
 | Czas działania | Odpowiada za niego adapter |
@@ -36,8 +36,10 @@ Używany, gdy `adapter` jest `null`. Tylko wtedy klucz `file` jest sprawdzany. P
 | `path` | Ścieżka pliku, może zawierać alias Yii. Niepusta | `@runtime/logs/query-monitoring.jsonl` |
 | `maxSize` | Rozmiar w bajtach, po którego przekroczeniu następuje rotacja, najmniej `1` | `10485760` |
 | `maxFiles` | Liczba kopii archiwalnych, najmniej `1` | `5` |
+| `fileMode` | Tryb nadawany plikowi danych i `.lock` przez proces, który je utworzył, liczba całkowita 0–0777 | `0664` |
+| `dirMode` | Tryb nadawany katalogowi przez proces, który go utworzył, liczba całkowita 0–0777 | `0775` |
 
-Każdy klucz można nadpisać osobno, a pominięty zachowuje wartość początkową. `path` musi być niepustym tekstem, `maxSize` i `maxFiles` liczbami całkowitymi co najmniej `1`; nieznany klucz to błędna konfiguracja pakietu ([01 §1](01-zbieranie-danych.md#1-komponent-i-konfiguracja)). W bootstrapie adapter tylko sprawdza konfigurację i rozwiązuje alias w `path`. Katalog, blokada i plik powstają przy pierwszym zapisie, tak jak pakiet nie łączy się z bazą w bootstrapie, więc błąd systemu plików pojawia się przy wysyłce, a nie przy starcie.
+Każdy klucz można nadpisać osobno, a pominięty zachowuje wartość początkową. `path` musi być niepustym tekstem, `maxSize` i `maxFiles` liczbami całkowitymi co najmniej `1`, `fileMode` i `dirMode` liczbami całkowitymi od `0` do `0777`; nieznany klucz to błędna konfiguracja pakietu ([01 §1](01-zbieranie-danych.md#1-komponent-i-konfiguracja)). W bootstrapie adapter tylko sprawdza konfigurację i rozwiązuje alias w `path`. Katalog, blokada i plik powstają przy pierwszym zapisie, tak jak pakiet nie łączy się z bazą w bootstrapie, więc błąd systemu plików pojawia się przy wysyłce, a nie przy starcie.
 
 | Co | Zachowanie |
 |---|---|
@@ -46,7 +48,9 @@ Każdy klucz można nadpisać osobno, a pominięty zachowuje wartość początko
 | Blokada zajęta | Paczka przepada, bez wyjątku i bez `Yii::error` |
 | Niepełny zapis | Gdy `fwrite` zapisze tylko część wiersza, adapter pod tą samą blokadą przycina plik do rozmiaru sprzed zapisu i kończy się wyjątkiem. Następna paczka nie dokleja się do urwanego JSON |
 | Wynik zapisu | Poza `send()` adapter ma `write(QueryBatch): bool`, które zwraca `false`, gdy paczka przepadła przez zajętą blokadę. `send()` wywołuje `write()` i pomija wynik |
-| Rotacja | Po zapisie, gdy rozmiar pliku jest większy niż `maxSize`. Równy `maxSize` nie rotuje. Bieżący plik przechodzi do `.1`, starsze kopie są przesuwane najwyżej do `.<maxFiles>`, a dotychczasowa `.<maxFiles>` znika. Paczka większa niż `maxSize` także w pustym pliku od razu trafia do `.1`; następny zapis tworzy nowy plik bieżący |
+| Rotacja | Po zapisie, gdy rozmiar pliku jest większy niż `maxSize`. Równy `maxSize` nie rotuje. Kopie są przesuwane od najstarszej przez `rename` na miejsce następnej (`.<maxFiles-1>` na `.<maxFiles>`, …, bieżący na `.1`), bez osobnego usuwania, więc dotychczasowa `.<maxFiles>` znika dopiero wtedy, gdy zastąpi ją udane przesunięcie. Nieudana rotacja kończy się wyjątkiem i nie usuwa żadnej innej kopii. Paczka zapisana przed nieudaną rotacją zostaje w pliku, choć `send()` rzucił wyjątek; w konsoli i w jobie następna paczka ma kolejny `seq`, więc w pliku nie ma luki. Paczka większa niż `maxSize` także w pustym pliku od razu trafia do `.1`; następny zapis tworzy nowy plik bieżący |
+| Plik ponad `maxSize` przed zapisem | Poprzednia rotacja się nie udała. Adapter pod blokadą najpierw rotuje, a gdy rotacja znów zawiedzie, nie dopisuje paczki i kończy się wyjątkiem. Plik bieżący nie rośnie więc ponad `maxSize` i jedną paczkę |
+| Uprawnienia | Proces, który tworzy katalog, plik danych albo `.lock`, nadaje im `dirMode` albo `fileMode` przez `chmod`, niezależnie od `umask`. Katalog zachowuje bit setgid odziedziczony po katalogu nadrzędnym, bo bez niego pliki tworzone później dostałyby główną grupę tworzącego użytkownika. Tak samo każdy brakujący katalog nadrzędny, który proces tworzy po drodze; katalogów, które już istniały, nie zmienia. Pliku utworzonego przez innego użytkownika nie zmienia. Użytkownik serwera WWW i użytkownik konsoli piszą do tych samych plików, gdy należą do jednej grupy, a katalog ma bit setgid; rotacja wymaga prawa zapisu do katalogu |
 | Katalog | Brakujący katalog pliku jest tworzony, jak w `yii\log\FileTarget`, także bez błędu przy równoległej próbie utworzenia go przez inny proces. Wymaga prawa zapisu do katalogu nadrzędnego |
 | Plik niedostępny | Nieudane utworzenie katalogu, otwarcie pliku blokady lub danych, `flock` z przyczyny innej niż zajęta blokada, niepełny zapis albo rotacja kończą się wyjątkiem z `send()`, obsłużonym jak w [§2](#2-błąd-adaptera). Aplikacja działa dalej, a `Yii::error` jest jeden na proces. Adapter nie wypisuje ostrzeżeń PHP, a komunikat wyjątku nie zawiera JSON paczki |
 | Dysk | Tylko lokalny. NFS poza zakresem |

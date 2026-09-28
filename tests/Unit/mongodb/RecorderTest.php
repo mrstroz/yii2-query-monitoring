@@ -12,6 +12,7 @@ use mrstroz\querymonitoring\mongodb\Recorder;
 use mrstroz\querymonitoring\support\CallerFrames;
 use mrstroz\querymonitoring\support\Guard;
 use mrstroz\querymonitoring\tests\Unit\LoggedTestCase;
+use mrstroz\querymonitoring\tests\Unit\StackProbe;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
@@ -25,26 +26,26 @@ final class RecorderTest extends LoggedTestCase
 
     public function testPairOfEventsGivesOneEntry(): void
     {
-        $collector = $this->collector();
-        $recorder = $this->recorder($collector);
+        $probe = new StackProbe();
+        $recorder = $this->recorder($probe);
 
         $recorder->started('7', 'find', $this->document(['find' => 'contacts', 'filter' => (object) ['email' => 'alice@example.com']]));
         $recorder->succeeded('7', 1235, $this->reply([]));
 
-        $queries = $collector->close(new \DateTimeImmutable())->queries;
+        $queries = $probe->finish();
         self::assertCount(1, $queries);
         self::assertSame(['mongodb', 'mongodb', 'find', 'contacts filter{email:?}', 1.235, 'success', null], [$queries[0]->db, $queries[0]->conn, $queries[0]->op, $queries[0]->query, $queries[0]->timeMs, $queries[0]->result, $queries[0]->error]);
     }
 
     public function testFailedCommandGivesErrorEntryWithCode(): void
     {
-        $collector = $this->collector();
-        $recorder = $this->recorder($collector);
+        $probe = new StackProbe();
+        $recorder = $this->recorder($probe);
 
         $recorder->started('3', 'find', $this->document(['find' => 'c', 'filter' => (object) ['$bad' => 1]]));
         $recorder->failed('3', 400, '2');
 
-        $entry = $collector->close(new \DateTimeImmutable())->queries[0];
+        $entry = $probe->finish()[0];
         self::assertSame([QueryEntry::RESULT_ERROR, '2', 0.4], [$entry->result, $entry->error, $entry->timeMs]);
     }
 
@@ -70,13 +71,13 @@ final class RecorderTest extends LoggedTestCase
     #[DataProvider('provideWriteReplyCases')]
     public function testWriteReplyGivesItsErrorCode(string $command, array $reply, ?string $expected): void
     {
-        $collector = $this->collector();
-        $recorder = $this->recorder($collector);
+        $probe = new StackProbe();
+        $recorder = $this->recorder($probe);
 
         $recorder->started('1', $command, $this->document([$command => 'c']));
         $recorder->succeeded('1', 1000, $this->reply($reply));
 
-        $entry = $collector->close(new \DateTimeImmutable())->queries[0];
+        $entry = $probe->finish()[0];
         self::assertSame([$expected === null ? QueryEntry::RESULT_SUCCESS : QueryEntry::RESULT_ERROR, $expected], [$entry->result, $entry->error]);
         self::assertStringNotContainsString('alice', (string) json_encode($entry->toArray()), 'only the code leaves the reply');
     }
@@ -95,107 +96,128 @@ final class RecorderTest extends LoggedTestCase
     #[DataProvider('provideReplyNotReadCases')]
     public function testReplyOfCommandsWithResultDocumentsIsNotRead(string $command): void
     {
-        $collector = $this->collector();
-        $recorder = $this->recorder($collector);
+        $probe = new StackProbe();
+        $recorder = $this->recorder($probe);
 
         $recorder->started('1', $command, $this->document([$command => 'c']));
         $recorder->succeeded('1', 1000, $this->reply(['writeConcernError' => (object) ['code' => 64], 'ok' => 1.0]));
 
         self::assertSame(0, $this->repliesRead);
-        self::assertSame(QueryEntry::RESULT_SUCCESS, $collector->close(new \DateTimeImmutable())->queries[0]->result);
+        self::assertSame(QueryEntry::RESULT_SUCCESS, $probe->finish()[0]->result);
     }
 
     public function testInterleavedCommandsArePairedByRequestId(): void
     {
-        $collector = $this->collector();
-        $recorder = $this->recorder($collector);
+        $probe = new StackProbe();
+        $recorder = $this->recorder($probe);
 
         $recorder->started('1', 'find', $this->document(['find' => 'a']));
         $recorder->started('2', 'count', $this->document(['count' => 'b']));
         $recorder->succeeded('2', 1000, $this->reply([]));
         $recorder->succeeded('1', 2000, $this->reply([]));
 
-        $queries = $collector->close(new \DateTimeImmutable())->queries;
+        $queries = $probe->finish();
         self::assertSame([['count', 'b', 1.0], ['find', 'a', 2.0]], array_map(static fn(QueryEntry $e): array => [$e->op, $e->query, $e->timeMs], $queries));
     }
 
     public function testEndWithoutStartGivesNothing(): void
     {
-        $collector = $this->collector();
-        $recorder = $this->recorder($collector);
+        $probe = new StackProbe();
+        $recorder = $this->recorder($probe);
 
         $recorder->succeeded('9', 1000, $this->reply([]));
         $recorder->failed('10', 1000, '2');
 
-        self::assertSame([0, 0], [$collector->count(), $collector->dropped()]);
+        self::assertSame([0, 0], [count($probe->finish()), $probe->dropped()]);
     }
 
     public function testEndRemovesTheState(): void
     {
-        $collector = $this->collector();
-        $recorder = $this->recorder($collector);
+        $probe = new StackProbe();
+        $recorder = $this->recorder($probe);
 
         $recorder->started('1', 'find', $this->document(['find' => 'a']));
         $recorder->succeeded('1', 1000, $this->reply([]));
         $recorder->succeeded('1', 1000, $this->reply([]));
         $recorder->failed('1', 1000, '2');
 
-        self::assertSame(1, $collector->count());
+        self::assertSame(1, count($probe->finish()));
     }
 
     public function testCommandNotDescribedByNormalisationHasNullQuery(): void
     {
-        $collector = $this->collector();
-        $recorder = $this->recorder($collector);
+        $probe = new StackProbe();
+        $recorder = $this->recorder($probe);
 
         $recorder->started('1', 'createIndexes', $this->document(['createIndexes' => 'a', 'indexes' => []]));
         $recorder->succeeded('1', 1000, $this->reply([]));
 
-        $entry = $collector->close(new \DateTimeImmutable())->queries[0];
+        $entry = $probe->finish()[0];
         self::assertSame(['createIndexes', null], [$entry->op, $entry->query]);
     }
 
-    public function testStartWhileNotAcceptingKeepsNoStateAndReadsNoDocument(): void
+    public function testStartDuringTheAdaptersSendKeepsNoStateAndReadsNoDocument(): void
     {
-        $collector = $this->collector();
-        $recorder = $this->recorder($collector);
+        $probe = $this->probeWithOneEntry();
+        $recorder = $this->recorder($probe);
+        $probe->onSend = function () use ($recorder): void {
+            $recorder->started('1', 'find', $this->document(['find' => 'a']));
+            $recorder->succeeded('1', 1000, $this->reply([]));
+        };
 
-        $collector->pause();
-        $recorder->started('1', 'find', $this->document(['find' => 'a']));
-        $collector->resume();
-        $recorder->succeeded('1', 1000, $this->reply([]));
+        self::assertSame([1, 0, 0], [count($probe->finish()), $probe->dropped(), $this->documentsRead]);
+    }
 
-        self::assertSame([0, 0, 0], [$collector->count(), $collector->dropped(), $this->documentsRead]);
+    public function testCommandStartedDuringASendAndEndedAfterItGivesNoEntry(): void
+    {
+        $probe = new StackProbe(maxEntries: 1, root: BatchType::Console);
+        $probe->stack->setRoute('worker/run');
+        $recorder = $this->recorder($probe);
+        $ran = false;
+        $probe->onSend = function () use ($recorder, &$ran): void {
+            if (!$ran) {
+                $ran = true;
+                $recorder->started('9', 'find', $this->document(['find' => 'from_adapter']));
+            }
+        };
+
+        $probe->stack->add(QueryEntry::success('mongodb', 'mongodb', 'find', 'a', 1.0, []));
+        $recorder->succeeded('9', 1000, $this->reply([]));
+        $recorder->started('10', 'find', $this->document(['find' => 'b']));
+        $recorder->succeeded('10', 1000, $this->reply([]));
+
+        self::assertTrue($ran, 'the adapter ran while the worker was running');
+        self::assertSame(['a', 'b'], array_map(static fn(QueryEntry $e): ?string => $e->query, $probe->finish()), 'the command of the adapter left no state; collecting went on');
+        self::assertSame(1, $this->documentsRead, 'only the document of the command after the send');
     }
 
     public function testEndAfterFinalisationGivesNothing(): void
     {
-        $collector = $this->collector();
-        $recorder = $this->recorder($collector);
+        $probe = new StackProbe();
+        $recorder = $this->recorder($probe);
 
         $recorder->started('1', 'find', $this->document(['find' => 'a']));
-        $batch = $collector->close(new \DateTimeImmutable());
+        $probe->stack->finalize();
         $recorder->succeeded('1', 1000, $this->reply([]));
 
-        self::assertSame([], $batch->queries);
-        self::assertSame(0, $collector->dropped());
+        self::assertSame([], $probe->batches, 'nothing to send, nothing counted');
     }
 
     public function testFullBatchAtStartCountsDroppedOnceWithoutReadingTheDocument(): void
     {
-        $collector = $this->fullCollector();
-        $recorder = $this->recorder($collector);
+        $probe = $this->probeWithOneEntry(maxEntries: 1);
+        $recorder = $this->recorder($probe);
 
         $recorder->started('1', 'find', $this->document(['find' => 'a']));
         $recorder->succeeded('1', 1000, $this->reply([]));
 
-        self::assertSame([1, 1, 0], [$collector->count(), $collector->dropped(), $this->documentsRead]);
+        self::assertSame([1, 1, 0], [count($probe->finish()), $probe->dropped(), $this->documentsRead]);
     }
 
     public function testBatchFilledBetweenStartAndEndCountsDroppedAtTheEnd(): void
     {
-        $collector = new QueryCollector('app', BatchType::Http, 'req_1', 'host', maxEntries: 1);
-        $recorder = $this->recorder($collector);
+        $probe = new StackProbe(maxEntries: 1);
+        $recorder = $this->recorder($probe);
 
         $recorder->started('1', 'find', $this->document(['find' => 'a']));
         $recorder->started('2', 'find', $this->document(['find' => 'b']));
@@ -203,21 +225,17 @@ final class RecorderTest extends LoggedTestCase
         $recorder->succeeded('1', 1000, $this->reply([]));
         $recorder->succeeded('1', 1000, $this->reply([]));
 
-        self::assertSame([1, 1], [$collector->count(), $collector->dropped()], 'the end event removed the state before counting it, so a repeated end counts nothing');
+        self::assertSame([1, 1], [count($probe->finish()), $probe->dropped()], 'the end event removed the state before counting it, so a repeated end counts nothing');
     }
 
-    public function testEndWhilePausedRemovesTheState(): void
+    public function testEndDuringTheAdaptersSendGivesNoEntry(): void
     {
-        $collector = $this->collector();
-        $recorder = $this->recorder($collector);
-
+        $probe = $this->probeWithOneEntry();
+        $recorder = $this->recorder($probe);
         $recorder->started('1', 'find', $this->document(['find' => 'a']));
-        $collector->pause();
-        $recorder->succeeded('1', 1000, $this->reply([]));
-        $collector->resume();
-        $recorder->succeeded('1', 1000, $this->reply([]));
+        $probe->onSend = fn() => $recorder->succeeded('1', 1000, $this->reply([]));
 
-        self::assertSame(0, $collector->count(), 'the command ended while the adapter sent; no state is left for a later event');
+        self::assertSame([1, 0], [count($probe->finish()), $probe->dropped()], 'the command ended while the adapter sent');
     }
 
     /**
@@ -232,30 +250,30 @@ final class RecorderTest extends LoggedTestCase
     #[DataProvider('provideEndEventCases')]
     public function testFailureAtTheEndEventIsSwallowedWithOnePackageError(string $event): void
     {
-        $collector = $this->collector();
+        $probe = new StackProbe();
         // uninitialised readonly properties: frames() throws \Error
         $callers = (new \ReflectionClass(CallerFrames::class))->newInstanceWithoutConstructor();
-        $recorder = new Recorder('mongodb', new MongoDbNormalizer(8192), $collector, new Guard(), $callers);
+        $recorder = new Recorder('mongodb', new MongoDbNormalizer(8192), $probe->stack, new Guard(), $callers);
 
         $recorder->started('1', 'find', $this->document(['find' => 'a']));
         $event === 'succeeded' ? $recorder->succeeded('1', 1000, $this->reply([])) : $recorder->failed('1', 1000, '2');
 
-        self::assertSame(0, $collector->count());
+        self::assertSame(0, count($probe->finish()));
         self::assertCount(1, $this->errors());
     }
 
     public function testFailingNormaliserKeepsNoStateAndLogsOnce(): void
     {
-        $collector = $this->collector();
+        $probe = new StackProbe();
         // uninitialised readonly maxQueryLength: normalize() throws \Error
         $broken = (new \ReflectionClass(MongoDbNormalizer::class))->newInstanceWithoutConstructor();
-        $recorder = $this->recorder($collector, $broken);
+        $recorder = $this->recorder($probe, $broken);
 
         $recorder->started('1', 'find', $this->document(['find' => 'a', 'filter' => (object) ['email' => 'alice@example.com']]));
         $recorder->succeeded('1', 1000, $this->reply([]));
         $recorder->started('2', 'find', $this->document(['find' => 'a']));
 
-        self::assertSame([0, 0], [$collector->count(), $collector->dropped()]);
+        self::assertSame([0, 0], [count($probe->finish()), $probe->dropped()]);
         $errors = $this->errors();
         self::assertCount(1, $errors);
         self::assertSame(Guard::LOG_CATEGORY, $errors[0][2]);
@@ -264,26 +282,26 @@ final class RecorderTest extends LoggedTestCase
 
     public function testFailingDocumentReadIsSwallowed(): void
     {
-        $collector = $this->collector();
-        $recorder = $this->recorder($collector);
+        $probe = new StackProbe();
+        $recorder = $this->recorder($probe);
 
         $recorder->started('1', 'find', static fn(): object => throw new \RuntimeException('BSON'));
         $recorder->succeeded('1', 1000, $this->reply([]));
 
-        self::assertSame(0, $collector->count());
+        self::assertSame(0, count($probe->finish()));
         self::assertCount(1, $this->errors());
     }
 
     public function testCallerIsTakenAtTheEndEvent(): void
     {
-        $collector = $this->collector();
-        $recorder = $this->recorder($collector);
+        $probe = new StackProbe();
+        $recorder = $this->recorder($probe);
 
         $recorder->started('1', 'find', $this->document(['find' => 'a']));
         $line = __LINE__ + 1;
         $recorder->succeeded('1', 1000, $this->reply([]));
 
-        $caller = $collector->close(new \DateTimeImmutable())->queries[0]->caller;
+        $caller = $probe->finish()[0]->caller;
         self::assertSame('tests/Unit/mongodb/RecorderTest.php:' . $line, $caller[0]);
     }
 
@@ -315,23 +333,21 @@ final class RecorderTest extends LoggedTestCase
         };
     }
 
-    private function recorder(QueryCollector $collector, ?MongoDbNormalizer $normalizer = null): Recorder
+    private function recorder(StackProbe $probe, ?MongoDbNormalizer $normalizer = null): Recorder
     {
         $root = dirname(__DIR__, 3);
 
-        return new Recorder('mongodb', $normalizer ?? new MongoDbNormalizer(8192), $collector, new Guard(), new CallerFrames($root, $root . '/vendor', $root . '/src', null));
+        return new Recorder('mongodb', $normalizer ?? new MongoDbNormalizer(8192), $probe->stack, new Guard(), new CallerFrames($root, $root . '/vendor', $root . '/src', null));
     }
 
-    private function collector(): QueryCollector
+    /**
+     * A stack whose root already holds one entry, so finalisation sends a batch.
+     */
+    private function probeWithOneEntry(int $maxEntries = QueryCollector::DEFAULT_MAX_ENTRIES): StackProbe
     {
-        return new QueryCollector('app', BatchType::Http, 'req_1', 'host');
-    }
+        $probe = new StackProbe($maxEntries);
+        $probe->stack->add(QueryEntry::success('mongodb', 'mongodb', 'find', 'a', 1.0, []));
 
-    private function fullCollector(): QueryCollector
-    {
-        $collector = new QueryCollector('app', BatchType::Http, 'req_1', 'host', maxEntries: 1);
-        $collector->add(QueryEntry::success('mongodb', 'mongodb', 'find', 'a', 1.0, []));
-
-        return $collector;
+        return $probe;
     }
 }

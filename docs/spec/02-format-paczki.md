@@ -6,18 +6,19 @@ Kontrakt między kolektorem a każdym adapterem. Zmiana pola oznacza nowe `v`.
 
 | Pole | Typ | Znaczenie |
 |---|---|---|
-| `v` | int | Wersja formatu, dziś `2`. Wersja `1` miała zamiast `route` pola `module`, `controller` i `action`, a wpis nie miał `caller` |
+| `v` | int | Wersja formatu, dziś `3`. Wersja `2` nie miała pola `job` ani typu `job`. Wersja `1` miała zamiast `route` pola `module`, `controller` i `action`, a wpis nie miał `caller` |
 | `app` | string | Wartość `app` z konfiguracji |
-| `type` | `http` \| `console` | Kontekst |
-| `id` | string | Losowy identyfikator generowany przez bibliotekę, wspólny dla wszystkich paczek zadania: 16 znaków `[0-9a-f]` z `random_bytes(8)` |
-| `seq` | int | Numer paczki w zadaniu konsolowym, od 1. Dla HTTP zawsze `1` |
-| `route` | string \| null | `uniqueId` akcji wejściowej, np. `admin/orders/order/view` albo `site/index` |
+| `type` | `http` \| `console` \| `job` | Typ kontekstu ([01 §5.1](01-zbieranie-danych.md#51-konteksty)) |
+| `id` | string | Losowy identyfikator kontekstu generowany przez bibliotekę, wspólny dla wszystkich jego paczek: 16 znaków `[0-9a-f]` z `random_bytes(8)`. W `job` identyfikuje jedną próbę wykonania, nie wiadomość kolejki |
+| `seq` | int | Numer paczki w kontekście, od 1. Dla HTTP zawsze `1` |
+| `route` | string \| null | `uniqueId` akcji wejściowej procesu, np. `admin/orders/order/view`, `site/index`, `queue/listen`. W paczce joba to trasa kontekstu korzenia w chwili wysyłki tej paczki |
+| `job` | object \| null | `null` dla `http` i `console`. Dla `job` obiekt z czterema kluczami w tej kolejności: `name` (string, nazwa klasy albo handlera), `queue` (string \| null, nazwa kolejki), `message_id` (string \| null, id wiadomości w kolejce, liczba zamieniona na tekst), `attempt` (int \| null, numer próby od 1). Każdy tekst obcięty do 255 bajtów UTF-8 razem z `…`, na granicy znaku. `attempt` mniejszy od `1` daje `null`. Pusty `name` daje `unknown` |
 | `ts` | string | Moment wysyłki, ISO 8601 w UTC |
 | `host` | string | Wynik `gethostname()`, pusty tekst, gdy funkcja zwróci `false` |
 | `dropped` | int | Wpisy pominięte po przekroczeniu limitu |
 | `queries` | array | Lista wpisów w kolejności zakończenia |
 
-`route` ma `null`, gdy żądanie skończyło się przed routingiem, np. błędem 404 w `UrlManager`.
+`route` ma `null`, gdy żądanie skończyło się przed routingiem, np. błędem 404 w `UrlManager`, i w paczce joba wysłanej, zanim trasa procesu była znana. Metadane joba podaje aplikacja albo integracja z kolejką ([01 §5.3](01-zbieranie-danych.md#53-granice-joba)). Treść wiadomości, argumenty joba i wyjątek nigdy nie trafiają do nagłówka.
 
 ## 2. Wpis
 
@@ -39,8 +40,8 @@ Jeden wpis to jedno polecenie faktycznie wysłane do bazy.
 ## 3. Przykład
 
 ```json
-{"v":2,"app":"shop-api","type":"http","id":"req_9f3a1c2e","seq":1,
- "route":"admin/orders/order/view",
+{"v":3,"app":"shop-api","type":"http","id":"req_9f3a1c2e","seq":1,
+ "route":"admin/orders/order/view","job":null,
  "ts":"2026-09-22T09:41:05.312Z","host":"web-03","dropped":0,
  "queries":[
   {"db":"mysql","conn":"db","op":"select","query":"SELECT * FROM `order` WHERE `id` = ?","time_ms":2.1,"result":"success","caller":["modules/admin/modules/orders/controllers/OrderController.php:41"]},
@@ -48,6 +49,14 @@ Jeden wpis to jedno polecenie faktycznie wysłane do bazy.
   {"db":"mongodb","conn":"mongodb","op":"find","query":"contacts filter{externalId:?,tenantId:?} sort{updatedAt:?} limit:?","time_ms":1.3,"result":"success","caller":["components/ContactRepository.php:88","modules/admin/modules/orders/controllers/OrderController.php:52"]},
   {"db":"mysql","conn":"db","op":"select","query":null,"time_ms":0.7,"result":"success","caller":[]}
  ]}
+```
+
+Nagłówek paczki joba wykonanego w workerze `yii2-queue`, druga paczka tej próby:
+
+```json
+{"v":3,"app":"shop-api","type":"job","id":"5be0c7d2a8f14e39","seq":2,
+ "route":"queue/listen","job":{"name":"app\\jobs\\SendInvoice","queue":"queue","message_id":"42","attempt":2},
+ "ts":"2026-09-22T09:41:07.004Z","host":"worker-01","dropped":0,"queries":[...]}
 ```
 
 ## 4. Normalizacja
@@ -123,14 +132,14 @@ Wartości parametrów, dokumenty, adresy URL z parametrami, dane uwierzytelniaj�
 
 ## 5. Limity
 
-| Limit | HTTP | Konsola |
+| Limit | `http` i korzeń przed poznaniem trasy | `console` i `job` |
 |---|---|---|
 | `maxEntries` | Kolektor przestaje dodawać wpisy i zwiększa `dropped`. Błędy po limicie też przepadają | Paczka jest wysyłana natychmiast po dodaniu wpisu numer `maxEntries` |
 | `maxBatchBytes`, liczony dla całego JSON z nagłówkiem | Jak wyżej, ten sam licznik | Kolektor wysyła dotychczasowy bufor, bieżący wpis trafia do następnej paczki |
-| Pojedynczy wpis z nagłówkiem ponad `maxBatchBytes` | Wpis przepada, `dropped` rośnie | Wpis przepada, `dropped` bieżącej paczki rośnie |
+| Pojedynczy wpis z nagłówkiem ponad `maxBatchBytes` | Wpis przepada, `dropped` rośnie | Wpis przepada, `dropped` bieżącego bufora rośnie, bez wysyłki ([01 §5.2](01-zbieranie-danych.md#52-porcjowanie)) |
 | `maxQueryLength` | [§4](#4-normalizacja) | [§4](#4-normalizacja) |
 
-Niezmiennik: JSON paczki nigdy nie przekracza `maxBatchBytes`. Kolektor liczy bajty nagłówka z bieżącymi wartościami, z miejscem na `seq` i `dropped` do 10 cyfr, oraz bajty każdego wpisu po serializacji. Gdy akcja wejściowa ustawiona po wpisach wydłuży nagłówek ponad limit, przy zamknięciu kolektor usuwa wpisy od końca i dolicza je do `dropped`. Wpis dodany po zamknięciu kolektora jest pomijany i nie zwiększa `dropped`. W HTTP pierwszy wpis, który nie mieści się w `maxEntries` lub `maxBatchBytes`, kończy przyjmowanie: każdy następny, także krótszy, tylko zwiększa `dropped`, więc lista jest pełna do pierwszego osiągniętego limitu ([00 §6](00-przeglad-i-zakres.md#6-kryteria-sukcesu)).
+Niezmiennik: JSON paczki nigdy nie przekracza `maxBatchBytes`. Kolektor liczy bajty nagłówka z bieżącymi wartościami, także `job`, z miejscem na `seq` i `dropped` do 10 cyfr, oraz bajty każdego wpisu po serializacji. W `console` i `job` `dropped` liczy się osobno w każdej paczce. Gdy akcja wejściowa ustawiona po wpisach wydłuży nagłówek ponad limit, przy zamknięciu kolektor usuwa wpisy od końca i dolicza je do `dropped`. Wpis dodany po zamknięciu kolektora jest pomijany i nie zwiększa `dropped`. W HTTP pierwszy wpis, który nie mieści się w `maxEntries` lub `maxBatchBytes`, kończy przyjmowanie: każdy następny, także krótszy, tylko zwiększa `dropped`, więc lista jest pełna do pierwszego osiągniętego limitu ([00 §6](00-przeglad-i-zakres.md#6-kryteria-sukcesu)).
 
 Wpis z `query` obciętym do `maxQueryLength` mieści się w `maxBatchBytes` przy wartościach początkowych, także z `caller`: trzy ścieżki, każda najwyżej 4096 bajtów (`PATH_MAX` w Linuksie), to razem około 12 KB. Ostatni wiersz tabeli dotyczy więc tylko konfiguracji z bardzo małym limitem paczki.
 

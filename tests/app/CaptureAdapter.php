@@ -12,6 +12,7 @@ use mrstroz\querymonitoring\batch\QueryBatch;
  *
  * Every call first appends `{"call": n}` to `QM_CAPTURE_FILE.calls`. `QM_ADAPTER` changes what the call does:
  * - `throw` — throws a RuntimeException instead of writing the batch,
+ * - `throw-on-<n>` — throws the same way only in call number n, other calls write the batch (YQM-48),
  * - `json-fail` — fails in `json_encode()` with JSON_THROW_ON_ERROR, as a serialising adapter would,
  * - `query` — runs `SELECT 4242 AS qm_in_adapter` through the monitored `db`, records the result in the
  *   call line (`"query": "4242"`) and then writes the batch,
@@ -35,7 +36,7 @@ final class CaptureAdapter implements BatchAdapterInterface
         }
         $file = (string) getenv('QM_CAPTURE_FILE');
         file_put_contents($file . '.calls', json_encode($call) . "\n", FILE_APPEND | LOCK_EX);
-        if ($mode === 'throw') {
+        if ($mode === 'throw' || $mode === 'throw-on-' . $this->calls) {
             throw new \RuntimeException('CaptureAdapter failed on purpose.');
         }
         if ($mode === 'json-fail') {

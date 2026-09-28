@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace mrstroz\querymonitoring\mongodb;
 
-use mrstroz\querymonitoring\collector\QueryCollector;
+use mrstroz\querymonitoring\context\ContextStack;
 use mrstroz\querymonitoring\SourceInterface;
 use mrstroz\querymonitoring\support\CallerFrames;
 use mrstroz\querymonitoring\support\Guard;
@@ -35,7 +35,7 @@ final class Source implements SourceInterface
      * @param \Closure(): MongoDbNormalizer $createNormalizer
      */
     public function __construct(
-        private readonly QueryCollector $collector,
+        private readonly ContextStack $contexts,
         private readonly Guard $guard,
         private readonly CallerFrames $callers,
         private readonly \Closure $createNormalizer,
@@ -85,7 +85,7 @@ final class Source implements SourceInterface
         $subscriber = $this->subscribers[$key] ??= new Subscriber(new Recorder(
             $this->firstId($key),
             $this->normalizer ??= ($this->createNormalizer)(),
-            $this->collector,
+            $this->contexts,
             $this->guard,
             $this->callers,
         ));

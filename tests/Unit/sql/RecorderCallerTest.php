@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace mrstroz\querymonitoring\tests\Unit\sql;
 
-use mrstroz\querymonitoring\batch\BatchType;
-use mrstroz\querymonitoring\collector\QueryCollector;
 use mrstroz\querymonitoring\sql\Recorder;
 use mrstroz\querymonitoring\sql\SqlNormalizer;
 use mrstroz\querymonitoring\support\CallerFrames;
 use mrstroz\querymonitoring\support\Guard;
 use mrstroz\querymonitoring\tests\Unit\LoggedTestCase;
+use mrstroz\querymonitoring\tests\Unit\StackProbe;
 use mrstroz\querymonitoring\tests\Unit\sql\deep\Deep;
 
 /**
@@ -41,14 +40,14 @@ final class RecorderCallerTest extends LoggedTestCase
 
     public function testRecordedEntryCarriesCallerOfTheQuery(): void
     {
-        $collector = $this->collector();
-        $recorder = $this->recorder($collector, new CallerFrames($this->root(), $this->root() . '/vendor', $this->root() . '/src', null));
+        $probe = new StackProbe();
+        $recorder = $this->recorder($probe, new CallerFrames($this->root(), $this->root() . '/vendor', $this->root() . '/src', null));
 
         $line = __LINE__ + 1;
         $recorder->record('SELECT 1', 1.0, null);
         $recorder->record('SELECT 2', 1.0, '42000');
 
-        $queries = $collector->close(new \DateTimeImmutable())->queries;
+        $queries = $probe->finish();
         self::assertSame($this->relative(__FILE__) . ':' . $line, $queries[0]->caller[0], 'nearest application frame first');
         self::assertNotSame([], $queries[1]->caller, 'an error entry has caller too');
         self::assertSame('caller', array_key_last($queries[1]->toArray()), 'caller is the last field of the entry');
@@ -61,28 +60,23 @@ final class RecorderCallerTest extends LoggedTestCase
      */
     private function callerAt(int $levels): array
     {
-        $collector = $this->collector();
+        $probe = new StackProbe();
         $frames = new CallerFrames($this->root(), __DIR__ . '/deep', $this->root() . '/src', null);
-        $recorder = $this->recorder($collector, $frames);
+        $recorder = $this->recorder($probe, $frames);
 
         $line = __LINE__ + 1;
         Deep::record($levels, $recorder);
 
-        $queries = $collector->close(new \DateTimeImmutable())->queries;
+        $queries = $probe->finish();
         self::assertCount(1, $queries);
         self::assertSame([], $this->errors());
 
         return [array_slice($queries[0]->caller, 0, 1), $line];
     }
 
-    private function recorder(QueryCollector $collector, CallerFrames $frames): Recorder
+    private function recorder(StackProbe $probe, CallerFrames $frames): Recorder
     {
-        return new Recorder('db', 'mysql', new SqlNormalizer(), $collector, new Guard(), $frames);
-    }
-
-    private function collector(): QueryCollector
-    {
-        return new QueryCollector('app', BatchType::Http, 'req_1', 'host');
+        return new Recorder('db', 'mysql', new SqlNormalizer(), $probe->stack, new Guard(), $frames);
     }
 
     private function root(): string

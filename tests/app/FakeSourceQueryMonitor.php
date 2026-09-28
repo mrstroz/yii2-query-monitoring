@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace mrstroz\querymonitoring\tests\app;
 
-use mrstroz\querymonitoring\collector\QueryCollector;
+use mrstroz\querymonitoring\context\ContextStack;
 use mrstroz\querymonitoring\QueryMonitor;
 use mrstroz\querymonitoring\support\CallerFrames;
 use mrstroz\querymonitoring\support\Guard;
@@ -16,7 +16,7 @@ use mrstroz\querymonitoring\tests\app\sources\FakeSource;
  */
 final class FakeSourceQueryMonitor extends QueryMonitor
 {
-    protected function createSources(QueryCollector $collector, Guard $guard, CallerFrames $callers): array
+    protected function createSources(ContextStack $contexts, Guard $guard, CallerFrames $callers): array
     {
         $sources = [];
         foreach (json_decode((string) getenv('QM_FAKE_SOURCES'), true, 512, JSON_THROW_ON_ERROR) as [$name, $takes, $incompatible]) {

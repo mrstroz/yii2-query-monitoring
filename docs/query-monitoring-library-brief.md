@@ -2,7 +2,7 @@
 
 ## Cel
 
-Potrzebujemy biblioteki instalowanej przez Composer w kilku aplikacjach Yii 2. Dla każdego żądania HTTP lub zadania konsolowego ma ona zebrać listę zapytań do MySQL, PostgreSQL i MongoDB. Każde zapytanie ma czas wykonania i wynik. Po instalacji i konfiguracji pomiar obejmuje także Active Record, bez zmian w modelach.
+Potrzebujemy biblioteki instalowanej przez Composer w kilku aplikacjach Yii 2. Dla każdego żądania HTTP, zadania konsolowego lub joba ma ona zebrać listę zapytań do MySQL, PostgreSQL i MongoDB. Każde zapytanie ma czas wykonania i wynik. Po instalacji i konfiguracji pomiar obejmuje także Active Record, bez zmian w modelach.
 
 Biblioteka mierzy i buduje paczkę. Aplikacja wybiera przez adapter, gdzie paczka trafia. Domyślny adapter zapisuje ją do rotowanego pliku.
 
@@ -11,13 +11,13 @@ Biblioteka ma działać stale na produkcji. Nie wymaga `enableProfiling` ani `en
 ## Środowisko
 
 - PHP 8.1 lub nowszy, Yii 2.0.45 lub nowszy.
-- HTTP w modelu PHP-FPM: osobny cykl aplikacji Yii dla każdego żądania. RoadRunner i Swoole dla HTTP są poza zakresem. Długie zadania konsolowe są wspierane.
+- HTTP w modelu PHP-FPM: osobny cykl aplikacji Yii dla każdego żądania. RoadRunner i Swoole dla HTTP są poza zakresem. Długie zadania konsolowe i workery kolejek są wspierane.
 - `yiisoft/yii2-mongodb` i `ext-mongodb` to zależności opcjonalne (`suggest`). Aplikacja tylko z SQL instaluje bibliotekę bez MongoDB.
 
 ## Zakres pierwszej wersji
 
 - Połączenia `yii\db\Connection` (MySQL, PostgreSQL) i `yii\mongodb\Connection`.
-- Żądania HTTP i zadania konsolowe. Każda aplikacja podaje swoją nazwę.
+- Żądania HTTP, zadania konsolowe i joby. Każda aplikacja podaje swoją nazwę.
 - Wszystkie wykonane operacje, również krótkie. Bez progu czasu i bez próbkowania.
 - Udane operacje i błędy. Błąd w bibliotece nie zmienia wyniku operacji ani odpowiedzi aplikacji.
 
@@ -29,11 +29,13 @@ Monitorowane połączenia wskazuje ręczna lista id komponentów w konfiguracji,
 
 Kolektor zbiera od podpięcia komponentu w bootstrapie do rozpoczęcia finalizacji w `EVENT_AFTER_REQUEST`, w tym widoki i obsługę wyjątków. Finalizacja zamyka kolektor i wysyła paczkę. Jeżeli finalizacja nie nastąpiła, wykonuje ją callback z `register_shutdown_function`, zarejestrowany przy starcie. To pokrywa `exit()` i `exit(1)` z handlera wyjątków Yii. Błąd krytyczny PHP nadal gubi paczkę. Operacje po finalizacji są poza zakresem i nie są zliczane. Żądanie bez zapytań nie wysyła paczki.
 
-## Zadanie konsolowe
+## Zadanie konsolowe i job
 
-Zadanie to jedno uruchomienie `php yii ...`, od startu do końca procesu. Worker kolejki to jedno długie zadanie z wieloma paczkami. Biblioteka nie rozpoznaje pojedynczych jobów.
+Zadanie to jedno uruchomienie `php yii ...`, od startu do końca procesu. Job to jedna próba wykonania zadania z kolejki. Aplikacja oznacza jego granice dwiema metodami komponentu, `beginJob()` i `endJob()`, albo gotowym behavior dla `yii2-queue`. Biblioteka nie zależy od żadnej kolejki. Job może być zagnieżdżony w żądaniu, komendzie albo innym jobie. Zapytanie należy wtedy tylko do najgłębszego joba.
 
-Zadanie wysyła paczkę po osiągnięciu dowolnego limitu: 500 wpisów, 256 KB lub 30 sekund od poprzedniej wysyłki. Pierwsze 30 sekund liczy się od startu kolektora. Czas jest sprawdzany przy kolejnej operacji. Bezczynny proces nie wysyła. Na końcu zadania biblioteka zawsze wysyła niepustą resztę, także przez `register_shutdown_function`. Wszystkie paczki jednego zadania mają wspólne `id` i kolejne `seq` od 1.
+Zadanie i job wysyłają paczkę po osiągnięciu dowolnego limitu: 500 wpisów, 256 KB lub 30 sekund od poprzedniej wysyłki. Pierwsze 30 sekund liczy się od startu zadania albo joba. Czas jest sprawdzany przy kolejnej operacji. Bezczynny proces nie wysyła. Koniec joba i koniec zadania zawsze wysyłają niepustą resztę, zadanie także przez `register_shutdown_function`. Wszystkie paczki jednego zadania albo jednej próby joba mają wspólne `id` i kolejne `seq` od 1. Ponowienie joba ma nowe `id`.
+
+Konfiguracja pozwala wykluczyć trasy HTTP, komendy i nazwy jobów. Wykluczony listener kolejki nie zapisuje swoich zapytań, a joby w nim nadal są mierzone.
 
 ## Format paczki
 
@@ -43,10 +45,11 @@ Nagłówek:
 
 - `v`: wersja formatu.
 - `app`: nazwa aplikacji z konfiguracji.
-- `type`: `http` lub `console`.
+- `type`: `http`, `console` lub `job`.
 - `id`: losowy identyfikator generowany przez bibliotekę.
-- `seq`: numer paczki w zadaniu konsolowym. Dla HTTP zawsze 1.
-- `module`, `controller`, `action`: akcja wejściowa zapamiętana z `EVENT_BEFORE_ACTION` aplikacji. `module` to `uniqueId` modułu lub `null` dla głównej aplikacji. `controller` i `action` to lokalne id. Obsługa błędu i zagnieżdżone `runAction` nie nadpisują tych pól. Gdy żądanie kończy się przed routingiem, pola mają `null`.
+- `seq`: numer paczki w zadaniu albo jobie. Dla HTTP zawsze 1.
+- `job`: dla joba nazwa klasy, nazwa kolejki, id wiadomości i numer próby. Bez treści wiadomości, argumentów i wyjątku.
+- `route`: `uniqueId` akcji wejściowej zapamiętanej z `EVENT_BEFORE_ACTION` aplikacji. Obsługa błędu i zagnieżdżone `runAction` go nie nadpisują. Gdy żądanie kończy się przed routingiem, `route` ma `null`.
 - `ts`: moment wysyłki w UTC.
 - `host`: wynik `gethostname()`.
 - `dropped`: liczba wpisów pominiętych po przekroczeniu limitu.
@@ -118,4 +121,4 @@ Jedna paczka to jeden wiersz JSON w pliku na lokalnym dysku pod `runtime/logs`. 
 
 ## Poza zakresem
 
-Worker, wysyłka do konkretnego systemu, dashboard, trwała baza statystyk, agregacja, analiza planów zapytań, rozpoznawanie jobów kolejki, `begin`/`commit`/`rollback` przez PDO, długo żyjące procesy HTTP (RoadRunner, Swoole), NFS.
+Worker, wysyłka do konkretnego systemu, dashboard, trwała baza statystyk, agregacja, analiza planów zapytań, rozpoznawanie jobów bez udziału aplikacji, wykonania równoległe w jednym procesie, `begin`/`commit`/`rollback` przez PDO, długo żyjące procesy HTTP (RoadRunner, Swoole), NFS.

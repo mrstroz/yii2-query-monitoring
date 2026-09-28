@@ -11,7 +11,7 @@ namespace mrstroz\querymonitoring\batch;
  */
 final class QueryBatch
 {
-    public const VERSION = 2;
+    public const VERSION = 3;
 
     /**
      * Flags for every JSON produced by the package; the collector counts bytes with the same flags.
@@ -22,6 +22,7 @@ final class QueryBatch
 
     /**
      * @param list<QueryEntry> $queries in order of completion
+     * @param JobInfo|null $job metadata of the job attempt, null for `http` and `console`
      */
     public function __construct(
         public readonly string $app,
@@ -33,6 +34,7 @@ final class QueryBatch
         public readonly string $host,
         public readonly int $dropped,
         public readonly array $queries,
+        public readonly ?JobInfo $job = null,
     ) {}
 
     /**
@@ -49,6 +51,7 @@ final class QueryBatch
             'id' => $this->id,
             'seq' => $this->seq,
             'route' => $this->route,
+            'job' => $this->job?->toArray(),
             'ts' => self::formatTs($this->ts),
             'host' => $this->host,
             'dropped' => $this->dropped,

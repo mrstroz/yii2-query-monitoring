@@ -15,7 +15,7 @@ Zmieniasz zachowanie? Najpierw poprawiasz specyfikację, potem kod, i edytujesz 
 | Dokument | Zawartość |
 |---|---|
 | [`spec/00-przeglad-i-zakres.md`](spec/00-przeglad-i-zakres.md) | Cel, główna zasada, zakres, poza zakresem, użytkownicy, kryteria sukcesu, środowiska, słownik, otwarte kwestie |
-| [`spec/01-zbieranie-danych.md`](spec/01-zbieranie-danych.md) | Komponent i konfiguracja, źródło SQL, źródło MongoDB, cykl życia HTTP i konsoli, ochrona aplikacji |
+| [`spec/01-zbieranie-danych.md`](spec/01-zbieranie-danych.md) | Komponent i konfiguracja, źródło SQL, źródło MongoDB, cykl życia HTTP, konteksty konsoli i jobów, wykluczenia tras, ochrona aplikacji |
 | [`spec/02-format-paczki.md`](spec/02-format-paczki.md) | Nagłówek, wpis, przykład, normalizacja, limity |
 | [`spec/03-adaptery-wyjsciowe.md`](spec/03-adaptery-wyjsciowe.md) | Kontrakt adaptera, błąd adaptera, adapter plikowy, test wydajności |
 
@@ -36,10 +36,13 @@ Zmieniasz zachowanie? Najpierw poprawiasz specyfikację, potem kod, i edytujesz 
 | [0004](adr/0004-normalizacja-literalow-na-znak-zapytania.md) | Normalizacja literałów na `?`, przy niepewności `null` | Zaakceptowany |
 | [0005](adr/0005-adapter-plikowy-z-blokada-i-utrata-paczki.md) | Adapter plikowy JSON Lines z blokadą nieblokującą | Zaakceptowany |
 | [0006](adr/0006-blad-adaptera-gubi-paczke.md) | Błąd adaptera gubi paczkę, bez ponowień | Zaakceptowany |
-| [0007](adr/0007-zadanie-konsolowe-to-jeden-proces.md) | Zadanie konsolowe to jedno uruchomienie procesu | Zaakceptowany |
+| [0007](adr/0007-zadanie-konsolowe-to-jeden-proces.md) | Zadanie konsolowe to jedno uruchomienie procesu | Zastąpiony przez 0012 |
 | [0008](adr/0008-architektura-i-konwencje-testow.md) | Architektura testów i wersja PHPUnit | Zaakceptowany |
 | [0009](adr/0009-caller-i-route-w-formacie-v2.md) | `caller` we wpisie i `route` w nagłówku, format `v: 2` | Zaakceptowany |
 | [0010](adr/0010-subskrybent-na-manager-polaczenia-mongodb.md) | Subskrybent sterownika na `Manager` połączenia MongoDB | Zaakceptowany |
+| [0011](adr/0011-zwijanie-list-in-i-parametrow-yii.md) | Zwijanie list `IN` i parametrów `:qpN` Yii | Zaakceptowany |
+| [0012](adr/0012-konteksty-http-console-job.md) | Konteksty `http`, `console` i `job` z jawnymi granicami joba, format `v: 3` | Zaakceptowany |
+| [0013](adr/0013-wykluczenia-tras-per-typ-kontekstu.md) | Wykluczenia tras osobno dla każdego typu kontekstu | Zaakceptowany |
 
 Szablon nowego ADR: [`adr/template.md`](adr/template.md).
 

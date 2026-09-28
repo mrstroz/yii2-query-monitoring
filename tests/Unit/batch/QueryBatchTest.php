@@ -6,12 +6,13 @@ namespace mrstroz\querymonitoring\tests\Unit\batch;
 
 use mrstroz\querymonitoring\adapter\BatchAdapterInterface;
 use mrstroz\querymonitoring\batch\BatchType;
+use mrstroz\querymonitoring\batch\JobInfo;
 use mrstroz\querymonitoring\batch\QueryBatch;
 use mrstroz\querymonitoring\batch\QueryEntry;
 use PHPUnit\Framework\TestCase;
 
 /**
- * YQM-2: spec 02 §1–§3, spec 03 §1.
+ * YQM-2 and YQM-49: spec 02 §1–§3, spec 03 §1.
  */
 final class QueryBatchTest extends TestCase
 {
@@ -33,7 +34,7 @@ final class QueryBatchTest extends TestCase
     public function testHeaderKeysFollowSpecOrder(): void
     {
         self::assertSame(
-            ['v', 'app', 'type', 'id', 'seq', 'route', 'ts', 'host', 'dropped', 'queries'],
+            ['v', 'app', 'type', 'id', 'seq', 'route', 'job', 'ts', 'host', 'dropped', 'queries'],
             array_keys($this->specExample()->toArray()),
         );
     }
@@ -92,9 +93,39 @@ final class QueryBatchTest extends TestCase
         $batch = new QueryBatch('app', BatchType::Console, 'id1', 7, null, new \DateTimeImmutable('2026-09-22T09:41:05.000Z'), 'h', 3, []);
 
         self::assertSame(
-            '{"v":2,"app":"app","type":"console","id":"id1","seq":7,"route":null,"ts":"2026-09-22T09:41:05.000Z","host":"h","dropped":3,"queries":[]}',
+            '{"v":3,"app":"app","type":"console","id":"id1","seq":7,"route":null,"job":null,"ts":"2026-09-22T09:41:05.000Z","host":"h","dropped":3,"queries":[]}',
             $batch->toJson(),
         );
+    }
+
+    public function testJobHeaderFromSpecIsProducedByteForByte(): void
+    {
+        $batch = new QueryBatch(
+            'shop-api',
+            BatchType::Job,
+            '5be0c7d2a8f14e39',
+            2,
+            'queue/listen',
+            new \DateTimeImmutable('2026-09-22T09:41:07.004Z'),
+            'worker-01',
+            0,
+            [],
+            JobInfo::create('app\\jobs\\SendInvoice', 'queue', 42, 2),
+        );
+
+        self::assertSame(
+            '{"v":3,"app":"shop-api","type":"job","id":"5be0c7d2a8f14e39","seq":2,'
+            . '"route":"queue/listen","job":{"name":"app\\\\jobs\\\\SendInvoice","queue":"queue","message_id":"42","attempt":2},'
+            . '"ts":"2026-09-22T09:41:07.004Z","host":"worker-01","dropped":0,"queries":[]}',
+            $batch->toJson(),
+        );
+    }
+
+    public function testJobWithUnknownMetadataKeepsAllFourKeys(): void
+    {
+        $batch = new QueryBatch('app', BatchType::Job, 'id1', 1, null, new \DateTimeImmutable('2026-09-22T09:41:05.000Z'), 'h', 0, [], JobInfo::create(''));
+
+        self::assertSame(['name' => 'unknown', 'queue' => null, 'message_id' => null, 'attempt' => null], $batch->toArray()['job']);
     }
 
     public function testUnicodeAndSlashesAreNotEscaped(): void

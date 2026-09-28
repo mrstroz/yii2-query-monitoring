@@ -16,7 +16,7 @@ Plan nie opisuje zachowania systemu. Każde zadanie wskazuje sekcję specyfikacj
 | [`05-mongodb.md`](05-mongodb.md) | E4: źródło MongoDB |
 | [`05a-zwijanie-list.md`](05a-zwijanie-list.md) | E4a: zwijanie list `IN` i parametrów `:qpN` w `query` |
 | [`05b-pelniejszy-query-mongodb.md`](05b-pelniejszy-query-mongodb.md) | E4b: `query` MongoDB dla głębokich dokumentów, `distinct` i długich poleceń |
-| [`06-konsola.md`](06-konsola.md) | E5: zadania konsolowe |
+| [`06-konsola.md`](06-konsola.md) | E5: konteksty konsoli i jobów, API joba, wykluczenia tras, adapter plikowy dla dwóch użytkowników |
 | [`07-wydajnosc-i-odbior.md`](07-wydajnosc-i-odbior.md) | E6: test wydajności, dokumentacja użytkownika |
 
 ## Format zadania
