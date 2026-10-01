@@ -11,7 +11,7 @@ interface BatchAdapterInterface
 }
 ```
 
-Konfiguracja `adapter` przyjmuje nazwę klasy, obiekt implementujący interfejs albo `callable` z jednym argumentem `QueryBatch`. Adapter jest wywoływany raz na gotową paczkę, nigdy per zapytanie. `QueryBatch` udostępnia dane jako tablicę i jako JSON.
+Konfiguracja `adapter` przyjmuje nazwę klasy, obiekt implementujący interfejs albo `callable` z jednym argumentem `QueryBatch`. Adapter jest wywoływany raz na gotową paczkę, nigdy per zapytanie. Paczka pominięta przez próbkowanie ([01 §5.6](01-zbieranie-danych.md#56-próbkowanie-paczek)) nie trafia do adaptera, a adapter nie dostaje o niej żadnej informacji. `QueryBatch` udostępnia dane jako tablicę i jako JSON.
 
 Pakiet nie zna adresu workera, kolejki ani formatu API odbiorcy.
 

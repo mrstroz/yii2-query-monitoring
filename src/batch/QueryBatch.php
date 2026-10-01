@@ -11,7 +11,7 @@ namespace mrstroz\querymonitoring\batch;
  */
 final class QueryBatch
 {
-    public const VERSION = 3;
+    public const VERSION = 4;
 
     /**
      * Flags for every JSON produced by the package; the collector counts bytes with the same flags.
@@ -23,6 +23,7 @@ final class QueryBatch
     /**
      * @param list<QueryEntry> $queries in order of completion
      * @param JobInfo|null $job metadata of the job attempt, null for `http` and `console`
+     * @param Sample|null $sample why a sampled batch was sent, null while sampling is off (spec 01 §5.6)
      */
     public function __construct(
         public readonly string $app,
@@ -35,7 +36,17 @@ final class QueryBatch
         public readonly int $dropped,
         public readonly array $queries,
         public readonly ?JobInfo $job = null,
+        public readonly ?Sample $sample = null,
     ) {}
+
+    /**
+     * The same batch with `sample` set; entries, times and `dropped` stay as they are. Every property is promoted
+     * from the constructor under its parameter's name, so a header field added later is copied too.
+     */
+    public function withSample(Sample $sample): self
+    {
+        return new self(...['sample' => $sample] + get_object_vars($this));
+    }
 
     /**
      * Keys in spec 02 §1 order. `ts` is converted to UTC and formatted as `Y-m-d\TH:i:s.v\Z`.
@@ -55,6 +66,7 @@ final class QueryBatch
             'ts' => self::formatTs($this->ts),
             'host' => $this->host,
             'dropped' => $this->dropped,
+            'sample' => $this->sample?->toArray(),
             'queries' => array_map(static fn(QueryEntry $entry): array => $entry->toArray(), $this->queries),
         ];
     }

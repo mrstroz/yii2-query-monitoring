@@ -43,6 +43,7 @@ Zmieniasz zachowanie? Najpierw poprawiasz specyfikację, potem kod, i edytujesz 
 | [0011](adr/0011-zwijanie-list-in-i-parametrow-yii.md) | Zwijanie list `IN` i parametrów `:qpN` Yii | Zaakceptowany |
 | [0012](adr/0012-konteksty-http-console-job.md) | Konteksty `http`, `console` i `job` z jawnymi granicami joba, format `v: 3` | Zaakceptowany |
 | [0013](adr/0013-wykluczenia-tras-per-typ-kontekstu.md) | Wykluczenia tras osobno dla każdego typu kontekstu | Zaakceptowany |
+| [0014](adr/0014-probkowanie-calych-paczek-przed-adapterem.md) | Próbkowanie całych paczek przed adapterem, format `v: 4` | Zaakceptowany |
 
 Szablon nowego ADR: [`adr/template.md`](adr/template.md).
 

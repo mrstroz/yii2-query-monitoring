@@ -57,10 +57,10 @@ final class JobContextTest extends IntegrationTestCase
         $jobs = $this->batchesOfJob($result, 'app\jobs\Mail');
         self::assertCount(1, $jobs);
         $batch = $jobs[0];
-        self::assertSame(3, $batch['v']);
+        self::assertSame(4, $batch['v']);
         self::assertSame('scenario/run', $batch['route'], 'route stays the controller route of the process');
         self::assertSame(['name' => 'app\jobs\Mail', 'queue' => 'mail', 'message_id' => '42', 'attempt' => 3], $batch['job']);
-        self::assertSame(['v', 'app', 'type', 'id', 'seq', 'route', 'job', 'ts', 'host', 'dropped', 'queries'], array_keys($batch));
+        self::assertSame(['v', 'app', 'type', 'id', 'seq', 'route', 'job', 'ts', 'host', 'dropped', 'sample', 'queries'], array_keys($batch));
     }
 
     #[DataProvider('provideDatabaseCases')]

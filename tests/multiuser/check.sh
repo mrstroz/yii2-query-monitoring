@@ -19,9 +19,12 @@ chgrp "$GROUP" "$DIR"
 chmod 2775 "$DIR"
 
 # 1. Alternating writes and rotations by both users: every send succeeds, every line is valid JSON.
+# A one-entry batch is a 295-byte line in format v: 4, so the file rotates at every seventh line. The 72 lines
+# written below leave two in the current file, which the checks after the loop read; keep the total off a
+# multiple of seven.
 for round in 1 2 3 4 5 6; do
-    as "$WEB" $PHP "$LOG" 7 2000 3 "web$round" || fail "web user write in round $round"
-    as "$CLI" $PHP "$LOG" 7 2000 3 "cli$round" || fail "console user write in round $round"
+    as "$WEB" $PHP "$LOG" 6 2000 3 "web$round" || fail "web user write in round $round"
+    as "$CLI" $PHP "$LOG" 6 2000 3 "cli$round" || fail "console user write in round $round"
 done
 [ -f "$LOG.1" ] || fail "no rotation happened"
 # Both directories the adapter created (the missing parent too) inherit the group, keep the inherited setgid

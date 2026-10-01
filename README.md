@@ -9,9 +9,10 @@ for each command. Parameter values and documents never enter a batch.
 
 ## Status
 
-Milestone E5: MySQL, PostgreSQL and MongoDB over HTTP requests, console commands and queue jobs, written to
-a rotated JSON Lines file or handed to an adapter you write. The specification (in Polish) is in
-[`docs/spec/`](docs/spec/).
+Milestone E5a: MySQL, PostgreSQL and MongoDB over HTTP requests, console commands and queue jobs, written to
+a rotated JSON Lines file or handed to an adapter you write, with optional sampling of whole batches. Batches
+use format `v: 4`; a receiver that accepts only `v: 3` rejects them, see [Sampling batches](#sampling-batches).
+The specification (in Polish) is in [`docs/spec/`](docs/spec/).
 
 ## Requirements
 
@@ -63,6 +64,7 @@ return [
 | `flushIntervalSeconds` | `30` | A console command or a job sends its batch at the first query after this many seconds since its last batch |
 | `excludedRoutes` | `[]` | Patterns not monitored, per context type: `['http' => ['health/index'], 'console' => ['queue/*'], 'job' => [...]]`. See [Excluding routes](#excluding-routes) |
 | `maxQueryLength` | `8192` | Bytes of one normalised `query`, cut with `…` |
+| `sampling` | `null` | Send only some batches to the adapter. `null` sends every batch. See [Sampling batches](#sampling-batches) |
 
 A monitored connection must not set its own `commandClass` or `commandMap` for its driver: the package
 measures queries by setting `commandMap` to its own `Command` class.
@@ -267,6 +269,70 @@ An excluded context records nothing and sends nothing; its queries are not count
 before the route is known, in bootstrap, are held and dropped once the route turns out excluded. A job inside
 an excluded command is judged by its own name, so excluding a worker command keeps its jobs monitored.
 
+## Sampling batches
+
+With `sampling` set, the package decides for every finished batch, just before the adapter, whether to send it.
+A batch that matches an enabled diagnostic criterion is always sent. Any other batch is sent with the
+probability `rate`. A batch is sent whole or not at all. This example sends 10% of ordinary batches and every
+batch with an error, a query of at least 500 ms, 2 s of queries together, or at least 200 queries:
+
+```php
+'queryMonitor' => [
+    'class' => \mrstroz\querymonitoring\QueryMonitor::class,
+    'app' => 'shop-api',
+    'connections' => ['db'],
+    'adapter' => $sendToWorker,
+    'sampling' => [
+        'rate' => 0.10,
+        'keepErrors' => true,
+        'slowQueryMs' => 500,
+        'slowBatchMs' => 2000,
+        'minQueries' => 200,
+    ],
+],
+```
+
+| Key | Default | Keeps a batch when |
+|---|---|---|
+| `rate` | required | Chosen by chance, with this probability from `0` to `1`, when no criterion matches |
+| `keepErrors` | `false` | An entry has `result: error` |
+| `slowQueryMs` | `null` | An entry took at least this many milliseconds |
+| `slowBatchMs` | `null` | The entries of this batch took at least this many milliseconds together |
+| `minQueries` | `null` | This batch describes at least this many queries: its entries plus `dropped` |
+
+`false` turns `keepErrors` off and `null` turns a threshold off; no criterion is on by default. Criteria cover SQL and MongoDB entries.
+A `sampling` that is not an array or `null`, an unknown key, a missing `rate` or a value out of range disables
+the package, like any wrong setting.
+
+In HTTP, `dropped` counts every query cut by a limit, so `minQueries` above `maxEntries` still keeps a request
+that hit the limit. A command or a job splits at `maxEntries`, so a threshold above it hardly ever fires there.
+`slowBatchMs` adds up only the stored entries: the time of dropped queries is unknown, so a truncated request
+can stay below it.
+
+- **Share of batches.** More than 10% of batches reach the adapter when many of them match a criterion. With
+  `rate: 1` every batch is sent. With `rate: 0` only diagnostic batches are sent, and they cannot estimate the
+  whole traffic; `rate: 0` with no criterion is a configuration error.
+- **The choice.** It depends only on the batch `id` and `seq` (an xxh3 hash), not on time, route, host or
+  queries, so the same batch always gets the same decision.
+- **What is sent.** A sent batch keeps all its entries, their order, times, `dropped`, `id` and `seq`; only the
+  header field `sample` says `{"rate":0.1,"reason":"sample"}` for a batch chosen by chance, or
+  `{"rate":1.0,"reason":"error"}` (`slow_query`, `slow_batch`, `many_queries`) for one kept by a criterion.
+  Without `sampling` it is `null`.
+- **What is skipped.** A skipped batch never reaches the adapter. It is not an error, is not logged and does
+  not count in `dropped`. A command or a job decides every batch on its own, so `seq` may have gaps, and an
+  error later in the same command does not bring back a batch skipped before it. The count and total time of a
+  batch describe that batch, not the whole command.
+- **Cost.** Sampling saves sending and the receiver's work, not the cost of collecting queries in PHP: every
+  query is still measured and normalised.
+
+**Format `v: 4`.** Since the header field `sample` was added, every batch has `"v":4` and `"sample"`, with
+sampling or without. A receiver that accepts only `v: 3`, such as a worker validating the version, rejects
+every batch, so update it before the package. Before you turn sampling on, the receiver must weigh each batch by
+`1 / sample.rate` in counts, sums, averages and percentiles (multiplied by its own sampling factor, e.g.
+Analytics Engine's `_sample_interval`), or show clearly that its numbers describe only the sample. Accepting
+the extra field is not enough. The requirements are in
+[spec 02 §7](docs/spec/02-format-paczki.md#7-próbkowanie-po-stronie-odbiorcy).
+
 ## Writing an adapter
 
 Set `adapter` to send batches somewhere else instead of the file:
@@ -284,9 +350,12 @@ final class QueueAdapter implements BatchAdapterInterface
 }
 ```
 
+Send `$batch->toJson()`, or encode `$batch->toArray()` with `QueryBatch::JSON_FLAGS`; without
+`JSON_PRESERVE_ZERO_FRACTION` a `sample.rate` of `1.0` becomes `1`.
+
 `send()` is called at most once per request, in `EVENT_AFTER_REQUEST` or, when the request ends with
 `exit()` or an unhandled exception, during PHP shutdown. A console command and a job call it once per batch,
-also while the command runs. A request without queries sends nothing. In the
+also while the command runs. A batch skipped by `sampling` never reaches it. A request without queries sends nothing. In the
 normal path the call happens before the response is sent, so a slow adapter delays it; the adapter is
 responsible for its own timeouts.
 

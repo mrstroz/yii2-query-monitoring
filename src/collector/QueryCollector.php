@@ -8,14 +8,15 @@ use mrstroz\querymonitoring\batch\BatchType;
 use mrstroz\querymonitoring\batch\JobInfo;
 use mrstroz\querymonitoring\batch\QueryBatch;
 use mrstroz\querymonitoring\batch\QueryEntry;
+use mrstroz\querymonitoring\batch\Sample;
 
 /**
  * In-memory buffer for one batch with the entry and byte limits of spec 02 §5.
  *
  * Invariant: `strlen($this->close(...)->toJson()) <= $maxBatchBytes` whenever the header alone fits.
  * The byte counter holds the header with its current values, `route` and `job` included (with
- * {@see self::SEQ_DIGITS} and {@see self::DROPPED_DIGITS} digits reserved for `seq` and `dropped`, and the
- * 24-character `ts`)
+ * {@see self::SEQ_DIGITS} and {@see self::DROPPED_DIGITS} digits reserved for `seq` and `dropped`, the
+ * 24-character `ts`, and `sample` as `null` or, after {@see self::reserveSample()}, the widest one sampling can set)
  * plus each entry serialised with {@see QueryBatch::JSON_FLAGS} and its separating comma.
  * The first entry that does not fit in `maxBatchBytes` or `maxEntries` stops intake: it and every
  * later entry, shorter ones included, are not stored and increase `dropped`.
@@ -53,6 +54,7 @@ final class QueryCollector
     private bool $full = false;
     private ?QueryBatch $batch = null;
     private ?string $route = null;
+    private ?Sample $reservedSample = null;
 
     public function __construct(
         private readonly string $app,
@@ -76,6 +78,19 @@ final class QueryCollector
             return;
         }
         $this->route = $route;
+        $this->headerBytes = $this->measureHeader();
+    }
+
+    /**
+     * Measures the header with `$widest` in `sample`, so the batch still fits in `maxBatchBytes` once sampling sets
+     * its own `sample` (spec 02 §5). Ignored after {@see self::close()}.
+     */
+    public function reserveSample(Sample $widest): void
+    {
+        if ($this->batch !== null) {
+            return;
+        }
+        $this->reservedSample = $widest;
         $this->headerBytes = $this->measureHeader();
     }
 
@@ -267,7 +282,7 @@ final class QueryCollector
     }
 
     /**
-     * Bytes of the header with an empty entry list and the widest reserved `seq`, `dropped` and `ts`.
+     * Bytes of the header with an empty entry list and the widest reserved `seq`, `dropped`, `ts` and `sample`.
      */
     private function measureHeader(): int
     {
@@ -282,6 +297,7 @@ final class QueryCollector
             dropped: self::RESERVED_NUMBER,
             queries: [],
             job: $this->job,
+            sample: $this->reservedSample,
         );
 
         return strlen($header->toJson());

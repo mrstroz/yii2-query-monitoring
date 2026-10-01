@@ -11,6 +11,7 @@ use mrstroz\querymonitoring\batch\BatchType;
 use mrstroz\querymonitoring\batch\JobInfo;
 use mrstroz\querymonitoring\batch\QueryBatch;
 use mrstroz\querymonitoring\collector\QueryCollector;
+use mrstroz\querymonitoring\context\BatchSampling;
 use mrstroz\querymonitoring\context\ContextSettings;
 use mrstroz\querymonitoring\context\ContextStack;
 use mrstroz\querymonitoring\context\RouteExclusions;
@@ -93,6 +94,19 @@ class QueryMonitor extends Component implements BootstrapInterface
      * @var array<string, mixed>
      */
     public array $file = [];
+
+    /**
+     * Sampling of finished batches before the adapter (spec 01 §5.6), e.g. `['rate' => 0.1, 'keepErrors' => true]`:
+     * `rate` (required, 0 to 1) is the probability of sending a batch no criterion keeps; `keepErrors`,
+     * `slowQueryMs`, `slowBatchMs` and `minQueries` keep a batch always, each off by default. `null` sends every batch.
+     * An unknown key or a wrong value disables the package.
+     *
+     * Not typed natively: a value of another type set by the application config must disable the package inside the
+     * guard, not fail in Yii's configuration (spec 00 §2).
+     *
+     * @var array<string, mixed>|null
+     */
+    public mixed $sampling = null;
 
     private ?Guard $guard = null;
     private ?ContextStack $contexts = null;
@@ -244,12 +258,14 @@ class QueryMonitor extends Component implements BootstrapInterface
             throw new InvalidConfigException('QueryMonitor::$maxQueryLength must be at least ' . strlen(SqlNormalizer::ELLIPSIS) . ' bytes.');
         }
         $exclusions = RouteExclusions::fromConfig($this->excludedRoutes);
+        $sampling = BatchSampling::fromConfig($this->sampling);
         $this->batchAdapter = $this->resolveAdapter();
         $contexts = new ContextStack($guard, $this->batchAdapter, new ContextSettings(
             fn(BatchType $type, string $id, ?JobInfo $job): QueryCollector => $this->createCollector($type, $id, $job),
             $this->createClock(),
             $this->flushIntervalSeconds,
             $exclusions,
+            $sampling,
         ));
         $contexts->openRoot($app instanceof \yii\console\Application ? BatchType::Console : BatchType::Http);
         $sources = $this->createSources($contexts, $guard, CallerFrames::forProcess());

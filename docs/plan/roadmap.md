@@ -4,8 +4,8 @@
 
 | Pole | Wartość |
 |---|---|
-| **Etap** | E5. Konsola i joby, 11 z 11, zakończony |
-| **Ostatnio ukończone** | [YQM-46..56](06-konsola.md): konteksty `http`, `console` i `job` ([ADR 0012](../adr/0012-konteksty-http-console-job.md)), porcjowanie, `beginJob()`/`endJob()`, `excludedRoutes` ([ADR 0013](../adr/0013-wykluczenia-tras-per-typ-kontekstu.md)), format `v: 3`, behavior `yii2-queue`, adapter plikowy dla dwóch użytkowników, README; macierz PHP 8.1 i 8.4 oraz najniższe zależności zielone. Poprawki po przeglądzie: rotacja tylko do pierwszej brakującej kopii (YQM-54), `beginJob(..., $scope)` kończy job `handled` przy powrocie z kolejki (YQM-53), trasa po wpisach przenosi nadmiar do następnej paczki (YQM-48) |
+| **Etap** | E5a. Próbkowanie paczek, 3 z 3, zakończony |
+| **Ostatnio ukończone** | [YQM-57..59](06a-probkowanie.md): `sampling` wysyła zwykłą paczkę z prawdopodobieństwem `rate` i zawsze paczkę z błędem, wolnym zapytaniem, dużym czasem łącznym albo dużą liczbą zapytań; wybór z hasha `id` i `seq`; pole `sample` i format `v: 4` dla każdej paczki ([ADR 0014](../adr/0014-probkowanie-calych-paczek-przed-adapterem.md)). Odbiorca musi przyjmować `v: 4` przed aktualizacją pakietu i ważyć metryki przed włączeniem próbkowania ([spec 02 §7](../spec/02-format-paczki.md#7-próbkowanie-po-stronie-odbiorcy)) |
 | **Następne** | Spisanie zadań [E6](07-wydajnosc-i-odbior.md) (wydajność i odbiór) według obowiązkowych punktów z tego pliku |
 
 Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trzeba zajrzeć na początku sesji.
@@ -22,9 +22,10 @@ Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trze
 | **E4a** | [05a-zwijanie-list](05a-zwijanie-list.md) | Zwijanie list w `query` | Ta sama struktura z inną długością listy `IN` lub `$in` daje ten sam `query` | 2/2 |
 | **E4b** | [05b-pelniejszy-query-mongodb](05b-pelniejszy-query-mongodb.md) | Pełniejszy `query` MongoDB | Głęboki potok Atlas Search, `distinct` i długie polecenie mają tekst `query` | 3/3 |
 | **E5** | [06-konsola](06-konsola.md) | Konsola i joby | Wiele paczek z `seq` na komendę i na próbę joba, wykluczony listener, adapter plikowy dla dwóch użytkowników | 11/11 |
+| **E5a** | [06a-probkowanie](06a-probkowanie.md) | Próbkowanie paczek | Część zwykłych paczek i każda diagnostyczna, `sample` z prawdopodobieństwem w formacie `v: 4` | 3/3 |
 | **E6** | [07-wydajnosc-i-odbior](07-wydajnosc-i-odbior.md) | Test wydajności, dokumentacja | Narzut w progu, limity potwierdzone, README pakietu | – |
 
-56 zadań spisanych. Jedno zadanie to jedna sesja i jeden commit.
+59 zadań spisanych. Jedno zadanie to jedna sesja i jeden commit.
 
 ## Dlaczego w tej kolejności
 
@@ -36,7 +37,7 @@ E2 przed E4 i E5, bo zestaw testów po dwóch etapach przestał mieć jedną zas
 
 E3 przed E4, bo zmienia kontrakt paczki: `v: 2` z `caller` we wpisie i `route` w nagłówku. MongoDB dokłada drugie źródło wpisów, więc wchodzi od razu w nowym formacie, zamiast przerabiać dwa źródła naraz.
 
-E5 po E4, bo limity konsoli i `seq` mają sens dopiero z oboma źródłami, a stos kontekstów musi obsłużyć recordery obu. E6 na końcu, bo test wydajności mierzy całość z normalizacją i zapisem, a limity w spec są wartościami początkowymi do korekty tym pomiarem.
+E5 po E4, bo limity konsoli i `seq` mają sens dopiero z oboma źródłami, a stos kontekstów musi obsłużyć recordery obu. E5a po E5, bo decyzja o wysłaniu dotyczy paczek wszystkich trzech kontekstów, a luki w `seq` mają sens dopiero przy wielu paczkach. E6 na końcu, bo test wydajności mierzy całość z normalizacją i zapisem, a limity w spec są wartościami początkowymi do korekty tym pomiarem.
 
 Efekt uboczny: do końca E3 pakiet nie ma MongoDB, więc demo w aplikacji z MongoDB pokaże tylko połowę zapytań.
 
@@ -63,4 +64,4 @@ Efekt uboczny: do końca E3 pakiet nie ma MongoDB, więc demo w aplikacji z Mong
 
 ## Czego w planie nie ma
 
-Lista w [spec 00 §4](../spec/00-przeglad-i-zakres.md#4-poza-zakresem-wersji-1). Agregaty i próbkowanie nie wrócą bez zmiany [ADR 0002](../adr/0002-plaska-lista-zamiast-agregatow.md). Rozpoznawanie jobów bez udziału aplikacji i wykonania równoległe w jednym procesie wymagają zmiany [ADR 0012](../adr/0012-konteksty-http-console-job.md).
+Lista w [spec 00 §4](../spec/00-przeglad-i-zakres.md#4-poza-zakresem-wersji-1). Agregaty i próbkowanie pojedynczych wpisów nie wrócą bez zmiany [ADR 0002](../adr/0002-plaska-lista-zamiast-agregatow.md); próbkowanie całych paczek opisuje [ADR 0014](../adr/0014-probkowanie-calych-paczek-przed-adapterem.md). Rozpoznawanie jobów bez udziału aplikacji i wykonania równoległe w jednym procesie wymagają zmiany [ADR 0012](../adr/0012-konteksty-http-console-job.md).

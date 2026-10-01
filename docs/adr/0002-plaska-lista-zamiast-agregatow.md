@@ -12,7 +12,7 @@ Odbiorca paczek jeszcze nie istnieje, więc nie wiadomo, które agregaty są pot
 
 ## Decyzja
 
-Paczka to nagłówek i płaska lista wpisów, jeden na polecenie wysłane do bazy, bez agregatów, progów i próbkowania. Kolektor pilnuje tylko limitu wpisów i rozmiaru.
+Paczka to nagłówek i płaska lista wpisów, jeden na polecenie wysłane do bazy, bez agregatów, bez progów i bez próbkowania wpisów. Kolektor pilnuje tylko limitu wpisów i rozmiaru. Próbkowanie całych paczek przed adapterem opisuje [ADR-0014](0014-probkowanie-calych-paczek-przed-adapterem.md): wysłana paczka nadal jest pełna.
 
 ## Konsekwencje
 
@@ -28,8 +28,12 @@ Paczka to nagłówek i płaska lista wpisów, jeden na polecenie wysłane do baz
 |---|---|
 | Grupy z licznikami i histogramem | Reguły grupowania i przedziały histogramu to decyzje bez odbiorcy, który by je zweryfikował |
 | Lista plus sumy w nagłówku | Sumy są wyprowadzalne z listy. Rozjazd przy `dropped > 0` |
-| Próg czasu i próbkowanie | Lista przestaje być pełna, a pełność jest kryterium sukcesu 1 |
+| Próg czasu i próbkowanie wpisów | Lista przestaje być pełna, a pełność jest kryterium sukcesu 1 |
 
 ## Kiedy wrócić do tej decyzji
 
 Gdy w produkcji `dropped` jest regularnie większe od zera albo gdy odbiorca potrzebuje percentyli bez czytania wszystkich paczek.
+
+## Historia decyzji
+
+Do 2026-09-30 decyzja wykluczała każde próbkowanie. [ADR-0014](0014-probkowanie-calych-paczek-przed-adapterem.md) dopuścił próbkowanie całych paczek; próbkowanie wpisów nadal jest odrzucone.

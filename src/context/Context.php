@@ -249,6 +249,10 @@ final class Context
     private function newCollector(): QueryCollector
     {
         $collector = ($this->settings->createCollector)($this->type, $this->id, $this->job);
+        // Here rather than in createCollector(): a subclass overriding it cannot skip the reservation (spec 02 §5).
+        if ($this->settings->sampling !== null) {
+            $collector->reserveSample($this->settings->sampling->widest());
+        }
         if ($this->route !== null) {
             $collector->setRoute($this->route);
         }

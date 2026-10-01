@@ -144,7 +144,12 @@ final class ReadmeExampleTest extends IntegrationTestCase
 
     public function testOptionTableListsEveryOptionWithItsDefault(): void
     {
-        preg_match_all('/^\| `(\w+)` \| ([^|]+?) \|/m', $this->readme(), $rows, PREG_SET_ORDER);
+        // Only the table of the Configuration section: the sampling and file adapter sections have key tables of their own.
+        // Code blocks go first, so a `# comment` line in one does not end the section.
+        $readme = (string) preg_replace('/^```.*?^```$/ms', '', $this->readme());
+        $section = preg_match('/^## Configuration\n(.*?)^#{1,3} /ms', $readme, $match) === 1 ? $match[1] : '';
+        self::assertNotSame('', $section, 'README has a Configuration section');
+        preg_match_all('/^\| `(\w+)` \| ([^|]+?) \|/m', $section, $rows, PREG_SET_ORDER);
         $table = [];
         foreach ($rows as [, $name, $default]) {
             $table[$name] = trim($default, " `");

@@ -27,5 +27,6 @@ Każdy plik opisuje jedną decyzję: kontekst, wybór, konsekwencje i odrzucone 
 | [0011](0011-zwijanie-list-in-i-parametrow-yii.md) | Zwijanie list `IN` i parametrów `:qpN` Yii | Zaakceptowany | 2026-09-25 |
 | [0012](0012-konteksty-http-console-job.md) | Konteksty `http`, `console` i `job` z jawnymi granicami joba, format `v: 3` | Zaakceptowany | 2026-09-28 |
 | [0013](0013-wykluczenia-tras-per-typ-kontekstu.md) | Wykluczenia tras osobno dla każdego typu kontekstu | Zaakceptowany | 2026-09-28 |
+| [0014](0014-probkowanie-calych-paczek-przed-adapterem.md) | Próbkowanie całych paczek przed adapterem, format `v: 4` | Zaakceptowany | 2026-09-30 |
 
 Szablon: [`template.md`](template.md).

@@ -37,7 +37,7 @@ Z tego wynika reszta: wyjątek w kolektorze lub adapterze jest przechwytywany i 
 | Źródło MongoDB | `yii\mongodb\Connection`, przez zdarzenia sterownika `ext-mongodb` |
 | Konteksty | Żądanie HTTP w PHP-FPM, zadanie konsolowe `php yii ...`, job oznaczony przez `beginJob()` i `endJob()` albo behavior `yii2-queue`, także zagnieżdżony synchronicznie |
 | Wykluczenia | Trasy HTTP i komend oraz nazwy jobów wyłączone z pomiaru w konfiguracji |
-| Dane | Wszystkie polecenia wysłane do bazy, bez progu czasu i bez próbkowania |
+| Dane | Wszystkie polecenia wysłane do bazy, bez progu czasu i bez próbkowania wpisów. Opcjonalne próbkowanie całych paczek przed adapterem ([01 §5.6](01-zbieranie-danych.md#56-próbkowanie-paczek)) |
 | Paczka | Nagłówek z akcją wejściową, płaska lista wpisów, licznik pominiętych |
 | Normalizacja | Usunięcie wartości z SQL i z dokumentów MongoDB |
 | Adapter | Kontrakt `send(QueryBatch): void`, obiekt lub `callable` |
@@ -48,7 +48,7 @@ Z tego wynika reszta: wyjątek w kolektorze lub adapterze jest przechwytywany i 
 | Element | Uzasadnienie |
 |---|---|
 | Agregaty: grupy, histogramy, sumy | Odbiorca paczek liczy je sam z płaskiej listy. Dodanie później to nowe pole, nie przebudowa |
-| Próg wolnego zapytania i próbkowanie | Lista ma być pełna. Filtrowanie robi odbiorca |
+| Próg wolnego zapytania i próbkowanie wpisów w paczce | Lista ma być pełna. Filtrowanie robi odbiorca. Próbkowanie obejmuje tylko całe paczki ([ADR 0014](../adr/0014-probkowanie-calych-paczek-przed-adapterem.md)) |
 | Worker, wysyłka do konkretnego systemu, dashboard | Osobne prace. Biblioteka daje tylko punkt podłączenia adaptera |
 | `begin`, `commit`, `rollback` | Yii wykonuje je bezpośrednio przez PDO, poza `Command`. Dodanie wymaga podpięcia pod zdarzenia `Connection` |
 | Rozpoznawanie jobów bez udziału aplikacji | Granice joba zna tylko kolejka. Pakiet daje API i opcjonalny behavior `yii2-queue`, bez zależności od kolejki ([ADR 0012](../adr/0012-konteksty-http-console-job.md)) |
@@ -70,7 +70,7 @@ Z tego wynika reszta: wyjątek w kolektorze lub adapterze jest przechwytywany i 
 
 ## 6. Kryteria sukcesu
 
-1. Seria operacji daje pełną listę wpisów z czasami i wynikami, w kolejności zakończenia. W HTTP lista kończy się na pierwszym osiągniętym limicie, a nadwyżka jest zliczona w `dropped`. W konsoli i w jobie seria jest podzielona na paczki bez utraty wpisów, poza wpisem większym niż cała paczka.
+1. Seria operacji daje pełną listę wpisów z czasami i wynikami, w kolejności zakończenia, w każdej wysłanej paczce. W HTTP lista kończy się na pierwszym osiągniętym limicie, a nadwyżka jest zliczona w `dropped`. W konsoli i w jobie seria jest podzielona na paczki bez utraty wpisów, poza wpisem większym niż cała paczka.
 2. Operacje z różnymi wartościami parametrów dają ten sam `query`. Paczka nie zawiera tych wartości.
 3. Active Record i zwykłe polecenia są mierzone bez zmian w kodzie aplikacji. Trafienie w cache Yii nie daje wpisu.
 4. Domyślny adapter zapisuje poprawne paczki, rotuje pliki i nie przerywa aplikacji przy błędzie zapisu.
@@ -98,6 +98,7 @@ Wymagania: PHP 8.1 lub nowszy, Yii 2.0.55 lub nowszy, Composer 2.1 lub nowszy (k
 | Kolektor | Obiekt w pamięci, który przyjmuje wpisy, pilnuje limitów i buduje paczkę |
 | Finalizacja | Koniec procesu dla pakietu: zakończenie wszystkich otwartych kontekstów i wysłanie ich reszty. Po niej żaden wpis nie jest zbierany |
 | Wykluczenie | Wzorzec z `excludedRoutes`, po którym kontekst nie zbiera ani nie wysyła swoich wpisów |
+| Próbkowanie | Decyzja tuż przed adapterem, czy wysłać całą paczkę: zawsze przy kryterium diagnostycznym, inaczej z prawdopodobieństwem `rate` ([01 §5.6](01-zbieranie-danych.md#56-próbkowanie-paczek)) |
 | Adapter | Obiekt lub `callable` z metodą `send(QueryBatch): void`, odbiorca paczki |
 | Akcja wejściowa | Pierwsza akcja kontrolera w żądaniu, zapamiętana z `EVENT_BEFORE_ACTION` aplikacji; w paczce jako `route` |
 | Ramka aplikacji | Ramka śladu wywołań z kodu aplikacji, nie z vendor, pakietu ani skryptu wejściowego ([02 §2](02-format-paczki.md#2-wpis)) |

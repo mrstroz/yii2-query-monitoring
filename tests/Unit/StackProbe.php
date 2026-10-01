@@ -10,6 +10,7 @@ use mrstroz\querymonitoring\batch\JobInfo;
 use mrstroz\querymonitoring\batch\QueryBatch;
 use mrstroz\querymonitoring\batch\QueryEntry;
 use mrstroz\querymonitoring\collector\QueryCollector;
+use mrstroz\querymonitoring\context\BatchSampling;
 use mrstroz\querymonitoring\context\ContextSettings;
 use mrstroz\querymonitoring\context\ContextStack;
 use mrstroz\querymonitoring\context\RouteExclusions;
@@ -51,6 +52,7 @@ final class StackProbe implements BatchAdapterInterface
         BatchType $root = BatchType::Http,
         int $flushIntervalSeconds = 30,
         ?RouteExclusions $exclusions = null,
+        ?BatchSampling $sampling = null,
     ) {
         $this->stack = new ContextStack(new Guard(), $this, new ContextSettings(
             function (BatchType $type, string $id, ?JobInfo $job) use ($maxEntries, $maxBatchBytes): QueryCollector {
@@ -63,6 +65,7 @@ final class StackProbe implements BatchAdapterInterface
             fn(): float => $this->now,
             $flushIntervalSeconds,
             $exclusions ?? RouteExclusions::none(),
+            $sampling,
         ));
         $this->stack->openRoot($root);
     }

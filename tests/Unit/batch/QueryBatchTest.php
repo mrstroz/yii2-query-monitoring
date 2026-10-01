@@ -9,10 +9,13 @@ use mrstroz\querymonitoring\batch\BatchType;
 use mrstroz\querymonitoring\batch\JobInfo;
 use mrstroz\querymonitoring\batch\QueryBatch;
 use mrstroz\querymonitoring\batch\QueryEntry;
+use mrstroz\querymonitoring\batch\Sample;
+use mrstroz\querymonitoring\batch\SampleReason;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * YQM-2 and YQM-49: spec 02 §1–§3, spec 03 §1.
+ * YQM-2, YQM-49 and YQM-58: spec 02 §1–§3, spec 03 §1.
  */
 final class QueryBatchTest extends TestCase
 {
@@ -34,7 +37,7 @@ final class QueryBatchTest extends TestCase
     public function testHeaderKeysFollowSpecOrder(): void
     {
         self::assertSame(
-            ['v', 'app', 'type', 'id', 'seq', 'route', 'job', 'ts', 'host', 'dropped', 'queries'],
+            ['v', 'app', 'type', 'id', 'seq', 'route', 'job', 'ts', 'host', 'dropped', 'sample', 'queries'],
             array_keys($this->specExample()->toArray()),
         );
     }
@@ -93,7 +96,7 @@ final class QueryBatchTest extends TestCase
         $batch = new QueryBatch('app', BatchType::Console, 'id1', 7, null, new \DateTimeImmutable('2026-09-22T09:41:05.000Z'), 'h', 3, []);
 
         self::assertSame(
-            '{"v":3,"app":"app","type":"console","id":"id1","seq":7,"route":null,"job":null,"ts":"2026-09-22T09:41:05.000Z","host":"h","dropped":3,"queries":[]}',
+            '{"v":4,"app":"app","type":"console","id":"id1","seq":7,"route":null,"job":null,"ts":"2026-09-22T09:41:05.000Z","host":"h","dropped":3,"sample":null,"queries":[]}',
             $batch->toJson(),
         );
     }
@@ -114,11 +117,113 @@ final class QueryBatchTest extends TestCase
         );
 
         self::assertSame(
-            '{"v":3,"app":"shop-api","type":"job","id":"5be0c7d2a8f14e39","seq":2,'
+            '{"v":4,"app":"shop-api","type":"job","id":"5be0c7d2a8f14e39","seq":2,'
             . '"route":"queue/listen","job":{"name":"app\\\\jobs\\\\SendInvoice","queue":"queue","message_id":"42","attempt":2},'
-            . '"ts":"2026-09-22T09:41:07.004Z","host":"worker-01","dropped":0,"queries":[]}',
+            . '"ts":"2026-09-22T09:41:07.004Z","host":"worker-01","dropped":0,"sample":null,"queries":[]}',
             $batch->toJson(),
         );
+    }
+
+    public function testSampledJobHeaderFromSpecIsProducedByteForByte(): void
+    {
+        $batch = new QueryBatch(
+            'shop-api',
+            BatchType::Job,
+            '5be0c7d2a8f14e39',
+            2,
+            'queue/listen',
+            new \DateTimeImmutable('2026-09-22T09:41:07.004Z'),
+            'worker-01',
+            0,
+            [],
+            JobInfo::create('app\\jobs\\SendInvoice', 'queue', 42, 2),
+            new Sample(0.1, SampleReason::Sample),
+        );
+
+        self::assertSame(
+            '{"v":4,"app":"shop-api","type":"job","id":"5be0c7d2a8f14e39","seq":2,'
+            . '"route":"queue/listen","job":{"name":"app\\\\jobs\\\\SendInvoice","queue":"queue","message_id":"42","attempt":2},'
+            . '"ts":"2026-09-22T09:41:07.004Z","host":"worker-01","dropped":0,"sample":{"rate":0.1,"reason":"sample"},"queries":[]}',
+            $batch->toJson(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{Sample, string}>
+     */
+    public static function provideSampleCases(): iterable
+    {
+        yield 'drawn at ten percent' => [new Sample(0.1, SampleReason::Sample), '{"rate":0.1,"reason":"sample"}'];
+        yield 'drawn at an integer rate one' => [new Sample(1, SampleReason::Sample), '{"rate":1.0,"reason":"sample"}'];
+        yield 'kept for an error' => [new Sample(1.0, SampleReason::Error), '{"rate":1.0,"reason":"error"}'];
+        yield 'kept for a slow query' => [new Sample(1.0, SampleReason::SlowQuery), '{"rate":1.0,"reason":"slow_query"}'];
+        yield 'kept for a slow batch' => [new Sample(1.0, SampleReason::SlowBatch), '{"rate":1.0,"reason":"slow_batch"}'];
+        yield 'kept for many queries' => [new Sample(1.0, SampleReason::ManyQueries), '{"rate":1.0,"reason":"many_queries"}'];
+        yield 'drawn at a long rate' => [new Sample(0.123456789, SampleReason::Sample), '{"rate":0.123456789,"reason":"sample"}'];
+    }
+
+    #[DataProvider('provideSampleCases')]
+    public function testSampleIsWrittenAfterDroppedWithRateAlwaysAsANumberWithAFraction(Sample $sample, string $json): void
+    {
+        $batch = $this->batch([QueryEntry::success('mysql', 'db', 'select', 'SELECT ?', 1.5, [])])->withSample($sample);
+
+        self::assertStringContainsString('"dropped":0,"sample":' . $json . ',"queries":[', $batch->toJson());
+    }
+
+    public function testWithSampleChangesOnlyTheSample(): void
+    {
+        $original = $this->specExample();
+
+        $sampled = $original->withSample(new Sample(0.25, SampleReason::Sample));
+
+        self::assertNull($original->sample, 'the original batch is not modified');
+        $expected = $original->toArray();
+        $expected['sample'] = ['rate' => 0.25, 'reason' => 'sample'];
+        self::assertSame($expected, $sampled->toArray());
+    }
+
+    /**
+     * Review finding 5: `withSample()` passes every property as a named argument, so each must be promoted from the
+     * constructor. The list below fails first when the constructor changes; the comparison then checks every field.
+     */
+    public function testWithSampleKeepsEveryOtherConstructorField(): void
+    {
+        $parameters = array_map(
+            static fn(\ReflectionParameter $p): string => $p->getName(),
+            (new \ReflectionMethod(QueryBatch::class, '__construct'))->getParameters(),
+        );
+        self::assertSame(
+            ['app', 'type', 'id', 'seq', 'route', 'ts', 'host', 'dropped', 'queries', 'job', 'sample'],
+            $parameters,
+            'a new header field: set it to a non-default value below and check that withSample() copies it',
+        );
+        $properties = array_map(
+            static fn(\ReflectionProperty $p): string => $p->getName(),
+            (new \ReflectionClass(QueryBatch::class))->getProperties(),
+        );
+        self::assertSame($parameters, $properties, 'withSample() passes every property as a named argument, so each one is promoted');
+        $original = new QueryBatch(
+            'shop-api',
+            BatchType::Job,
+            '5be0c7d2a8f14e39',
+            7,
+            'queue/listen',
+            new \DateTimeImmutable('2026-09-22T09:41:07.004Z'),
+            'worker-01',
+            3,
+            [QueryEntry::success('mysql', 'db', 'select', 'SELECT ?', 1.5, [])],
+            JobInfo::create('app\\jobs\\SendInvoice', 'queue', 42, 2),
+            new Sample(0.5, SampleReason::Sample),
+        );
+
+        $sampled = $original->withSample(new Sample(1.0, SampleReason::Error));
+
+        foreach ($parameters as $name) {
+            if ($name !== 'sample') {
+                self::assertSame($original->{$name}, $sampled->{$name}, $name);
+            }
+        }
+        self::assertEquals(new Sample(1.0, SampleReason::Error), $sampled->sample);
     }
 
     public function testJobWithUnknownMetadataKeepsAllFourKeys(): void
