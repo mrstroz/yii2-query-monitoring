@@ -15,6 +15,8 @@ use mrstroz\querymonitoring\context\BatchSampling;
 use mrstroz\querymonitoring\context\ContextSettings;
 use mrstroz\querymonitoring\context\ContextStack;
 use mrstroz\querymonitoring\context\RouteExclusions;
+use mrstroz\querymonitoring\context\UserSource;
+use mrstroz\querymonitoring\context\UserValueException;
 use mrstroz\querymonitoring\mongodb\MongoDbNormalizer;
 use mrstroz\querymonitoring\mongodb\Source as MongoDbSource;
 use mrstroz\querymonitoring\sql\Source as SqlSource;
@@ -107,6 +109,23 @@ class QueryMonitor extends Component implements BootstrapInterface
      * @var array<string, mixed>|null
      */
     public mixed $sampling = null;
+
+    /**
+     * Source of the header field `user` (spec 01 §5.7): `null` leaves it null; `true` takes the id of the identity the
+     * application already loaded in its `yii\web\User` component, without loading it (no session, no
+     * `findIdentity()`); a callable, e.g. `[UserIds::class, 'of']` or `fn(QueryBatch $batch) => ...`, gets each sent
+     * batch and returns the id, not the identity: an int, a Stringable (e.g. a MongoDB ObjectId), null, or a valid
+     * UTF-8 string of at most 66 bytes as JSON with {@see QueryBatch::JSON_FLAGS}, quotes included (64 ASCII
+     * characters without `"` or `\`; escaped and multi-byte characters take more). A wrong value or an exception of
+     * the source gives null with one `Yii::error` of its own per process, never with the value; any other setting
+     * disables the package. The source must not load the identity itself (`getId()`, `getIdentity()`): it runs when
+     * the batch is sent, possibly after the headers, and would change the session and the login state.
+     *
+     * Not typed natively, like {@see self::$sampling}.
+     *
+     * @var bool|callable|null
+     */
+    public mixed $user = null;
 
     private ?Guard $guard = null;
     private ?ContextStack $contexts = null;
@@ -259,6 +278,9 @@ class QueryMonitor extends Component implements BootstrapInterface
         }
         $exclusions = RouteExclusions::fromConfig($this->excludedRoutes);
         $sampling = BatchSampling::fromConfig($this->sampling);
+        // Its own guard: a source failing at every batch must not take the one log entry of the adapter, and it logs
+        // the message of a rejected value only, never of an exception the source threw (spec 01 §5.7, §6).
+        $user = UserSource::fromConfig($this->user, new Guard([UserValueException::class]));
         $this->batchAdapter = $this->resolveAdapter();
         $contexts = new ContextStack($guard, $this->batchAdapter, new ContextSettings(
             fn(BatchType $type, string $id, ?JobInfo $job): QueryCollector => $this->createCollector($type, $id, $job),
@@ -266,6 +288,7 @@ class QueryMonitor extends Component implements BootstrapInterface
             $this->flushIntervalSeconds,
             $exclusions,
             $sampling,
+            $user,
         ));
         $contexts->openRoot($app instanceof \yii\console\Application ? BatchType::Console : BatchType::Http);
         $sources = $this->createSources($contexts, $guard, CallerFrames::forProcess());

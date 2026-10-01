@@ -17,7 +17,8 @@ use mrstroz\querymonitoring\support\Guard;
  * The one object the sources hold: every entry goes to the deepest open context, so a new batch or a new job
  * needs no change in any recorder. The stack also holds the re-entry flag of spec 01 §6 and is the only place
  * that calls the adapter, each batch inside its own guard, so a failed batch never stops the next one. Sampling
- * decides there whether a finished batch reaches the adapter at all (spec 01 §5.6).
+ * decides there whether a finished batch reaches the adapter at all (spec 01 §5.6), and the `user` of a kept batch is
+ * read there too (spec 01 §5.7).
  *
  * @internal handed to the sources by {@see \mrstroz\querymonitoring\QueryMonitor::createSources()}; its methods
  * are not an extension point and may change
@@ -224,7 +225,8 @@ final class ContextStack
     /**
      * Sends one batch with intake paused, so queries the adapter runs are not entries of any context. With sampling
      * on, a batch it does not keep never reaches the adapter and nothing is logged (spec 01 §5.6); the context
-     * already closed its buffer and moved on to the next `seq`.
+     * already closed its buffer and moved on to the next `seq`. The `user` source runs only for a kept batch, still with
+     * intake paused, so its own queries are not entries; its failure leaves `user` null and the batch is sent.
      */
     private function send(QueryBatch $batch): void
     {
@@ -239,6 +241,10 @@ final class ContextStack
                         return;
                     }
                     $batch = $batch->withSample($sample);
+                }
+                $user = $this->settings->user?->resolve($batch);
+                if ($user !== null) {
+                    $batch = $batch->withUser($user);
                 }
                 $this->adapter->send($batch);
             }, 'send');

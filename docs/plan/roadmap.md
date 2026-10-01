@@ -4,8 +4,8 @@
 
 | Pole | Wartość |
 |---|---|
-| **Etap** | E5a. Próbkowanie paczek, 3 z 3, zakończony |
-| **Ostatnio ukończone** | [YQM-57..59](06a-probkowanie.md): `sampling` wysyła zwykłą paczkę z prawdopodobieństwem `rate` i zawsze paczkę z błędem, wolnym zapytaniem, dużym czasem łącznym albo dużą liczbą zapytań; wybór z hasha `id` i `seq`; pole `sample` i format `v: 4` dla każdej paczki ([ADR 0014](../adr/0014-probkowanie-calych-paczek-przed-adapterem.md)). Odbiorca musi przyjmować `v: 4` przed aktualizacją pakietu i ważyć metryki przed włączeniem próbkowania ([spec 02 §7](../spec/02-format-paczki.md#7-próbkowanie-po-stronie-odbiorcy)) |
+| **Etap** | E5b. Identyfikator użytkownika w paczce, 1 z 1, zakończony |
+| **Ostatnio ukończone** | [YQM-60](06b-uzytkownik.md): pole `user` w nagłówku każdej paczki `v: 4`; opcja `user` bierze identyfikator tożsamości już wczytanej przez `yii\web\User` (bez sesji i bez `findIdentity()`) albo wartość z `callable` ([ADR 0015](../adr/0015-identyfikator-uzytkownika-w-paczce.md)). Wcześniej [YQM-57..59](06a-probkowanie.md): próbkowanie całych paczek i format `v: 4` ([ADR 0014](../adr/0014-probkowanie-calych-paczek-przed-adapterem.md)). Odbiorca musi przyjmować `v: 4` z polami `user` i `sample` przed aktualizacją pakietu ([spec 02 §7](../spec/02-format-paczki.md#7-próbkowanie-po-stronie-odbiorcy)) |
 | **Następne** | Spisanie zadań [E6](07-wydajnosc-i-odbior.md) (wydajność i odbiór) według obowiązkowych punktów z tego pliku |
 
 Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trzeba zajrzeć na początku sesji.
@@ -23,9 +23,10 @@ Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trze
 | **E4b** | [05b-pelniejszy-query-mongodb](05b-pelniejszy-query-mongodb.md) | Pełniejszy `query` MongoDB | Głęboki potok Atlas Search, `distinct` i długie polecenie mają tekst `query` | 3/3 |
 | **E5** | [06-konsola](06-konsola.md) | Konsola i joby | Wiele paczek z `seq` na komendę i na próbę joba, wykluczony listener, adapter plikowy dla dwóch użytkowników | 11/11 |
 | **E5a** | [06a-probkowanie](06a-probkowanie.md) | Próbkowanie paczek | Część zwykłych paczek i każda diagnostyczna, `sample` z prawdopodobieństwem w formacie `v: 4` | 3/3 |
+| **E5b** | [06b-uzytkownik](06b-uzytkownik.md) | Identyfikator użytkownika | Pole `user` z tożsamości wczytanej przez aplikację albo z `callable`, bez dodatkowych zapytań | 1/1 |
 | **E6** | [07-wydajnosc-i-odbior](07-wydajnosc-i-odbior.md) | Test wydajności, dokumentacja | Narzut w progu, limity potwierdzone, README pakietu | – |
 
-59 zadań spisanych. Jedno zadanie to jedna sesja i jeden commit.
+60 zadań spisanych. Jedno zadanie to jedna sesja i jeden commit.
 
 ## Dlaczego w tej kolejności
 
@@ -37,7 +38,7 @@ E2 przed E4 i E5, bo zestaw testów po dwóch etapach przestał mieć jedną zas
 
 E3 przed E4, bo zmienia kontrakt paczki: `v: 2` z `caller` we wpisie i `route` w nagłówku. MongoDB dokłada drugie źródło wpisów, więc wchodzi od razu w nowym formacie, zamiast przerabiać dwa źródła naraz.
 
-E5 po E4, bo limity konsoli i `seq` mają sens dopiero z oboma źródłami, a stos kontekstów musi obsłużyć recordery obu. E5a po E5, bo decyzja o wysłaniu dotyczy paczek wszystkich trzech kontekstów, a luki w `seq` mają sens dopiero przy wielu paczkach. E6 na końcu, bo test wydajności mierzy całość z normalizacją i zapisem, a limity w spec są wartościami początkowymi do korekty tym pomiarem.
+E5 po E4, bo limity konsoli i `seq` mają sens dopiero z oboma źródłami, a stos kontekstów musi obsłużyć recordery obu. E5a po E5, bo decyzja o wysłaniu dotyczy paczek wszystkich trzech kontekstów, a luki w `seq` mają sens dopiero przy wielu paczkach. E5b po E5a, bo identyfikator użytkownika wchodzi do niewydanego jeszcze formatu `v: 4` i jest odczytywany dopiero dla paczki, którą próbkowanie zachowało. E6 na końcu, bo test wydajności mierzy całość z normalizacją i zapisem, a limity w spec są wartościami początkowymi do korekty tym pomiarem.
 
 Efekt uboczny: do końca E3 pakiet nie ma MongoDB, więc demo w aplikacji z MongoDB pokaże tylko połowę zapytań.
 

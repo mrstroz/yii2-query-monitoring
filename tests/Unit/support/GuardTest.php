@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace mrstroz\querymonitoring\tests\Unit\support;
 
 use mrstroz\querymonitoring\adapter\FileAdapterException;
+use mrstroz\querymonitoring\context\UserValueException;
 use mrstroz\querymonitoring\support\Guard;
 use mrstroz\querymonitoring\tests\Unit\LoggedTestCase;
 
@@ -88,5 +89,50 @@ final class GuardTest extends LoggedTestCase
     private function throwing(): int
     {
         throw new \RuntimeException('boom');
+    }
+
+    public function testDefaultTrustedClassesAreThePackageOnes(): void
+    {
+        self::assertSame(
+            [\yii\base\InvalidConfigException::class, FileAdapterException::class, \mrstroz\querymonitoring\context\ContextLimitException::class],
+            Guard::DEFAULT_TRUSTED,
+        );
+        (new Guard())->run(static fn(): mixed => throw new \yii\base\InvalidConfigException('QueryMonitor::$app is required.'), 'bootstrap');
+
+        self::assertSame(
+            ['Query monitoring failed in bootstrap with yii\base\InvalidConfigException: QueryMonitor::$app is required.'],
+            array_column($this->errors(), 0),
+        );
+    }
+
+    /**
+     * Review finding 3: the `user` source's guard trusts only the rejected-value exception, so a configuration error
+     * the source itself throws is logged by its class.
+     */
+    public function testGivenTrustedClassesReplaceTheDefaultOnes(): void
+    {
+        $guard = new Guard([UserValueException::class]);
+        $guard->run(static fn(): mixed => throw new \yii\base\InvalidConfigException('qm-user-marker 1187'), 'user');
+        $other = new Guard([UserValueException::class]);
+        $other->run(static fn(): mixed => throw new UserValueException('got array'), 'user');
+
+        self::assertSame(
+            ['Query monitoring failed in user with yii\base\InvalidConfigException', 'Query monitoring failed in user with ' . UserValueException::class . ': got array'],
+            array_column($this->errors(), 0),
+        );
+    }
+
+    public function testRejectedUserValueIsNotTrustedByTheDefaultGuard(): void
+    {
+        (new Guard())->run(static fn(): mixed => throw new UserValueException('got array'), 'send');
+
+        self::assertSame(['Query monitoring failed in send with ' . UserValueException::class], array_column($this->errors(), 0));
+    }
+
+    public function testSubclassOfATrustedClassIsTrusted(): void
+    {
+        (new Guard([\RuntimeException::class]))->run(static fn(): mixed => throw new \UnexpectedValueException('names the reason'), 'test');
+
+        self::assertSame(['Query monitoring failed in test with UnexpectedValueException: names the reason'], array_column($this->errors(), 0));
     }
 }

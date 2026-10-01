@@ -19,7 +19,7 @@ chgrp "$GROUP" "$DIR"
 chmod 2775 "$DIR"
 
 # 1. Alternating writes and rotations by both users: every send succeeds, every line is valid JSON.
-# A one-entry batch is a 295-byte line in format v: 4, so the file rotates at every seventh line. The 72 lines
+# A one-entry batch is a 307-byte line in format v: 4, so the file rotates at every seventh line. The 72 lines
 # written below leave two in the current file, which the checks after the loop read; keep the total off a
 # multiple of seven.
 for round in 1 2 3 4 5 6; do

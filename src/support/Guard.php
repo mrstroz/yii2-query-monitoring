@@ -18,7 +18,22 @@ final class Guard
 {
     public const LOG_CATEGORY = 'mrstroz\querymonitoring';
 
+    /**
+     * Exceptions whose message is logged by default: configuration errors, the file adapter's, whose message names the
+     * operation and the path, and the context limit, which names the limit.
+     */
+    public const DEFAULT_TRUSTED = [
+        \yii\base\InvalidConfigException::class,
+        FileAdapterException::class,
+        ContextLimitException::class,
+    ];
+
     private bool $logged = false;
+
+    /**
+     * @param list<class-string<\Throwable>> $trusted exceptions whose message is logged; any other is logged by class
+     */
+    public function __construct(private readonly array $trusted = self::DEFAULT_TRUSTED) {}
 
     /**
      * @template T
@@ -40,9 +55,8 @@ final class Guard
     }
 
     /**
-     * Only the package's own exceptions carry their message: configuration errors, the file adapter's,
-     * whose message names the operation and the path, and the context limit, which names the limit. Any other exception is logged by
-     * class, because its message may quote SQL.
+     * Only an exception of a trusted class carries its message. Any other exception is logged by class, because its
+     * message may quote SQL or data.
      */
     private function log(\Throwable $e, string $context): void
     {
@@ -50,8 +64,10 @@ final class Guard
             return;
         }
         $this->logged = true;
-        $trusted = $e instanceof \yii\base\InvalidConfigException || $e instanceof FileAdapterException
-            || $e instanceof ContextLimitException;
+        $trusted = false;
+        foreach ($this->trusted as $class) {
+            $trusted = $trusted || $e instanceof $class;
+        }
         $detail = $trusted ? ': ' . $e->getMessage() : '';
 
         try {

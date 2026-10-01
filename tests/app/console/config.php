@@ -7,7 +7,7 @@ declare(strict_types=1);
  * without the components and settings only a web application knows.
  */
 $config = require dirname(__DIR__) . '/config.php';
-unset($config['components']['request'], $config['components']['urlManager']);
+unset($config['components']['request'], $config['components']['urlManager'], $config['components']['user'], $config['components']['session']);
 $config['id'] = 'qm-test-console';
 $config['controllerNamespace'] = 'mrstroz\querymonitoring\tests\app\console\controllers';
 // A real exit(1) after an unhandled exception, as in production; YII_ENV_TEST would silence it.

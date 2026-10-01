@@ -253,6 +253,9 @@ final class Context
         if ($this->settings->sampling !== null) {
             $collector->reserveSample($this->settings->sampling->widest());
         }
+        if ($this->settings->user !== null) {
+            $collector->reserveUser(UserSource::widest());
+        }
         if ($this->route !== null) {
             $collector->setRoute($this->route);
         }

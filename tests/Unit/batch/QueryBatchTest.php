@@ -37,7 +37,7 @@ final class QueryBatchTest extends TestCase
     public function testHeaderKeysFollowSpecOrder(): void
     {
         self::assertSame(
-            ['v', 'app', 'type', 'id', 'seq', 'route', 'job', 'ts', 'host', 'dropped', 'sample', 'queries'],
+            ['v', 'app', 'type', 'id', 'seq', 'route', 'job', 'ts', 'host', 'user', 'dropped', 'sample', 'queries'],
             array_keys($this->specExample()->toArray()),
         );
     }
@@ -96,7 +96,7 @@ final class QueryBatchTest extends TestCase
         $batch = new QueryBatch('app', BatchType::Console, 'id1', 7, null, new \DateTimeImmutable('2026-09-22T09:41:05.000Z'), 'h', 3, []);
 
         self::assertSame(
-            '{"v":4,"app":"app","type":"console","id":"id1","seq":7,"route":null,"job":null,"ts":"2026-09-22T09:41:05.000Z","host":"h","dropped":3,"sample":null,"queries":[]}',
+            '{"v":4,"app":"app","type":"console","id":"id1","seq":7,"route":null,"job":null,"ts":"2026-09-22T09:41:05.000Z","host":"h","user":null,"dropped":3,"sample":null,"queries":[]}',
             $batch->toJson(),
         );
     }
@@ -119,7 +119,7 @@ final class QueryBatchTest extends TestCase
         self::assertSame(
             '{"v":4,"app":"shop-api","type":"job","id":"5be0c7d2a8f14e39","seq":2,'
             . '"route":"queue/listen","job":{"name":"app\\\\jobs\\\\SendInvoice","queue":"queue","message_id":"42","attempt":2},'
-            . '"ts":"2026-09-22T09:41:07.004Z","host":"worker-01","dropped":0,"sample":null,"queries":[]}',
+            . '"ts":"2026-09-22T09:41:07.004Z","host":"worker-01","user":null,"dropped":0,"sample":null,"queries":[]}',
             $batch->toJson(),
         );
     }
@@ -143,7 +143,7 @@ final class QueryBatchTest extends TestCase
         self::assertSame(
             '{"v":4,"app":"shop-api","type":"job","id":"5be0c7d2a8f14e39","seq":2,'
             . '"route":"queue/listen","job":{"name":"app\\\\jobs\\\\SendInvoice","queue":"queue","message_id":"42","attempt":2},'
-            . '"ts":"2026-09-22T09:41:07.004Z","host":"worker-01","dropped":0,"sample":{"rate":0.1,"reason":"sample"},"queries":[]}',
+            . '"ts":"2026-09-22T09:41:07.004Z","host":"worker-01","user":null,"dropped":0,"sample":{"rate":0.1,"reason":"sample"},"queries":[]}',
             $batch->toJson(),
         );
     }
@@ -183,25 +183,80 @@ final class QueryBatchTest extends TestCase
     }
 
     /**
-     * Review finding 5: `withSample()` passes every property as a named argument, so each must be promoted from the
-     * constructor. The list below fails first when the constructor changes; the comparison then checks every field.
+     * @return iterable<string, array{?string, string}>
      */
-    public function testWithSampleKeepsEveryOtherConstructorField(): void
+    public static function provideUserCases(): iterable
+    {
+        yield 'none' => [null, '"user":null'];
+        yield 'a number as text' => ['42', '"user":"42"'];
+        yield 'unicode and a slash, not escaped' => ['zażółć/7', '"user":"zażółć/7"'];
+        yield 'a quote, escaped' => ['a"b', '"user":"a\\"b"'];
+    }
+
+    #[DataProvider('provideUserCases')]
+    public function testUserIsWrittenAfterHostAndBeforeDropped(?string $user, string $json): void
+    {
+        $batch = $this->batch([])->withUser($user);
+
+        self::assertStringContainsString('"host":"host",' . $json . ',"dropped":0,', $batch->toJson());
+        self::assertSame($user, $batch->toArray()['user']);
+    }
+
+    public function testWithUserChangesOnlyTheUser(): void
+    {
+        $original = $this->specExample()->withSample(new Sample(0.25, SampleReason::Sample));
+
+        $named = $original->withUser('u-7');
+
+        self::assertSame('1187', $original->user, 'the original batch is not modified');
+        $expected = $original->toArray();
+        $expected['user'] = 'u-7';
+        self::assertSame($expected, $named->toArray());
+        self::assertNull($named->withUser(null)->user);
+    }
+
+    /**
+     * @return iterable<string, array{string, \Closure(QueryBatch): QueryBatch, \Closure(QueryBatch): void}>
+     */
+    public static function provideCopyCases(): iterable
+    {
+        yield 'withSample' => [
+            'sample',
+            static fn(QueryBatch $batch): QueryBatch => $batch->withSample(new Sample(1.0, SampleReason::Error)),
+            static fn(QueryBatch $copy) => self::assertEquals(new Sample(1.0, SampleReason::Error), $copy->sample),
+        ];
+        yield 'withUser' => [
+            'user',
+            static fn(QueryBatch $batch): QueryBatch => $batch->withUser('u-7'),
+            static fn(QueryBatch $copy) => self::assertSame('u-7', $copy->user),
+        ];
+    }
+
+    /**
+     * Review finding 5: `withSample()` and `withUser()` pass every property as a named argument, so each must be
+     * promoted from the constructor. The list below fails first when the constructor changes; the comparison then
+     * checks every field.
+     *
+     * @param \Closure(QueryBatch): QueryBatch $copy
+     * @param \Closure(QueryBatch): void $assertChanged
+     */
+    #[DataProvider('provideCopyCases')]
+    public function testCopyKeepsEveryOtherConstructorField(string $changed, \Closure $copy, \Closure $assertChanged): void
     {
         $parameters = array_map(
             static fn(\ReflectionParameter $p): string => $p->getName(),
             (new \ReflectionMethod(QueryBatch::class, '__construct'))->getParameters(),
         );
         self::assertSame(
-            ['app', 'type', 'id', 'seq', 'route', 'ts', 'host', 'dropped', 'queries', 'job', 'sample'],
+            ['app', 'type', 'id', 'seq', 'route', 'ts', 'host', 'dropped', 'queries', 'job', 'sample', 'user'],
             $parameters,
-            'a new header field: set it to a non-default value below and check that withSample() copies it',
+            'a new header field: set it to a non-default value below and check that both copies keep it',
         );
         $properties = array_map(
             static fn(\ReflectionProperty $p): string => $p->getName(),
             (new \ReflectionClass(QueryBatch::class))->getProperties(),
         );
-        self::assertSame($parameters, $properties, 'withSample() passes every property as a named argument, so each one is promoted');
+        self::assertSame($parameters, $properties, 'the copies pass every property as a named argument, so each one is promoted');
         $original = new QueryBatch(
             'shop-api',
             BatchType::Job,
@@ -214,16 +269,17 @@ final class QueryBatchTest extends TestCase
             [QueryEntry::success('mysql', 'db', 'select', 'SELECT ?', 1.5, [])],
             JobInfo::create('app\\jobs\\SendInvoice', 'queue', 42, 2),
             new Sample(0.5, SampleReason::Sample),
+            '1187',
         );
 
-        $sampled = $original->withSample(new Sample(1.0, SampleReason::Error));
+        $result = $copy($original);
 
         foreach ($parameters as $name) {
-            if ($name !== 'sample') {
-                self::assertSame($original->{$name}, $sampled->{$name}, $name);
+            if ($name !== $changed) {
+                self::assertSame($original->{$name}, $result->{$name}, $name);
             }
         }
-        self::assertEquals(new Sample(1.0, SampleReason::Error), $sampled->sample);
+        $assertChanged($result);
     }
 
     public function testJobWithUnknownMetadataKeepsAllFourKeys(): void
@@ -269,6 +325,7 @@ final class QueryBatchTest extends TestCase
                 QueryEntry::success('mongodb', 'mongodb', 'find', 'contacts filter{externalId:?,tenantId:?} sort{updatedAt:?} limit:?', 1.3, ['components/ContactRepository.php:88', 'modules/admin/modules/orders/controllers/OrderController.php:52']),
                 QueryEntry::success('mysql', 'db', 'select', null, 0.7, []),
             ],
+            user: '1187',
         );
     }
 

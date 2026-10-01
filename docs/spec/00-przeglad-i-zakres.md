@@ -27,7 +27,7 @@ Paczka ma odpowiadać na trzy pytania:
 
 **Biblioteka nigdy nie zmienia wyniku operacji bazodanowej ani odpowiedzi aplikacji.**
 
-Z tego wynika reszta: wyjątek w kolektorze lub adapterze jest przechwytywany i logowany, a nie propagowany. Gdy paczka przekracza limit, wpisy przepadają i są liczone, zamiast blokować żądanie. Gdy plik jest zajęty, paczka przepada, zamiast czekać. Wartości parametrów nie trafiają do paczki, więc biblioteka nie może stać się kanałem wycieku danych.
+Z tego wynika reszta: wyjątek w kolektorze lub adapterze jest przechwytywany i logowany, a nie propagowany. Gdy paczka przekracza limit, wpisy przepadają i są liczone, zamiast blokować żądanie. Gdy plik jest zajęty, paczka przepada, zamiast czekać. Wartości parametrów nie trafiają do paczki, więc biblioteka nie może stać się kanałem wycieku danych. Jedynym wyjątkiem jest identyfikator użytkownika, który aplikacja może świadomie włączyć ([01 §5.7](01-zbieranie-danych.md#57-identyfikator-użytkownika), [ADR 0015](../adr/0015-identyfikator-uzytkownika-w-paczce.md)).
 
 ## 3. Zakres wersji 1
 
@@ -38,7 +38,7 @@ Z tego wynika reszta: wyjątek w kolektorze lub adapterze jest przechwytywany i 
 | Konteksty | Żądanie HTTP w PHP-FPM, zadanie konsolowe `php yii ...`, job oznaczony przez `beginJob()` i `endJob()` albo behavior `yii2-queue`, także zagnieżdżony synchronicznie |
 | Wykluczenia | Trasy HTTP i komend oraz nazwy jobów wyłączone z pomiaru w konfiguracji |
 | Dane | Wszystkie polecenia wysłane do bazy, bez progu czasu i bez próbkowania wpisów. Opcjonalne próbkowanie całych paczek przed adapterem ([01 §5.6](01-zbieranie-danych.md#56-próbkowanie-paczek)) |
-| Paczka | Nagłówek z akcją wejściową, płaska lista wpisów, licznik pominiętych |
+| Paczka | Nagłówek z akcją wejściową, płaska lista wpisów, licznik pominiętych. Opcjonalnie identyfikator użytkownika ([01 §5.7](01-zbieranie-danych.md#57-identyfikator-użytkownika)) |
 | Normalizacja | Usunięcie wartości z SQL i z dokumentów MongoDB |
 | Adapter | Kontrakt `send(QueryBatch): void`, obiekt lub `callable` |
 | Adapter plikowy | JSON Lines w `runtime/logs`, rotacja po rozmiarze, wspólna blokada |
@@ -54,6 +54,7 @@ Z tego wynika reszta: wyjątek w kolektorze lub adapterze jest przechwytywany i 
 | Rozpoznawanie jobów bez udziału aplikacji | Granice joba zna tylko kolejka. Pakiet daje API i opcjonalny behavior `yii2-queue`, bez zależności od kolejki ([ADR 0012](../adr/0012-konteksty-http-console-job.md)) |
 | Wykonania równoległe w jednym procesie (fibers) | Stos kontekstów zakłada zagnieżdżenie synchroniczne |
 | Wynik joba i treść wyjątku w paczce | Paczka opisuje zapytania, nie job. Treść wyjątku może zawierać dane |
+| Inne dane użytkownika niż jeden identyfikator, hashowanie identyfikatora przez pakiet | Paczka opisuje zapytania. Aplikacja, która chce skrótu zamiast identyfikatora, zwraca go ze źródła ([ADR 0015](../adr/0015-identyfikator-uzytkownika-w-paczce.md)) |
 | RoadRunner, Swoole dla HTTP | Wymaga resetu stanu kolektora między żądaniami |
 | NFS i współdzielone wolumeny | Blokada `flock` na NFS nie jest wiarygodna |
 | Własne klasy `Command`, dynamiczne połączenia | Podmiana klasy działa tylko dla połączeń z konfiguracji |
@@ -99,6 +100,7 @@ Wymagania: PHP 8.1 lub nowszy, Yii 2.0.55 lub nowszy, Composer 2.1 lub nowszy (k
 | Finalizacja | Koniec procesu dla pakietu: zakończenie wszystkich otwartych kontekstów i wysłanie ich reszty. Po niej żaden wpis nie jest zbierany |
 | Wykluczenie | Wzorzec z `excludedRoutes`, po którym kontekst nie zbiera ani nie wysyła swoich wpisów |
 | Próbkowanie | Decyzja tuż przed adapterem, czy wysłać całą paczkę: zawsze przy kryterium diagnostycznym, inaczej z prawdopodobieństwem `rate` ([01 §5.6](01-zbieranie-danych.md#56-próbkowanie-paczek)) |
+| Identyfikator użytkownika | Pole `user` nagłówka: identyfikator zalogowanego użytkownika jako tekst albo `null`, tylko przy włączonej opcji `user` ([01 §5.7](01-zbieranie-danych.md#57-identyfikator-użytkownika)) |
 | Adapter | Obiekt lub `callable` z metodą `send(QueryBatch): void`, odbiorca paczki |
 | Akcja wejściowa | Pierwsza akcja kontrolera w żądaniu, zapamiętana z `EVENT_BEFORE_ACTION` aplikacji; w paczce jako `route` |
 | Ramka aplikacji | Ramka śladu wywołań z kodu aplikacji, nie z vendor, pakietu ani skryptu wejściowego ([02 §2](02-format-paczki.md#2-wpis)) |

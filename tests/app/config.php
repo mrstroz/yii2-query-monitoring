@@ -6,6 +6,7 @@ use mrstroz\querymonitoring\QueryMonitor;
 use mrstroz\querymonitoring\tests\app\CaptureAdapter;
 use mrstroz\querymonitoring\tests\app\JsonLogTarget;
 use mrstroz\querymonitoring\tests\app\modules\admin\Module as AdminModule;
+use mrstroz\querymonitoring\tests\app\TestIdentity;
 use mrstroz\querymonitoring\tests\app\TestPdo;
 
 /**
@@ -78,6 +79,25 @@ return [
             $db = $app->get('db');
             assert($db instanceof yii\db\Connection);
             $db->createCommand('SELECT 1 AS qm_bootstrap')->queryScalar();
+        }] : []), ...(getenv('QM_AFTER_REQUEST') === '1' ? [static function (yii\base\Application $app): void {
+            // QM_AFTER_REQUEST=1: registered after the package's bootstrap, so it runs after the package's
+            // finalisation in both EVENT_AFTER_REQUEST and the shutdown fallback (YQM-60). It only reads: nothing is
+            // created, loaded or opened.
+            register_shutdown_function(static function () use ($app): void {
+                $userComponentCreated = $app->has('user', true);
+                $user = $userComponentCreated ? $app->get('user') : null;
+                $identityLoaded = false;
+                if ($user instanceof yii\web\User) {
+                    $property = new ReflectionProperty(yii\web\User::class, '_identity');
+                    $identityLoaded = $property->getValue($user) !== false;
+                }
+                file_put_contents($app->getRuntimePath() . '/after-request.json', json_encode([
+                    'userComponentCreated' => $userComponentCreated,
+                    'sessionActive' => session_status() === PHP_SESSION_ACTIVE,
+                    'findIdentityCalls' => TestIdentity::$finds,
+                    'identityLoaded' => $identityLoaded,
+                ]));
+            });
         }] : [])],
     'modules' => [
         'admin' => [
@@ -87,6 +107,15 @@ return [
     ],
     'components' => [
         'cache' => yii\caching\ArrayCache::class,
+        // QM_USER_COMPONENT=other: a `user` component that is not a yii\web\User (YQM-60).
+        'user' => getenv('QM_USER_COMPONENT') === 'other' ? yii\base\Component::class : [
+            'class' => yii\web\User::class,
+            'identityClass' => TestIdentity::class,
+            'enableSession' => true,
+            'enableAutoLogin' => false,
+        ],
+        // Files under the run's @runtime; web/index.php presets one for QM_SESSION_USER.
+        'session' => ['savePath' => '@runtime/sessions'],
         'db' => $connection,
         'dbOther' => $connection,
         'mongodb' => $mongodb,

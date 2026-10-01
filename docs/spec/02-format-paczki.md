@@ -1,12 +1,12 @@
 # 02. Format paczki
 
-Kontrakt między kolektorem a każdym adapterem. Zmiana pola oznacza nowe `v`.
+Kontrakt między kolektorem a każdym adapterem. Zmiana pola oznacza nowe `v`. Wyjątkiem jest wersja jeszcze niewydana: pole `user` weszło do `v: 4` przed pierwszym wydaniem pakietu z tą wersją ([ADR 0015](../adr/0015-identyfikator-uzytkownika-w-paczce.md)).
 
 ## 1. Nagłówek
 
 | Pole | Typ | Znaczenie |
 |---|---|---|
-| `v` | int | Wersja formatu, dziś `4`. Wersja `3` nie miała pola `sample`. Wersja `2` nie miała pola `job` ani typu `job`. Wersja `1` miała zamiast `route` pola `module`, `controller` i `action`, a wpis nie miał `caller` |
+| `v` | int | Wersja formatu, dziś `4`. Wersja `3` nie miała pól `user` i `sample`. Wersja `2` nie miała pola `job` ani typu `job`. Wersja `1` miała zamiast `route` pola `module`, `controller` i `action`, a wpis nie miał `caller` |
 | `app` | string | Wartość `app` z konfiguracji |
 | `type` | `http` \| `console` \| `job` | Typ kontekstu ([01 §5.1](01-zbieranie-danych.md#51-konteksty)) |
 | `id` | string | Losowy identyfikator kontekstu generowany przez bibliotekę, wspólny dla wszystkich jego paczek: 16 znaków `[0-9a-f]` z `random_bytes(8)`. W `job` identyfikuje jedną próbę wykonania, nie wiadomość kolejki |
@@ -15,11 +15,12 @@ Kontrakt między kolektorem a każdym adapterem. Zmiana pola oznacza nowe `v`.
 | `job` | object \| null | `null` dla `http` i `console`. Dla `job` obiekt z czterema kluczami w tej kolejności: `name` (string, nazwa klasy albo handlera), `queue` (string \| null, nazwa kolejki), `message_id` (string \| null, id wiadomości w kolejce, liczba zamieniona na tekst), `attempt` (int \| null, numer próby od 1). Każdy tekst obcięty do 255 bajtów UTF-8 razem z `…`, na granicy znaku. `attempt` mniejszy od `1` daje `null`. Pusty `name` daje `unknown` |
 | `ts` | string | Moment wysyłki, ISO 8601 w UTC |
 | `host` | string | Wynik `gethostname()`, pusty tekst, gdy funkcja zwróci `false` |
+| `user` | string \| null | Identyfikator użytkownika ze źródła ustawionego opcją `user` ([01 §5.7](01-zbieranie-danych.md#57-identyfikator-użytkownika)), liczba całkowita i obiekt `Stringable` (np. `ObjectId`) jako tekst. Najwyżej 66 bajtów w JSON z `QueryBatch::JSON_FLAGS` razem z cudzysłowami, np. 64 znaki ASCII bez `"` i `\`; znaki poprzedzane w JSON przez `\` i znaki wielobajtowe zajmują więcej. `null`, gdy opcja nie jest ustawiona, gdy źródło nie podało identyfikatora albo podało niepoprawny |
 | `dropped` | int | Wpisy pominięte po przekroczeniu limitu |
 | `sample` | object \| null | `null`, gdy `sampling` nie jest ustawione ([01 §5.6](01-zbieranie-danych.md#56-próbkowanie-paczek)). Inaczej obiekt z dwoma kluczami w tej kolejności: `rate` (liczba, prawdopodobieństwo, z jakim ta paczka została wysłana, od `0` wyłącznie do `1` włącznie, w `toJson()` zawsze z częścią ułamkową, np. `1.0` także przy `rate` ustawionym jako `1`, i `0.1`; adapter, który sam koduje `toArray()`, używa `QueryBatch::JSON_FLAGS`, inaczej `1.0` staje się `1`; paczka zachowana przez kryterium ma `1.0`) i `reason` (`sample` dla paczki wylosowanej, `error`, `slow_query`, `slow_batch` albo `many_queries` dla kryterium, które ją zachowało) |
 | `queries` | array | Lista wpisów w kolejności zakończenia |
 
-`route` ma `null`, gdy żądanie skończyło się przed routingiem, np. błędem 404 w `UrlManager`, i w paczce joba wysłanej, zanim trasa procesu była znana. Metadane joba podaje aplikacja albo integracja z kolejką ([01 §5.3](01-zbieranie-danych.md#53-granice-joba)). Treść wiadomości, argumenty joba i wyjątek nigdy nie trafiają do nagłówka.
+`route` ma `null`, gdy żądanie skończyło się przed routingiem, np. błędem 404 w `UrlManager`, i w paczce joba wysłanej, zanim trasa procesu była znana. Metadane joba podaje aplikacja albo integracja z kolejką ([01 §5.3](01-zbieranie-danych.md#53-granice-joba)). Treść wiadomości, argumenty joba i wyjątek nigdy nie trafiają do nagłówka. Pierwszy przykład w [§3](#3-przykład) pochodzi z aplikacji z `user: true`, drugi z workera bez komponentu `user`.
 
 ## 2. Wpis
 
@@ -43,7 +44,7 @@ Jeden wpis to jedno polecenie faktycznie wysłane do bazy.
 ```json
 {"v":4,"app":"shop-api","type":"http","id":"req_9f3a1c2e","seq":1,
  "route":"admin/orders/order/view","job":null,
- "ts":"2026-09-22T09:41:05.312Z","host":"web-03","dropped":0,"sample":null,
+ "ts":"2026-09-22T09:41:05.312Z","host":"web-03","user":"1187","dropped":0,"sample":null,
  "queries":[
   {"db":"mysql","conn":"db","op":"select","query":"SELECT * FROM `order` WHERE `id` = ?","time_ms":2.1,"result":"success","caller":["modules/admin/modules/orders/controllers/OrderController.php:41"]},
   {"db":"mysql","conn":"db","op":"insert","query":"INSERT INTO `audit_log` (`order_id`, `action`) VALUES (?, ?)","time_ms":0.9,"result":"error","error":"23000","caller":["models/AuditLog.php:27","modules/admin/modules/orders/controllers/OrderController.php:44"]},
@@ -57,7 +58,7 @@ Nagłówek paczki joba wykonanego w workerze `yii2-queue`, druga paczka tej pró
 ```json
 {"v":4,"app":"shop-api","type":"job","id":"5be0c7d2a8f14e39","seq":2,
  "route":"queue/listen","job":{"name":"app\\jobs\\SendInvoice","queue":"queue","message_id":"42","attempt":2},
- "ts":"2026-09-22T09:41:07.004Z","host":"worker-01","dropped":0,"sample":{"rate":0.1,"reason":"sample"},"queries":[...]}
+ "ts":"2026-09-22T09:41:07.004Z","host":"worker-01","user":null,"dropped":0,"sample":{"rate":0.1,"reason":"sample"},"queries":[...]}
 ```
 
 Ta sama paczka z wpisem `result: error` przy `keepErrors: true` ma `"sample":{"rate":1.0,"reason":"error"}`.
@@ -142,7 +143,7 @@ Wartości parametrów, dokumenty, adresy URL z parametrami, dane uwierzytelniaj�
 | Pojedynczy wpis z nagłówkiem ponad `maxBatchBytes` | Wpis przepada, `dropped` rośnie | Wpis przepada, `dropped` bieżącego bufora rośnie, bez wysyłki ([01 §5.2](01-zbieranie-danych.md#52-porcjowanie)) |
 | `maxQueryLength` | [§4](#4-normalizacja) | [§4](#4-normalizacja) |
 
-Niezmiennik: JSON paczki nigdy nie przekracza `maxBatchBytes`. Kolektor liczy bajty nagłówka z bieżącymi wartościami, także `job`, z najszerszym możliwym `sample` przy ustawionym `sampling` (najdłuższy `reason` z `rate` albo `1.0`, zależnie od tego, co w JSON jest dłuższe) i z `"sample":null` bez niego, z miejscem na `seq` i `dropped` do 10 cyfr, oraz bajty każdego wpisu po serializacji. W `console` i `job` `dropped` liczy się osobno w każdej paczce. Gdy akcja wejściowa ustawiona po wpisach wydłuży nagłówek ponad limit, w HTTP przy zamknięciu kolektor usuwa wpisy od końca i dolicza je do `dropped`, a w `console` i `job` te wpisy przechodzą do następnej paczki ([01 §5.2](01-zbieranie-danych.md#52-porcjowanie)). Wpis dodany po zamknięciu kolektora jest pomijany i nie zwiększa `dropped`. W HTTP pierwszy wpis, który nie mieści się w `maxEntries` lub `maxBatchBytes`, kończy przyjmowanie: każdy następny, także krótszy, tylko zwiększa `dropped`, więc lista jest pełna do pierwszego osiągniętego limitu ([00 §6](00-przeglad-i-zakres.md#6-kryteria-sukcesu)).
+Niezmiennik: JSON paczki nigdy nie przekracza `maxBatchBytes`. Kolektor liczy bajty nagłówka z bieżącymi wartościami, także `job`, z najszerszym możliwym `sample` przy ustawionym `sampling` (najdłuższy `reason` z `rate` albo `1.0`, zależnie od tego, co w JSON jest dłuższe) i z `"sample":null` bez niego, z najdłuższym dozwolonym `user` (64 znaki ASCII) przy ustawionej opcji `user` i z `"user":null` bez niej, z miejscem na `seq` i `dropped` do 10 cyfr, oraz bajty każdego wpisu po serializacji. W `console` i `job` `dropped` liczy się osobno w każdej paczce. Gdy akcja wejściowa ustawiona po wpisach wydłuży nagłówek ponad limit, w HTTP przy zamknięciu kolektor usuwa wpisy od końca i dolicza je do `dropped`, a w `console` i `job` te wpisy przechodzą do następnej paczki ([01 §5.2](01-zbieranie-danych.md#52-porcjowanie)). Wpis dodany po zamknięciu kolektora jest pomijany i nie zwiększa `dropped`. W HTTP pierwszy wpis, który nie mieści się w `maxEntries` lub `maxBatchBytes`, kończy przyjmowanie: każdy następny, także krótszy, tylko zwiększa `dropped`, więc lista jest pełna do pierwszego osiągniętego limitu ([00 §6](00-przeglad-i-zakres.md#6-kryteria-sukcesu)).
 
 Wpis z `query` obciętym do `maxQueryLength` mieści się w `maxBatchBytes` przy wartościach początkowych, także z `caller`: trzy ścieżki, każda najwyżej 4096 bajtów (`PATH_MAX` w Linuksie), to razem około 12 KB. Ostatni wiersz tabeli dotyczy więc tylko konfiguracji z bardzo małym limitem paczki.
 
@@ -152,13 +153,14 @@ Sumy, grupy, histogramy i percentyle. Odbiorca liczy je z listy. Pełny ślad wy
 
 ## 7. Próbkowanie po stronie odbiorcy
 
-Paczka z `sample` różnym od `null` pochodzi z próby ([01 §5.6](01-zbieranie-danych.md#56-próbkowanie-paczek)). Jej waga to `1 / sample.rate`. Paczka zachowana przez kryterium ma wagę `1`, wylosowana przy `rate` `0.1` wagę `10`. Paczka z `sample: null` ma wagę `1`. Wpisy, czasy i `dropped` są prawdziwe dla tej jednej paczki i nie są skalowane przez pakiet.
+Paczka z `sample` różnym od `null` pochodzi z próby ([01 §5.6](01-zbieranie-danych.md#56-próbkowanie-paczek)). Jej waga to `1 / sample.rate`. Paczka zachowana przez kryterium ma wagę `1`, wylosowana przy `rate` `0.1` wagę `10`. Paczka z `sample: null` ma wagę `1`. Wpisy, czasy i `dropped` są prawdziwe dla tej jednej paczki i nie są skalowane przez pakiet. Tabela obejmuje też pole `user`, które nie ma wagi.
 
 Odbiorca, np. worker Cloudflare:
 
 | Wymaganie | Co to znaczy |
 |---|---|
-| Przyjmuje `v: 4` | Reguły `v: 3` i pole `sample` z tabeli [§1](#1-nagłówek), jako osobna gałąź `v: 4` w schemacie paczki, a nie tylko dodatkowe pole nagłówka. Worker, który przyjmuje tylko `v` `2` i `3`, odrzuca każdą paczkę pakietu w tej wersji, także bez próbkowania. Musi przyjmować `v: 4`, zanim aplikacja zaktualizuje pakiet |
+| Przyjmuje `v: 4` | Reguły `v: 3` i pola `user` i `sample` z tabeli [§1](#1-nagłówek), jako osobna gałąź `v: 4` w schemacie paczki, a nie tylko dodatkowe pole nagłówka. Worker, który przyjmuje tylko `v` `2` i `3`, odrzuca każdą paczkę pakietu w tej wersji, także bez próbkowania. Musi przyjmować `v: 4`, zanim aplikacja zaktualizuje pakiet |
+| Przyjmuje `user` | Tekst albo `null`, jako wymiar paczki i jej wpisów, bez wagi. `null` znaczy „nieznany”, nie „gość”: aplikacja mogła nie włączyć opcji albo nie wczytać tożsamości w tym żądaniu ([01 §5.7](01-zbieranie-danych.md#57-identyfikator-użytkownika)). Wartość to dana osobowa |
 | Odczytuje `sample.rate` | Przy każdej paczce, przed liczeniem czegokolwiek z jej wpisów |
 | Zachowuje wagę | Każdy punkt analityki wyliczony z paczki albo jej wpisu niesie `1 / sample.rate` tej paczki, bo po zapisie nie da się jej odtworzyć |
 | Waży metryki | Licznik to suma wag, suma to suma wartości razy waga, średnia to suma ważona przez sumę wag, percentyl to percentyl ważony. Gdy magazyn sam próbkuje zapisy, jak Analytics Engine z `_sample_interval`, waga zapisu to iloczyn obu: `_sample_interval × 1 / sample.rate` |

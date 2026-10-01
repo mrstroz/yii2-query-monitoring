@@ -24,6 +24,7 @@ final class QueryBatch
      * @param list<QueryEntry> $queries in order of completion
      * @param JobInfo|null $job metadata of the job attempt, null for `http` and `console`
      * @param Sample|null $sample why a sampled batch was sent, null while sampling is off (spec 01 §5.6)
+     * @param string|null $user id of the application user, null while the `user` setting is off (spec 01 §5.7)
      */
     public function __construct(
         public readonly string $app,
@@ -37,6 +38,7 @@ final class QueryBatch
         public readonly array $queries,
         public readonly ?JobInfo $job = null,
         public readonly ?Sample $sample = null,
+        public readonly ?string $user = null,
     ) {}
 
     /**
@@ -46,6 +48,14 @@ final class QueryBatch
     public function withSample(Sample $sample): self
     {
         return new self(...['sample' => $sample] + get_object_vars($this));
+    }
+
+    /**
+     * The same batch with `user` set; everything else stays as it is, like {@see self::withSample()}.
+     */
+    public function withUser(?string $user): self
+    {
+        return new self(...['user' => $user] + get_object_vars($this));
     }
 
     /**
@@ -65,6 +75,7 @@ final class QueryBatch
             'job' => $this->job?->toArray(),
             'ts' => self::formatTs($this->ts),
             'host' => $this->host,
+            'user' => $this->user,
             'dropped' => $this->dropped,
             'sample' => $this->sample?->toArray(),
             'queries' => array_map(static fn(QueryEntry $entry): array => $entry->toArray(), $this->queries),

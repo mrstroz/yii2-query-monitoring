@@ -9,9 +9,10 @@ for each command. Parameter values and documents never enter a batch.
 
 ## Status
 
-Milestone E5a: MySQL, PostgreSQL and MongoDB over HTTP requests, console commands and queue jobs, written to
-a rotated JSON Lines file or handed to an adapter you write, with optional sampling of whole batches. Batches
-use format `v: 4`; a receiver that accepts only `v: 3` rejects them, see [Sampling batches](#sampling-batches).
+Milestone E5b: MySQL, PostgreSQL and MongoDB over HTTP requests, console commands and queue jobs, written to
+a rotated JSON Lines file or handed to an adapter you write, with optional sampling of whole batches and an
+optional id of the logged-in user. Batches use format `v: 4`; a receiver that accepts only `v: 3` rejects them,
+see [Sampling batches](#sampling-batches).
 The specification (in Polish) is in [`docs/spec/`](docs/spec/).
 
 ## Requirements
@@ -65,6 +66,7 @@ return [
 | `excludedRoutes` | `[]` | Patterns not monitored, per context type: `['http' => ['health/index'], 'console' => ['queue/*'], 'job' => [...]]`. See [Excluding routes](#excluding-routes) |
 | `maxQueryLength` | `8192` | Bytes of one normalised `query`, cut with `…` |
 | `sampling` | `null` | Send only some batches to the adapter. `null` sends every batch. See [Sampling batches](#sampling-batches) |
+| `user` | `null` | Id of the logged-in user in every batch: `true` for the identity Yii already loaded, or a callable. `null` writes `"user":null`. See [Recording the user](#recording-the-user) |
 
 A monitored connection must not set its own `commandClass` or `commandMap` for its driver: the package
 measures queries by setting `commandMap` to its own `Command` class.
@@ -325,13 +327,78 @@ can stay below it.
 - **Cost.** Sampling saves sending and the receiver's work, not the cost of collecting queries in PHP: every
   query is still measured and normalised.
 
-**Format `v: 4`.** Since the header field `sample` was added, every batch has `"v":4` and `"sample"`, with
-sampling or without. A receiver that accepts only `v: 3`, such as a worker validating the version, rejects
+**Format `v: 4`.** Since the header fields `user` and `sample` were added, every batch has `"v":4`, `"user"` and
+`"sample"`, with these options or without. A receiver that accepts only `v: 3`, such as a worker validating the version, rejects
 every batch, so update it before the package. Before you turn sampling on, the receiver must weigh each batch by
 `1 / sample.rate` in counts, sums, averages and percentiles (multiplied by its own sampling factor, e.g.
 Analytics Engine's `_sample_interval`), or show clearly that its numbers describe only the sample. Accepting
 the extra field is not enough. The requirements are in
 [spec 02 §7](docs/spec/02-format-paczki.md#7-próbkowanie-po-stronie-odbiorcy).
+
+## Recording the user
+
+With `user` set, every batch carries the id of the application user in the header field `user`, so the receiver
+can tell which users run the most queries. It is off by default.
+
+```php
+'queryMonitor' => [
+    'class' => \mrstroz\querymonitoring\QueryMonitor::class,
+    'app' => 'shop-api',
+    'connections' => ['db'],
+    'user' => true,
+],
+```
+
+`true` takes the id of the identity your application has already loaded in its `user` component
+(`yii\web\User` or a subclass): `Yii::$app->user->getIdentity(false)?->getId()`. The package never loads it
+itself: no session is read or opened, no auto-login cookie is read, `findIdentity()` is not called, so it adds no
+query. A request that never touched the identity therefore has `"user":null` even when someone is logged in.
+Most applications touch it anyway, through `AccessControl`, `Yii::$app->user->isGuest` in a layout,
+`getId()` or `getIdentity()`. The value is read when the batch is sent, so a login or logout in the request
+counts. A console application usually has no `user` component, so its batches have `null` (one that sets an
+identity in its `yii\web\User` gets that id); a job run synchronously inside a web request gets that request's
+user. Any other `user` component gives `null`.
+
+To decide yourself, give a callable instead: a closure, a static method as `[UserIds::class, 'of']`, a function
+name or an invokable object. It gets the finished batch (`type`, `route`, `job`, `sample` are set, `user` is
+still `null`) and returns the id, not the identity object: an `int`, a `string`, a `Stringable` such as the
+`MongoDB\BSON\ObjectId` of a `yii2-mongodb` identity, or `null`. Any object with `__toString()` is turned into
+its string, so returning an identity model whose `__toString()` gives a login or an e-mail would write that.
+
+```php
+use mrstroz\querymonitoring\batch\QueryBatch;
+
+// A hash instead of the id. Keep the pepper secret, or a hash of a small int id is easy to reverse.
+'user' => static function (QueryBatch $batch): ?string {
+    $id = Yii::$app->has('user') ? Yii::$app->user->getIdentity(false)?->getId() : null;
+
+    return $id === null ? null : hash_hmac('sha256', (string) $id, Yii::$app->params['userIdPepper']);
+},
+```
+
+- **When.** For every batch that is sent, after `sampling` kept it: a skipped batch does not call it. A command
+  or a job calls it once per batch. Queries it runs are not recorded.
+- **Values.** An int and a `Stringable` are written as strings (`"42"`); `null` and `''` give `null`. A string
+  must be valid UTF-8 and at most 66 bytes as JSON with `QueryBatch::JSON_FLAGS`, quotes included: 64 ASCII
+  characters without `"` or `\`, enough for a UUID, a ULID, an ObjectId or a SHA-256 in hex; escaped and
+  multi-byte characters take more. A longer or invalid string, a float, a bool, an array or another object gives
+  `null`; the id is never cut.
+- **Do not load the identity in the source.** `Yii::$app->user->getId()` or `getIdentity()` without `false`
+  renews the login when the batch is sent: it reads and may open the session, extends `authTimeout`, may log the
+  user out after `absoluteAuthTimeout` or log in from the auto-login cookie with a new session id, and runs
+  `findIdentity()`, in the shutdown fallback after the headers are out. If you want the id also for requests that
+  never touch the identity, load it yourself earlier, e.g. in a `beforeAction` handler. That is your application's
+  choice, with the same effects and one query, but before the response.
+- **Failures.** An exception or a rejected value gives `"user":null` and the batch is still sent. It is logged
+  once per process with `Yii::error`, separately from the package's other errors, so a broken source does not
+  hide a failing adapter. The log never contains the returned value: a rejected value logs only the reason, and
+  an exception of the source, whatever its class, only its class name. A setting other than `null`, `true` or a
+  callable (e.g. `false`, or `[Foo::class, 'nonStaticMethod']`) disables the package, like any wrong setting.
+- **Personal data.** The id identifies a person. Return an internal id or a hash, never an e-mail or a login.
+
+The receiver reads `user` as a dimension of the batch and its entries, without a weight, and `null` as "unknown",
+not "guest" ([spec 01 §5.7](docs/spec/01-zbieranie-danych.md#57-identyfikator-użytkownika),
+[spec 02 §7](docs/spec/02-format-paczki.md#7-próbkowanie-po-stronie-odbiorcy)).
 
 ## Writing an adapter
 
