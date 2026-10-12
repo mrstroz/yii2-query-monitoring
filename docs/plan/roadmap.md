@@ -5,7 +5,7 @@
 | Pole | Wartość |
 |---|---|
 | **Etap** | E5b. Identyfikator użytkownika w paczce, 1 z 1, zakończony |
-| **Ostatnio ukończone** | [YQM-60](06b-uzytkownik.md): pole `user` w nagłówku każdej paczki `v: 4`; opcja `user` bierze identyfikator tożsamości już wczytanej przez `yii\web\User` (bez sesji i bez `findIdentity()`) albo wartość z `callable` ([ADR 0015](../adr/0015-identyfikator-uzytkownika-w-paczce.md)). Wcześniej [YQM-57..59](06a-probkowanie.md): próbkowanie całych paczek i format `v: 4` ([ADR 0014](../adr/0014-probkowanie-calych-paczek-przed-adapterem.md)). Odbiorca musi przyjmować `v: 4` z polami `user` i `sample` przed aktualizacją pakietu ([spec 02 §7](../spec/02-format-paczki.md#7-próbkowanie-po-stronie-odbiorcy)) |
+| **Ostatnio ukończone** | Wydanie `1.0.0` (2026-10-12) z `README.md` przepisanym dla użytkowników pakietu; E6 wejdzie jako kolejne wydania `1.x`. Przed nim [YQM-60](06b-uzytkownik.md): pole `user` w nagłówku każdej paczki `v: 4`; opcja `user` bierze identyfikator tożsamości już wczytanej przez `yii\web\User` (bez sesji i bez `findIdentity()`) albo wartość z `callable` ([ADR 0015](../adr/0015-identyfikator-uzytkownika-w-paczce.md)). Wcześniej [YQM-57..59](06a-probkowanie.md): próbkowanie całych paczek i format `v: 4` ([ADR 0014](../adr/0014-probkowanie-calych-paczek-przed-adapterem.md)). Odbiorca musi przyjmować `v: 4` z polami `user` i `sample` przed aktualizacją pakietu ([spec 02 §7](../spec/02-format-paczki.md#7-próbkowanie-po-stronie-odbiorcy)) |
 | **Następne** | Spisanie zadań [E6](07-wydajnosc-i-odbior.md) (wydajność i odbiór) według obowiązkowych punktów z tego pliku |
 
 Tę tabelę podmienia ten, kto kończy zadanie. To jedyne miejsce, w które trzeba zajrzeć na początku sesji.

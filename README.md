@@ -1,30 +1,60 @@
 # Yii 2 Query Monitoring
 
-Collects a flat list of the database queries run during one HTTP request, console command or queue job of a
-Yii 2 application and hands it, in batches, to an output adapter: by default a JSON Lines file, or an adapter you provide. Each
-entry has the connection, the operation, the normalised query text with literals and Yii parameters `:qpN`
-replaced by `?` and lists of values collapsed (`IN (?, ...)`, `$in:[?,...]`), the time and the result: for
-SQL the time of `PDO::prepare()` and `PDOStatement::execute()`, for MongoDB the duration the driver reports
-for each command. Parameter values and documents never enter a batch.
+[![CI](https://github.com/mrstroz/yii2-query-monitoring/actions/workflows/ci.yml/badge.svg)](https://github.com/mrstroz/yii2-query-monitoring/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/mrstroz/yii2-query-monitoring)](https://github.com/mrstroz/yii2-query-monitoring/releases)
+[![PHP](https://img.shields.io/badge/php-8.1%2B-777bb4)](https://www.php.net/)
+[![Yii](https://img.shields.io/badge/yii-2.0.55%2B-1f6fb2)](https://www.yiiframework.com/)
+[![License](https://img.shields.io/github/license/mrstroz/yii2-query-monitoring)](LICENSE)
 
-## Status
+See every database query your Yii 2 application runs in production: for each HTTP request, console command and
+queue job, with its time, its normalised text and the line of your code that ran it. MySQL, PostgreSQL and
+MongoDB end up in one flat list, written to a JSON Lines file or handed to an adapter of your own.
 
-Milestone E5b: MySQL, PostgreSQL and MongoDB over HTTP requests, console commands and queue jobs, written to
-a rotated JSON Lines file or handed to an adapter you write, with optional sampling of whole batches and an
-optional id of the logged-in user. Batches use format `v: 4`; a receiver that accepts only `v: 3` rejects them,
-see [Sampling batches](#sampling-batches).
-The specification (in Polish) is in [`docs/spec/`](docs/spec/).
+```json
+{"v":4,"app":"shop-api","type":"http","id":"9f3a1c2e5be0c7d2","seq":1,"route":"admin/orders/order/view","job":null,
+ "ts":"2026-09-22T09:41:05.312Z","host":"web-03","user":"1187","dropped":0,"sample":null,
+ "queries":[
+  {"db":"mysql","conn":"db","op":"select","query":"SELECT * FROM `order` WHERE `id` = ?","time_ms":2.1,
+   "result":"success","caller":["modules/admin/modules/orders/controllers/OrderController.php:41"]},
+  {"db":"mysql","conn":"db","op":"insert","query":"INSERT INTO `audit_log` (`order_id`, `action`) VALUES (?, ?)",
+   "time_ms":0.9,"result":"error","error":"23000","caller":["models/AuditLog.php:27","modules/admin/modules/orders/controllers/OrderController.php:44"]},
+  {"db":"mongodb","conn":"mongodb","op":"find","query":"contacts filter{externalId:?,tenantId:?} sort{updatedAt:?} limit:?",
+   "time_ms":1.3,"result":"success","caller":["components/ContactRepository.php:88"]}
+ ]}
+```
+
+## Features
+
+- **Every query, in order.** SQL and MongoDB in one list per request, command or job attempt, savepoints included.
+- **Queries you can group.** Literals and Yii's `:qp0` parameters become `?` and value lists collapse
+  (`IN (?, ...)`, `$in:[?,...]`), so the same query has the same text in every request and N+1 loops stand out.
+- **The place in your code.** Up to three frames of your application per entry, as `path:line` relative to the
+  project root.
+- **Safe for production.** It never changes a query result or a response and catches its own failures. Parameter
+  values, documents, credentials and absolute paths never enter a batch.
+- **Works out of the box.** A rotated JSON Lines file under `@runtime/logs`, or an adapter of your own.
+- **Console commands and queue jobs**, with a ready behavior for `yii2-queue`.
+- **Sampling** that still keeps every slow or failing batch, and an optional **user id**.
+
+## How it works
+
+- **SQL.** The package sets `commandMap` of each listed connection's driver to its own `Command` subclass, which
+  times `PDO::prepare()` and `PDOStatement::execute()`; Yii's profiling is not used. A hit in Yii's query cache
+  sends nothing to the database and gives no entry.
+- **MongoDB.** A command subscriber of the driver, added to the connection's `Manager`, records each command with
+  the duration the driver reports.
+- **Sending.** A request sends one batch in `EVENT_AFTER_REQUEST`, or at PHP shutdown after `exit()` or an
+  unhandled exception. A command or a job sends a batch whenever one fills up, after `flushIntervalSeconds` and at
+  its end. An exception of the package or the adapter is logged once per process with `Yii::error` (category
+  `mrstroz\querymonitoring`), loses that batch and never reaches the application.
 
 ## Requirements
 
-- PHP 8.1 or newer
-- Yii 2.0.55 or newer
-- Composer 2.1 or newer (`caller` paths are relative to the root package Composer reports)
-- PHP-FPM request model (no RoadRunner or Swoole)
-- For MongoDB only: `ext-mongodb` 2.0 or newer and `yiisoft/yii2-mongodb` 3.0.4 or newer. An application
-  without MongoDB installs the package without them
-- For the `yii2-queue` behavior only: `yiisoft/yii2-queue` 2.3.7 or newer. Any other queue uses two method
-  calls instead
+- PHP 8.1 or newer, Yii 2.0.55 or newer, Composer 2.1 or newer
+- PHP-FPM or the CLI (no RoadRunner or Swoole)
+- For MongoDB only: `ext-mongodb` 2.0+ and `yiisoft/yii2-mongodb` 3.0.4+. An application without MongoDB
+  installs the package without them.
+- For the queue behavior only: `yiisoft/yii2-queue` 2.3.7+
 
 ## Installation
 
@@ -34,8 +64,8 @@ composer require mrstroz/yii2-query-monitoring
 
 ## Configuration
 
-Register the component, list its id under `bootstrap` and name the connections to monitor. A connection
-inside a module is `module/id`. Without `adapter`, batches go to `@runtime/logs/query-monitoring.jsonl`.
+Register the component, list it under `bootstrap` and name the connections to monitor. That is the whole setup:
+batches go to `@runtime/logs/query-monitoring.jsonl`.
 
 <!-- example:sql-config -->
 ```php
@@ -56,27 +86,25 @@ return [
 | Option | Default | Meaning |
 |---|---|---|
 | `app` | required | Application name written to every batch |
-| `connections` | `[]` | Ids of `yii\db\Connection` and `yii\mongodb\Connection` components to monitor |
-| `adapter` | `null` | Class name, object implementing `BatchAdapterInterface`, or `callable(QueryBatch)`; `null` writes to a file |
-| `file` | `[]` | Settings of the file adapter, see below; ignored when `adapter` is set |
+| `connections` | `[]` | Ids of the `yii\db\Connection` and `yii\mongodb\Connection` components to monitor; `module/id` for a connection of a module |
+| `adapter` | `null` | Where batches go: a class name or an object implementing `BatchAdapterInterface`, or a `callable(QueryBatch)`. `null` writes to a file, see [File output](#file-output) |
+| `file` | `[]` | Settings of the file adapter, see [File output](#file-output). Ignored when `adapter` is set |
 | `enabled` | `true` | `false` installs nothing and sends nothing |
-| `maxEntries` | `500` | Entries per batch. HTTP counts the excess in `dropped`; a console command or a job sends the batch and starts the next one |
-| `maxBatchBytes` | `262144` | Size of the batch JSON. HTTP counts the excess in `dropped`; a console command or a job sends the batch and starts the next one |
-| `flushIntervalSeconds` | `30` | A console command or a job sends its batch at the first query after this many seconds since its last batch |
-| `excludedRoutes` | `[]` | Patterns not monitored, per context type: `['http' => ['health/index'], 'console' => ['queue/*'], 'job' => [...]]`. See [Excluding routes](#excluding-routes) |
-| `maxQueryLength` | `8192` | Bytes of one normalised `query`, cut with `…` |
-| `sampling` | `null` | Send only some batches to the adapter. `null` sends every batch. See [Sampling batches](#sampling-batches) |
-| `user` | `null` | Id of the logged-in user in every batch: `true` for the identity Yii already loaded, or a callable. `null` writes `"user":null`. See [Recording the user](#recording-the-user) |
+| `maxEntries` | `500` | Entries per batch, see [Limits](#limits) |
+| `maxBatchBytes` | `262144` | Bytes of the batch JSON (256 KB), see [Limits](#limits) |
+| `maxQueryLength` | `8192` | Bytes of one normalised `query`; a longer one is cut and ends with `…` |
+| `flushIntervalSeconds` | `30` | A command or a job sends its batch at the first query this many seconds after its previous batch |
+| `excludedRoutes` | `[]` | Requests, commands and jobs not to monitor, see [Excluding routes](#excluding-routes) |
+| `sampling` | `null` | Send only some batches, see [Sampling](#sampling) |
+| `user` | `null` | Record the id of the logged-in user, see [Recording the user](#recording-the-user) |
 
-A monitored connection must not set its own `commandClass` or `commandMap` for its driver: the package
-measures queries by setting `commandMap` to its own `Command` class.
+A monitored connection must not set its own `commandClass` or `commandMap` for its driver: the package needs that
+slot for its `Command` class. A wrong setting disables the package for the process with one `Yii::error`, and the
+application runs as without it.
 
 ### MongoDB
 
-List a `yii\mongodb\Connection` in `connections` like a SQL one. The package adds a command subscriber of
-the MongoDB driver to the connection's `Manager`, also when the connection was opened before the package
-and every time it is opened again. One batch then holds the entries of both kinds, in the order the
-commands ended:
+List a `yii\mongodb\Connection` in `connections` like a SQL one. One batch then holds the entries of both kinds:
 
 <!-- example:mongodb-config -->
 ```php
@@ -94,65 +122,122 @@ return [
 ];
 ```
 
-Each command the driver sends is one entry, `getMore` and every part of a split `insert` included; a
-`writeErrors` or `writeConcernError` in the reply makes it `result: error` with the server's code. The
-driver shares one client, and its subscribers, between connections with the same DSN, `options` and
-`driverOptions`: commands of such a connection that is not in `connections` are recorded under the listed
-one while that one has been opened in the same process, and two listed ones on one client are both
-recorded under the first. The reply of `find`, `getMore`, `aggregate` and `distinct` is not read, so a
-`writeConcernError` of an `aggregate` with `$out` or `$merge` is not an error entry.
+- Each command the driver sends is one entry, `getMore` and every part of a split `insert` included. A
+  `writeErrors` or `writeConcernError` in the reply makes it `result: error` with the server's code. The replies
+  of `find`, `getMore`, `aggregate` and `distinct` are not read, so a `writeConcernError` of an `aggregate` with
+  `$out` or `$merge` is not an error entry.
+- The driver shares one client, and its subscribers, between connections with the same DSN, `options` and
+  `driverOptions`. Commands of an unlisted connection on such a client are recorded under the listed one once that
+  one has been opened in the process, and two listed connections on one client are both recorded under the first.
 
-A wrong setting, including a wrong key of `file` when the file adapter is used, disables the package for
-the process with one `Yii::error`; the application runs as without it.
+## Batch format
 
-## The file adapter
+A batch is one JSON object, format `v: 4`. The file adapter writes it as one line.
 
-Each batch is one line of JSON appended to the file. Every key of `file` can be set on its own; the
-others keep their defaults:
+| Header field | Meaning |
+|---|---|
+| `v` | Format version, `4` |
+| `app` | The `app` option |
+| `type` | `http`, `console` or `job` |
+| `id`, `seq` | Random id (16 hex characters) of the request, command or job attempt, and the number of the batch in it, from 1 |
+| `route` | Route of the request or command, e.g. `admin/orders/order/view`; `null` when the request ended before routing, e.g. with a 404 |
+| `job` | For `type: job`: `name`, `queue`, `message_id`, `attempt`; otherwise `null` |
+| `ts`, `host` | When the batch was sent (ISO 8601, UTC) and `gethostname()` |
+| `user` | Id of the logged-in user with the [`user`](#recording-the-user) option, otherwise `null` |
+| `dropped` | Queries not stored because a limit was reached |
+| `sample` | `null`, or `{"rate":…,"reason":…}` with [`sampling`](#sampling) |
+| `queries` | Entries, in the order the queries ended |
+
+| Entry field | Meaning |
+|---|---|
+| `db` | `mysql`, `pgsql` or `mongodb` |
+| `conn` | Connection id from `connections` |
+| `op` | First SQL keyword in lower case (`select`, `insert`, `with`) or the MongoDB command name (`find`, `getMore`) |
+| `query` | Normalised text; `null` when the normaliser is not sure, e.g. on syntax it does not know |
+| `time_ms` | SQL: `prepare()` plus `execute()`, without fetching rows. MongoDB: the duration the driver reports |
+| `result`, `error` | `success` or `error`; `error` is the SQLSTATE (`"23000"`) or the MongoDB code (`"11000"`) |
+| `caller` | Up to three frames of your code as `path:line` relative to the project root, nearest first; `[]` when none is in the first 64 frames of the stack |
+
+**Normalisation.** String, number and MongoDB values become `?`; table, column, collection and field names stay,
+because they are code. Only MySQL's default `sql_mode` is supported: with `ANSI_QUOTES` or `NO_BACKSLASH_ESCAPES`
+the text is normalised wrongly. The full rules, per dialect, are in
+[spec 02 §4](https://github.com/mrstroz/yii2-query-monitoring/blob/main/docs/spec/02-format-paczki.md#4-normalizacja) (in Polish).
+
+### Limits
+
+A request stops storing entries at the first one that exceeds `maxEntries` or `maxBatchBytes`, and counts that one
+and every later query in `dropped`. A console command or a job sends the full batch instead and starts the next
+one. The batch JSON never exceeds `maxBatchBytes`, header included. The defaults hold the requests
+of a typical application whole; a request that reaches them usually has an N+1 loop worth fixing.
+
+## File output
+
+Without `adapter`, each batch is appended as one line to a file. Every key of `file` can be set on its own:
 
 | Key | Default | Meaning |
 |---|---|---|
-| `file.path` | `@runtime/logs/query-monitoring.jsonl` | File path; Yii aliases allowed. The directory is created on the first write |
-| `file.maxSize` | `10485760` | Bytes; a file that grows over it is rotated |
-| `file.maxFiles` | `5` | Rotated copies kept: `.1` is the newest, `.5` the oldest |
-| `file.fileMode` | `0664` | Mode given to the file and its `.lock` by the process that creates them |
-| `file.dirMode` | `0775` | Mode given to the directory, and to any missing parent, by the process that creates it; an inherited setgid bit is kept |
+| `path` | `@runtime/logs/query-monitoring.jsonl` | File path; Yii aliases allowed. The directory is created on the first write |
+| `maxSize` | `10485760` | Bytes (10 MB); a file that grows over it is rotated |
+| `maxFiles` | `5` | Rotated copies kept: `.1` is the newest, `.5` the oldest |
+| `fileMode` | `0664` | Mode given to the file and its `.lock` by the process that creates them |
+| `dirMode` | `0775` | Mode given to a directory the package creates; an inherited setgid bit is kept |
 
 ```php
 'queryMonitor' => [
     'class' => \mrstroz\querymonitoring\QueryMonitor::class,
     'app' => 'shop-api',
     'connections' => ['db'],
-    'file' => ['path' => '@app/runtime/monitoring/queries.jsonl'],
+    'file' => ['path' => '@app/runtime/monitoring/queries.jsonl', 'maxFiles' => 10],
 ],
 ```
 
-Writing and rotation take a non-blocking lock on `<path>.lock`. When another process holds it, the
-batch is dropped rather than making the request wait. The file must be on a local disk (no NFS). A write
-that fails, for example on a full disk or a directory without write permission, is logged once per
-process with `Yii::error` and the batch is lost.
+- **Locking.** Writing and rotation take a non-blocking lock on `<path>.lock`. When another process holds it, the
+  batch is dropped rather than making the request wait. A write that fails, e.g. on a full disk, is logged once
+  per process and the batch is lost. Use a local disk, not NFS.
+- **Rotation.** Copies move up only to the first missing one, so a failed rotation and its retry remove no copy. A
+  file already over `maxSize` is rotated before the next write; when that fails too, the batch is not appended,
+  so the file does not keep growing.
+- **Web and console as different users.** Put both users in one group and give the directory to that group with
+  the setgid bit. With the default modes the files are then writable by both, whoever created them:
 
-When the web server and console commands run as different users, put both in one group and give the
-directory to that group with the setgid bit, so every file created in it gets the group:
+  ```
+  chgrp www-data runtime/logs && chmod 2775 runtime/logs   # the console user is a member of www-data
+  ```
 
+  Do not set the sticky bit on that directory: with `fs.protected_regular` the kernel then stops one user from
+  opening the other user's files, and rotation cannot move them.
+
+## Your own adapter
+
+Set `adapter` to a class name, an object or a callable to send batches anywhere else:
+
+```php
+use mrstroz\querymonitoring\adapter\BatchAdapterInterface;
+use mrstroz\querymonitoring\batch\QueryBatch;
+
+final class HttpAdapter implements BatchAdapterInterface
+{
+    public function send(QueryBatch $batch): void
+    {
+        // $batch->toJson() is the batch as one line of JSON.
+    }
+}
 ```
-chgrp www-data runtime/logs && chmod 2775 runtime/logs   # the console user is a member of www-data
-```
 
-Do not set the sticky bit on that directory: with `fs.protected_regular`, the kernel then stops the second user
-from opening the other user's lock and data file, and rotation cannot move them.
+- Send `$batch->toJson()`, or encode `$batch->toArray()` with `QueryBatch::JSON_FLAGS`; without
+  `JSON_PRESERVE_ZERO_FRACTION` a `sample.rate` of `1.0` becomes `1`.
+- A request calls `send()` at most once, in `EVENT_AFTER_REQUEST` (before the response is sent, so a slow adapter
+  delays it: set your own timeouts) or during PHP shutdown. A command and a job call it once per batch. A request
+  without queries sends nothing.
+- An exception from `send()` never reaches the application: it is logged once per process and the batch is lost,
+  with no retry.
 
-With the default modes the file and the lock are then writable by both users, whoever created them.
-Rotation renames files, which needs write permission on the directory. Copies move up only to the first
-missing one, so a rotation that fails, and its retry, remove no copy; a file already over `maxSize` is rotated before
-the next write, and when that fails too, the batch is not appended, so the file does not keep growing.
+## Console commands and queue jobs
 
-## Console commands and jobs
-
-A console command is monitored like a request, but it may send many batches. Its batches share one `id` and
-count up in `seq` from 1. A batch is sent when it reaches `maxEntries`, before an entry that no longer fits
-in `maxBatchBytes`, at the first query after `flushIntervalSeconds`, and at the end of the command. There is
-no timer: an idle process sends nothing until its next query or its end.
+A console command is monitored like a request, but it may send many batches. They share one `id` and count up in
+`seq` from 1. A batch is sent when it reaches `maxEntries`, before an entry that would not fit in `maxBatchBytes`,
+at the first query after `flushIntervalSeconds`, and at the end of the command. There is no timer: an idle process
+sends nothing until its next query or its end.
 
 <!-- example:console-config -->
 ```php
@@ -171,15 +256,15 @@ return [
 ];
 ```
 
-A job is one attempt to run one unit of work, usually a message of a queue. It gets batches of its own,
-`type: job`, with a new `id` and `seq` from 1, and a `job` header with its class name, queue name, message
-id and attempt number, never its arguments or exception. Its queries do not appear in the batches of the
-command or request that ran it.
+A **job** is one attempt to run one unit of work, usually a queue message. It gets batches of its own,
+`type: job`, with a new `id`, `seq` from 1 and a `job` header: class name, queue name, message id and attempt
+number, never the job's arguments or exception. Its queries do not appear in the batches of the command or request
+that ran it.
 
-### Queue workers with `yii2-queue`
+### With `yii2-queue`
 
-Attach the behavior to the queue component and exclude the worker commands, whose own queries only poll
-the queue. The jobs they run are still monitored:
+Attach the behavior to the queue component and exclude the worker commands, whose own queries only poll the
+queue. The jobs they run are still monitored:
 
 <!-- example:queue-config -->
 ```php
@@ -205,18 +290,16 @@ return [
 ];
 ```
 
-The routes start with the id of the queue component: with `mailQueue` they are `mailQueue/listen` and so on.
-A pattern like `queue/*` excludes every command of that component, `queue/info` included.
-
-The behavior opens the job in `Queue::EVENT_BEFORE_EXEC` and ends it in `EVENT_AFTER_EXEC` or
-`EVENT_AFTER_ERROR`. In `isolate` mode, the default of `queue/listen` and `queue/run`, the job runs in a child
-process `queue/exec`, and the child sends the job's batches; that is why `queue/exec` is excluded too. A job
-another handler marks as `handled` gets no end event; it ends at the first monitored operation after the queue
-returns from it, also in `yii\queue\sync\Queue`, which has no worker loop. A `sync\Queue` with `handle: true`
-runs its jobs in `EVENT_AFTER_REQUEST`; when the queue component is created after the package's bootstrap (for
-example at the first `push()`), that happens after the package has finalised and their queries are not monitored.
-List the queue in `bootstrap` before `queryMonitor` to monitor them. When
-`monitor` does not name a `QueryMonitor` component, the behavior logs one `Yii::error` and monitors no jobs.
+- Worker routes start with the id of the queue component (`mailQueue/listen` for `mailQueue`); `queue/*` excludes
+  every command of the component, `queue/info` included.
+- The behavior opens a job in `Queue::EVENT_BEFORE_EXEC` and ends it in `EVENT_AFTER_EXEC` or `EVENT_AFTER_ERROR`.
+  In `isolate` mode, the default, the job runs in a child process `queue/exec`, which sends its batches; that is
+  why `queue/exec` is excluded too. A job another handler marks as `handled` ends at the first monitored operation
+  after the queue returns from it.
+- A `sync\Queue` with `handle: true` runs its jobs in `EVENT_AFTER_REQUEST`: list it in `bootstrap` before
+  `queryMonitor`, or the package may finalise first and miss them.
+- `monitor` (default `'queryMonitor'`) names the component. When it is not a `QueryMonitor`, the behavior logs one
+  `Yii::error` and monitors no jobs.
 
 ### Any other consumer
 
@@ -237,138 +320,101 @@ try {
 }
 ```
 
-Pass the message object as `scope:` to `beginJob()` as a safety net: the package keeps only a weak reference,
-and once the object is released the job ends at the latest at the next monitored operation. `endJob()` in
-`finally` stays the way to end it on time.
-
-`beginJob()` and `endJob()` never throw and never change what the job does, throws, or how the queue
-retries or acknowledges it. A handle that was already ended, or one returned while the package is disabled,
-does nothing.
+`beginJob()` and `endJob()` never throw and never change what the job does or how the queue retries it. A handle
+that was already ended, or one returned while the package is disabled, does nothing. Pass the message as `scope:`
+for a safety net: the package keeps a weak reference, and once the object is released the job ends at the next
+monitored operation.
 
 ### What to expect
 
-- **Retries.** Every attempt is a new job with a new `id`; `job.message_id` and `job.attempt` tie the attempts
-  of one message together.
-- **Nesting.** A job run synchronously inside a request, a command or another job is a child: its queries
-  belong only to it, and the parent collects again after `endJob()`. Ending a parent ends its children that
-  are still open. At most 16 contexts are open at once, the request or command included; a `beginJob()` over
-  that limit returns an inert handle, logs one `Yii::error`, and the job's queries go to the deepest open
-  context with that context's metadata, even when the job's name is excluded. A consumer that forgets `endJob()`
-  reaches the limit, so use `finally`.
-- **Idle workers.** A job sends its remainder when it ends, so nothing waits for the next message.
-- **Shutdown.** The end of the process sends what is left, also after `exit()` or an unhandled exception, and
-  ends jobs that were not ended. A fatal error in some phases or `SIGKILL` loses the unsent remainder.
-- **Several jobs at once** in one process (fibers, Swoole) are not supported.
+- **Retries.** Every attempt is a new job with a new `id`; `job.message_id` and `job.attempt` tie the attempts of
+  one message together.
+- **Nesting.** A job run synchronously inside a request, a command or another job is a child: its queries belong
+  only to it, and the parent collects again after `endJob()`. Ending a parent ends its open children. At most 16
+  contexts are open at once, the request or command included; a `beginJob()` over that limit returns an inert
+  handle, logs one `Yii::error`, and the job's queries go to the deepest open context. A consumer that forgets
+  `endJob()` reaches the limit, so use `finally`.
+- **Shutdown.** The end of the process sends what is left, also after `exit()` or an unhandled exception, and ends
+  jobs that were not ended. A fatal error in some phases or `SIGKILL` loses the unsent remainder.
+- **One job at a time.** Several jobs running at once in one process (fibers) are not supported.
 
-### Excluding routes
+## Excluding routes
 
-`excludedRoutes` has one list per context type. `http` and `console` patterns are compared with the route of
-the request or command (`health/index`, `queue/listen`, no leading `/`), `job` patterns with the job name. A
-pattern matches exactly, or as a prefix when it ends with `*`; `*` alone matches everything. Case matters. A
-request or command whose route is never known (a 404, an unknown command) is never excluded.
-
-An excluded context records nothing and sends nothing; its queries are not counted in `dropped`. Queries run
-before the route is known, in bootstrap, are held and dropped once the route turns out excluded. A job inside
-an excluded command is judged by its own name, so excluding a worker command keeps its jobs monitored.
-
-## Sampling batches
-
-With `sampling` set, the package decides for every finished batch, just before the adapter, whether to send it.
-A batch that matches an enabled diagnostic criterion is always sent. Any other batch is sent with the
-probability `rate`. A batch is sent whole or not at all. This example sends 10% of ordinary batches and every
-batch with an error, a query of at least 500 ms, 2 s of queries together, or at least 200 queries:
+`excludedRoutes` has one list of patterns per context type:
 
 ```php
-'queryMonitor' => [
-    'class' => \mrstroz\querymonitoring\QueryMonitor::class,
-    'app' => 'shop-api',
-    'connections' => ['db'],
-    'adapter' => $sendToWorker,
-    'sampling' => [
-        'rate' => 0.10,
-        'keepErrors' => true,
-        'slowQueryMs' => 500,
-        'slowBatchMs' => 2000,
-        'minQueries' => 200,
-    ],
+'excludedRoutes' => [
+    'http' => ['health/index', 'debug/*'],
+    'console' => ['queue/*', 'migrate/*'],
+    'job' => ['app\jobs\PingJob'],
+],
+```
+
+`http` and `console` patterns are compared with the route (`health/index`, no leading `/`), `job` patterns with the
+job name. A pattern matches exactly, or as a prefix when it ends with `*`; `*` alone matches everything. Case
+matters. An excluded context records and sends nothing, and its queries are not counted in `dropped`; queries run
+in bootstrap, before the route is known, are dropped once it turns out excluded. A request or command whose route
+is never known (a 404, an unknown command) is never excluded. A job inside an excluded command is judged by its own name.
+
+## Sampling
+
+With `sampling` set, the package decides for every finished batch, just before the adapter, whether to send it. A
+batch that matches an enabled criterion is always sent; any other is sent with the probability `rate`. A batch is
+sent whole or not at all. This example sends 10% of ordinary batches and every batch with an error, a query of at
+least 500 ms, 2 s of queries together, or at least 200 queries:
+
+```php
+'sampling' => [
+    'rate' => 0.10,
+    'keepErrors' => true,
+    'slowQueryMs' => 500,
+    'slowBatchMs' => 2000,
+    'minQueries' => 200,
 ],
 ```
 
 | Key | Default | Keeps a batch when |
 |---|---|---|
-| `rate` | required | Chosen by chance, with this probability from `0` to `1`, when no criterion matches |
+| `rate` | required | Drawn with this probability, from `0` to `1`, when no criterion matches |
 | `keepErrors` | `false` | An entry has `result: error` |
 | `slowQueryMs` | `null` | An entry took at least this many milliseconds |
-| `slowBatchMs` | `null` | The entries of this batch took at least this many milliseconds together |
-| `minQueries` | `null` | This batch describes at least this many queries: its entries plus `dropped` |
+| `slowBatchMs` | `null` | The entries of the batch took at least this many milliseconds together |
+| `minQueries` | `null` | The batch describes at least this many queries: its entries plus `dropped` |
 
-`false` turns `keepErrors` off and `null` turns a threshold off; no criterion is on by default. Criteria cover SQL and MongoDB entries.
-A `sampling` that is not an array or `null`, an unknown key, a missing `rate` or a value out of range disables
-the package, like any wrong setting.
-
-In HTTP, `dropped` counts every query cut by a limit, so `minQueries` above `maxEntries` still keeps a request
-that hit the limit. A command or a job splits at `maxEntries`, so a threshold above it hardly ever fires there.
-`slowBatchMs` adds up only the stored entries: the time of dropped queries is unknown, so a truncated request
-can stay below it.
-
-- **Share of batches.** More than 10% of batches reach the adapter when many of them match a criterion. With
-  `rate: 1` every batch is sent. With `rate: 0` only diagnostic batches are sent, and they cannot estimate the
-  whole traffic; `rate: 0` with no criterion is a configuration error.
-- **The choice.** It depends only on the batch `id` and `seq` (an xxh3 hash), not on time, route, host or
-  queries, so the same batch always gets the same decision.
-- **What is sent.** A sent batch keeps all its entries, their order, times, `dropped`, `id` and `seq`; only the
-  header field `sample` says `{"rate":0.1,"reason":"sample"}` for a batch chosen by chance, or
-  `{"rate":1.0,"reason":"error"}` (`slow_query`, `slow_batch`, `many_queries`) for one kept by a criterion.
-  Without `sampling` it is `null`.
-- **What is skipped.** A skipped batch never reaches the adapter. It is not an error, is not logged and does
-  not count in `dropped`. A command or a job decides every batch on its own, so `seq` may have gaps, and an
-  error later in the same command does not bring back a batch skipped before it. The count and total time of a
-  batch describe that batch, not the whole command.
-- **Cost.** Sampling saves sending and the receiver's work, not the cost of collecting queries in PHP: every
-  query is still measured and normalised.
-
-**Format `v: 4`.** Since the header fields `user` and `sample` were added, every batch has `"v":4`, `"user"` and
-`"sample"`, with these options or without. A receiver that accepts only `v: 3`, such as a worker validating the version, rejects
-every batch, so update it before the package. Before you turn sampling on, the receiver must weigh each batch by
-`1 / sample.rate` in counts, sums, averages and percentiles (multiplied by its own sampling factor, e.g.
-Analytics Engine's `_sample_interval`), or show clearly that its numbers describe only the sample. Accepting
-the extra field is not enough. The requirements are in
-[spec 02 §7](docs/spec/02-format-paczki.md#7-próbkowanie-po-stronie-odbiorcy).
+- **The header** says why a batch was sent: `"sample":{"rate":0.1,"reason":"sample"}` when drawn, or
+  `{"rate":1.0,"reason":"error"}` (`slow_query`, `slow_batch`, `many_queries`) when kept by a criterion; `null`
+  without `sampling`. A skipped batch never reaches the adapter and is not logged or counted in `dropped`.
+- **The draw** depends only on the batch `id` and `seq` (an xxh3 hash), so a batch always gets the same decision.
+  A command or a job decides each batch on its own, so its `seq` may have gaps.
+- **Criteria** see one batch: a command or a job splits at `maxEntries`, so `minQueries` above it hardly ever fires
+  there, and `slowBatchMs` adds up stored entries only.
+- **Weighting.** The receiver must weigh each batch by `1 / sample.rate` in counts, sums, averages and
+  percentiles. `rate: 0` sends diagnostic batches only; without any criterion it is a configuration error.
+- **Cost.** Sampling saves sending and the receiver's work; every query is still measured and normalised.
 
 ## Recording the user
 
 With `user` set, every batch carries the id of the application user in the header field `user`, so the receiver
-can tell which users run the most queries. It is off by default.
+can see which users run the most queries. It is off by default.
 
 ```php
-'queryMonitor' => [
-    'class' => \mrstroz\querymonitoring\QueryMonitor::class,
-    'app' => 'shop-api',
-    'connections' => ['db'],
-    'user' => true,
-],
+'user' => true,
 ```
 
-`true` takes the id of the identity your application has already loaded in its `user` component
-(`yii\web\User` or a subclass): `Yii::$app->user->getIdentity(false)?->getId()`. The package never loads it
-itself: no session is read or opened, no auto-login cookie is read, `findIdentity()` is not called, so it adds no
-query. A request that never touched the identity therefore has `"user":null` even when someone is logged in.
-Most applications touch it anyway, through `AccessControl`, `Yii::$app->user->isGuest` in a layout,
-`getId()` or `getIdentity()`. The value is read when the batch is sent, so a login or logout in the request
-counts. A console application usually has no `user` component, so its batches have `null` (one that sets an
-identity in its `yii\web\User` gets that id); a job run synchronously inside a web request gets that request's
-user. Any other `user` component gives `null`.
+`true` takes the id of the identity your application has **already loaded** in its `yii\web\User` component,
+`Yii::$app->user->getIdentity(false)?->getId()`, when the batch is sent. The package never loads it itself (no
+session, no auto-login cookie, no `findIdentity()`), so it adds no query. A request that never touched the identity
+has `"user":null`, but most do, through `AccessControl` or `Yii::$app->user->isGuest` in a layout. A console
+application without a `user` component gets `null`.
 
-To decide yourself, give a callable instead: a closure, a static method as `[UserIds::class, 'of']`, a function
-name or an invokable object. It gets the finished batch (`type`, `route`, `job`, `sample` are set, `user` is
-still `null`) and returns the id, not the identity object: an `int`, a `string`, a `Stringable` such as the
-`MongoDB\BSON\ObjectId` of a `yii2-mongodb` identity, or `null`. Any object with `__toString()` is turned into
-its string, so returning an identity model whose `__toString()` gives a login or an e-mail would write that.
+To decide yourself, give a callable. It gets the finished batch and returns the id: an `int`, a `string`, a
+`Stringable` such as a MongoDB `ObjectId`, or `null`. It runs once per sent batch, after sampling, and its own
+queries are not recorded.
 
 ```php
 use mrstroz\querymonitoring\batch\QueryBatch;
 
-// A hash instead of the id. Keep the pepper secret, or a hash of a small int id is easy to reverse.
+// A keyed hash instead of the id. Keep the pepper secret, or a hash of a small int id is easy to reverse.
 'user' => static function (QueryBatch $batch): ?string {
     $id = Yii::$app->has('user') ? Yii::$app->user->getIdentity(false)?->getId() : null;
 
@@ -376,65 +422,41 @@ use mrstroz\querymonitoring\batch\QueryBatch;
 },
 ```
 
-- **When.** For every batch that is sent, after `sampling` kept it: a skipped batch does not call it. A command
-  or a job calls it once per batch. Queries it runs are not recorded.
-- **Values.** An int and a `Stringable` are written as strings (`"42"`); `null` and `''` give `null`. A string
-  must be valid UTF-8 and at most 66 bytes as JSON with `QueryBatch::JSON_FLAGS`, quotes included: 64 ASCII
-  characters without `"` or `\`, enough for a UUID, a ULID, an ObjectId or a SHA-256 in hex; escaped and
-  multi-byte characters take more. A longer or invalid string, a float, a bool, an array or another object gives
-  `null`; the id is never cut.
-- **Do not load the identity in the source.** `Yii::$app->user->getId()` or `getIdentity()` without `false`
-  renews the login when the batch is sent: it reads and may open the session, extends `authTimeout`, may log the
-  user out after `absoluteAuthTimeout` or log in from the auto-login cookie with a new session id, and runs
-  `findIdentity()`, in the shutdown fallback after the headers are out. If you want the id also for requests that
-  never touch the identity, load it yourself earlier, e.g. in a `beforeAction` handler. That is your application's
-  choice, with the same effects and one query, but before the response.
-- **Failures.** An exception or a rejected value gives `"user":null` and the batch is still sent. It is logged
-  once per process with `Yii::error`, separately from the package's other errors, so a broken source does not
-  hide a failing adapter. The log never contains the returned value: a rejected value logs only the reason, and
-  an exception of the source, whatever its class, only its class name. A setting other than `null`, `true` or a
-  callable (e.g. `false`, or `[Foo::class, 'nonStaticMethod']`) disables the package, like any wrong setting.
-- **Personal data.** The id identifies a person. Return an internal id or a hash, never an e-mail or a login.
+- **Values.** Ints and `Stringable`s are written as strings (`"42"`); `null` and `''` give `null`. A string must be
+  valid UTF-8 and at most 66 bytes as JSON with quotes: 64 plain ASCII characters fit a UUID, an ObjectId or a
+  SHA-256 in hex. Anything longer or of another type gives `null`; the id is never cut.
+- **Do not load the identity in the callable.** `getId()` or `getIdentity()` without `false` renew the login at send
+  time, possibly after the headers are out: session, `authTimeout`, auto-login cookie, `findIdentity()`. To have
+  the id for every request, load the identity earlier yourself, e.g. in `beforeAction`.
+- **Failures.** An exception or a rejected value gives `"user":null`, and the batch is still sent. It is logged once
+  per process, without the value: only the reason or the exception class.
+- **Personal data.** The id identifies a person. Return an internal id or a hash, never an e-mail or a login, nor
+  an identity model whose `__toString()` gives one.
 
-The receiver reads `user` as a dimension of the batch and its entries, without a weight, and `null` as "unknown",
-not "guest" ([spec 01 §5.7](docs/spec/01-zbieranie-danych.md#57-identyfikator-użytkownika),
-[spec 02 §7](docs/spec/02-format-paczki.md#7-próbkowanie-po-stronie-odbiorcy)).
+## Limitations
 
-## Writing an adapter
+- PHP-FPM and CLI only: long-running HTTP servers (RoadRunner, Swoole) would need the collector reset per request.
+- Only connections from the configuration are monitored, and only when they have no `commandClass` or `commandMap`
+  of their own for their driver.
+- `begin`, `commit` and `rollback` go through PDO directly and are not recorded; savepoints are. Fetching rows is not
+  timed, and an error while reading a SQL cursor is not an entry.
+- MySQL with `ANSI_QUOTES` or `NO_BACKSLASH_ESCAPES` gets wrongly normalised `query` texts.
+- The file adapter needs a local disk: `flock` on NFS is not reliable.
+- The library sends batches and does not aggregate them: counting, grouping and dashboards belong to the receiver.
 
-Set `adapter` to send batches somewhere else instead of the file:
+## Documentation
 
-```php
-use mrstroz\querymonitoring\adapter\BatchAdapterInterface;
-use mrstroz\querymonitoring\batch\QueryBatch;
-
-final class QueueAdapter implements BatchAdapterInterface
-{
-    public function send(QueryBatch $batch): void
-    {
-        // $batch->toJson() is one line of JSON; see docs/spec/02-format-paczki.md for the format.
-    }
-}
-```
-
-Send `$batch->toJson()`, or encode `$batch->toArray()` with `QueryBatch::JSON_FLAGS`; without
-`JSON_PRESERVE_ZERO_FRACTION` a `sample.rate` of `1.0` becomes `1`.
-
-`send()` is called at most once per request, in `EVENT_AFTER_REQUEST` or, when the request ends with
-`exit()` or an unhandled exception, during PHP shutdown. A console command and a job call it once per batch,
-also while the command runs. A batch skipped by `sampling` never reaches it. A request without queries sends nothing. In the
-normal path the call happens before the response is sent, so a slow adapter delays it; the adapter is
-responsible for its own timeouts.
-
-An exception from the adapter, or from the package itself, never reaches the application: it is logged
-once per process with `Yii::error` (category `mrstroz\querymonitoring`) and the batch is lost. Queries
-the adapter runs are not recorded.
+The specification and the architecture decisions, in Polish, are in
+[`docs/`](https://github.com/mrstroz/yii2-query-monitoring/tree/main/docs): what the package collects
+([spec 01](https://github.com/mrstroz/yii2-query-monitoring/blob/main/docs/spec/01-zbieranie-danych.md)), the batch
+format ([spec 02](https://github.com/mrstroz/yii2-query-monitoring/blob/main/docs/spec/02-format-paczki.md)) and the
+adapters ([spec 03](https://github.com/mrstroz/yii2-query-monitoring/blob/main/docs/spec/03-adaptery-wyjsciowe.md)).
 
 ## Development
 
-Everything runs in the package's Docker image, with MySQL 8, PostgreSQL 16 and MongoDB 7 started by
-`docker-compose.yml`. Once per checkout, set your user and group ids so files created in the container
-belong to you:
+Everything runs in the package's Docker image, with MySQL 8, PostgreSQL 16 and MongoDB 7 from
+`docker-compose.yml`. Once per checkout, set your user and group ids so files created in the container belong to
+you:
 
 ```
 cp .env.dist .env    # then set UID and GID to the output of `id -u` and `id -g`
@@ -449,23 +471,14 @@ docker compose run --rm php composer stan   # PHPStan, level 8
 docker compose run --rm php composer cs     # PHP CS Fixer, dry run
 ```
 
-A skipped test fails the run, so `composer test` without the databases is red, not silently green
-(PHPUnit still prints "OK, but some tests were skipped!", with exit code 1). GitHub Actions runs the
-same checks against the same database images.
-
-### Test application
-
-`tests/app/` is a small Yii application with Active Record and a capturing adapter. The integration
-tests run it in a separate PHP process per request, like one PHP-FPM request. To play one request by
-hand, after `composer test` has created the `qm_order` table:
+A skipped test fails the run, so `composer test` without the databases is red. `tests/app/` is a small Yii
+application that the integration tests run in a separate PHP process per request. To play one request by hand once
+`composer test` has created the `qm_order` table (`QM_DB` is `mysql` or `pgsql`, `QM_COMPONENT` takes JSON merged into the component configuration):
 
 ```
 docker compose run --rm -e QM_ROUTE=order/index -e QM_DB=pgsql -e QM_CAPTURE_FILE=/tmp/batch.jsonl \
     php sh -c 'php tests/app/web/index.php && echo && cat /tmp/batch.jsonl'
 ```
-
-It prints the response and then the batch the adapter received. `QM_DB` is `mysql` or `pgsql`;
-`QM_COMPONENT` takes JSON merged into the component configuration, e.g. `'{"enabled": false}'`.
 
 ## License
 

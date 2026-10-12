@@ -4,6 +4,7 @@
 /tests export-ignore
 /.gitattributes export-ignore
 /.gitignore export-ignore
+/CLAUDE.md export-ignore
 /.php-cs-fixer.dist.php export-ignore
 /docker-compose.yml export-ignore
 /phpstan.neon.dist export-ignore
