@@ -37,6 +37,15 @@ These three scripts are the plan's definition of done; keep their names. Do not 
 
 Commit messages in English with the task id: `feat: YQM-5 measured Command class`.
 
+## Releases
+
+The package is on Packagist (`mrstroz/yii2-query-monitoring`). A GitHub webhook updates it on every push, so a new tag shows up in Composer within a minute; nothing is uploaded by hand. Applications install it with `^1.0`, so every change that reaches them needs a release:
+
+- An annotated tag on `main` without a `v` prefix (`1.0.0`, `1.1.0`), pushed with `git push origin <tag>` after CI on that commit is green, then a GitHub release with notes in English (`gh release create <tag> --verify-tag --notes-file …`).
+- Semantic versioning: patch for fixes, minor for new options or behaviour that keep existing configurations and the batch format working, major for anything that breaks a configuration, the public API or the batch format a receiver reads (a new `v` that old receivers reject).
+- A pushed tag is never moved or deleted; a mistake gets the next patch version.
+- Tag and publish only when the user asks.
+
 ## Architecture constraints that shape the code
 
 These come from the ADRs and are easy to violate by accident:
